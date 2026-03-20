@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
-project(PlanetarySystem)
+project(GameEngine)
 
 set(CMAKE_CXX_STANDARD 17)
-set(PROJECT_NAME "PlanetarySystem")
+set(PROJECT_NAME "GameEngine")
 
 # Find dependencies
 find_package(glfw3 3.3 REQUIRED)
@@ -34,8 +34,8 @@ target_include_directories(${PROJECT_NAME}
       )
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
-    target_compile_options(${PROJECT_NAME} PRIVATE -fsanitize=address)
-    target_link_options(${PROJECT_NAME} PRIVATE -fsanitize=address)
+  target_compile_options(${PROJECT_NAME} PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(${PROJECT_NAME} PRIVATE -fsanitize=address)
 endif()
 
 # Platform-specific settings

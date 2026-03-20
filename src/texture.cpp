@@ -1,9 +1,10 @@
-#include "texture.h"
+#include "texture.hpp"
 
 Texture2D::Texture2D()
     : ID(0), Width(0), Height(0), Internal_Format(GL_RGB), Image_Format(GL_RGB),
       Wrap_S(GL_CLAMP_TO_EDGE), Wrap_T(GL_CLAMP_TO_EDGE),
-      Filter_Min(GL_LINEAR_MIPMAP_LINEAR), Filter_Max(GL_LINEAR) {}
+      Filter_Min(GL_LINEAR_MIPMAP_LINEAR), Filter_Max(GL_LINEAR) {
+}
 
 void Texture2D::Generate(unsigned int width, unsigned int height,
                          unsigned char *data) {

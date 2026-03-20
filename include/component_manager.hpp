@@ -1,6 +1,7 @@
 #pragma once
 #include "component_array.hpp"
 #include "entity.hpp"
+#include <iostream>
 #include <memory>
 #include <unordered_map>
 
@@ -10,8 +11,6 @@ private:
   std::unordered_map<const char *, std::shared_ptr<IComponentArray>>
       componentArrays;
   ComponentTypeID nextComponentType;
-
-  template <typename T> std::shared_ptr<ComponentArray<T>> GetComponentArray();
 
 public:
   ComponentManager() : nextComponentType(0) {
@@ -48,6 +47,19 @@ public:
 
   template <typename T> T &GetComponent(EntityID entity) {
     return GetComponentArray<T>()->GetData(entity);
+  }
+
+  template <typename T> std::shared_ptr<ComponentArray<T>> GetComponentArray() {
+    const char *typeName = typeid(T).name();
+
+    if (componentTypes.find(typeName) == componentTypes.end()) {
+      std::cerr << "Component " << typeName << " not registered before use. "
+                << std::endl;
+      exit(EXIT_FAILURE);
+    }
+
+    return std::static_pointer_cast<ComponentArray<T>>(
+        componentArrays[typeName]);
   }
 
   void EntityDestroyed(EntityID entity) {

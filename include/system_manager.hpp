@@ -1,36 +1,42 @@
 #pragma once
 #include "entity.hpp"
+#include "system.hpp"
 #include <assert.h>
 #include <memory>
-#include <set>
 #include <unordered_map>
-
-class System {
-public:
-  std::set<EntityID> entities;
-};
+#include <vector>
 
 class SystemManager {
 private:
-  std::unordered_map<const char *, std::shared_ptr<System>> systems;
+  std::vector<std::pair<const char *, std::shared_ptr<System>>> systems;
   std::unordered_map<const char *, Signature> systemSignatures;
 
+  size_t find(const char *typeName) {
+    for (size_t i = 0; i < systems.size(); ++i) {
+      if (systems[i].first == typeName) {
+        return i;
+      }
+    }
+    return systems.size();
+  }
+
 public:
-  template <typename T> std::shared_ptr<T> RegisterSystem() {
+  template <typename T> std::shared_ptr<T> RegisterSystem(World &world) {
     const char *typeName = typeid(T).name();
 
-    assert(systems.find(typeName) == systems.end() &&
+    assert(find(typeName) == systems.size() &&
            "Registering system more than once.");
 
     auto system = std::make_shared<T>();
-    systems.insert({typeName, system});
+    system->Init(world);
+    systems.emplace_back(typeName, system);
     return system;
   }
 
   template <typename T> void SetSignature(Signature signature) {
     const char *typeName = typeid(T).name();
 
-    assert(systems.find(typeName) != systems.end() &&
+    assert(find(typeName) != systems.size() &&
            "System used before registered.");
 
     systemSignatures.insert({typeName, signature});
@@ -55,6 +61,13 @@ public:
       } else {
         system->entities.erase(entity);
       }
+    }
+  }
+
+  void UpdateAll(float deltaTime) {
+    for (auto const &pair : systems) {
+      auto const &system = pair.second;
+      system->Update(deltaTime);
     }
   }
 };

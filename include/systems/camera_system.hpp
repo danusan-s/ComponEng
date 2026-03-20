@@ -1,7 +1,7 @@
 #pragma once
 #include "system.hpp"
 
-class OpenGLRenderSystem : public System {
+class CameraSystem : public System {
 public:
   void Update(float deltaTime) override;
 };

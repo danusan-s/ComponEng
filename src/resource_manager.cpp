@@ -66,12 +66,6 @@ void ResourceManager::Clear() {
 
   std::cout << "Textures deleted successfully" << std::endl;
 
-  std::cout << "Attempting to delete cubemaps" << std::endl;
-  // (properly) delete all cubemaps
-  for (auto iter : Cubemaps)
-    glDeleteTextures(1, &iter.second.ID);
-  std::cout << "Cubemaps deleted successfully" << std::endl;
-
   std::cout << "Attempting to delete models" << std::endl;
   // (properly) delete all models
   for (auto iter : Models) {

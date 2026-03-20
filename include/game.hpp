@@ -7,5 +7,8 @@ public:
   void Run();
 
 private:
+  void InitSystems();
+  void InitObjects();
+  void InitComponents();
   World world;
 };

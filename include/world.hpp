@@ -11,6 +11,8 @@ private:
   std::unique_ptr<SystemManager> systemManager;
 
 public:
+  EntityID cameraEntity;
+
   void Init() {
     componentManager = std::make_unique<ComponentManager>();
     entityManager = std::make_unique<EntityManager>();
@@ -55,15 +57,23 @@ public:
     return componentManager->GetComponent<T>(entity);
   }
 
+  template <typename T> std::shared_ptr<ComponentArray<T>> GetComponentArray() {
+    return componentManager->GetComponentArray<T>();
+  }
+
   template <typename T> ComponentTypeID GetComponentType() {
     return componentManager->GetComponentType<T>();
   }
 
   template <typename T> std::shared_ptr<T> RegisterSystem() {
-    return systemManager->RegisterSystem<T>();
+    return systemManager->RegisterSystem<T>(*this);
   }
 
   template <typename T> void SetSystemSignature(Signature signature) {
     systemManager->SetSignature<T>(signature);
+  }
+
+  void Update(float deltaTime) {
+    systemManager->UpdateAll(deltaTime);
   }
 };

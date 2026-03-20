@@ -1,12 +1,17 @@
 #include "game.hpp"
+#include "entity.hpp"
 #include "resource_manager.hpp"
 #include "utils.hpp"
 #include <GLFW/glfw3.h>
 #include <random>
 
-#include "components/material.hpp"
-#include "components/mesh.hpp"
-#include "components/transform.hpp"
+#include "components/camera_component.hpp"
+#include "components/input_component.hpp"
+#include "components/material_component.hpp"
+#include "components/mesh_component.hpp"
+#include "components/rigidbody_component.hpp"
+#include "components/transform_component.hpp"
+#include "systems/camera_system.hpp"
 #include "systems/render_system.hpp"
 
 void Game::Init() {
@@ -16,16 +21,64 @@ void Game::Init() {
       Utils::GetAssetPath("shaders/diffuse.vert").c_str(),
       Utils::GetAssetPath("shaders/diffuse.frag").c_str(), nullptr, "default");
 
+  ResourceManager::LoadTexture(
+      Utils::GetAssetPath("textures/white.png").c_str(), false, "white");
+
   ResourceManager::LoadModel(Utils::GetAssetPath("models/cube.obj").c_str(),
                              "cube");
 
-  world.RegisterComponent<Transform>();
-  world.RegisterComponent<Mesh>();
-  world.RegisterComponent<Material>();
+  InitComponents();
+  InitSystems();
+  InitObjects();
 }
 
-void InitObjects(World &world) {
-  std::vector<EntityID> entities(MAX_ENTITIES);
+void Game::InitComponents() {
+  world.RegisterComponent<TransformComponent>();
+  world.RegisterComponent<MeshComponent>();
+  world.RegisterComponent<MaterialComponent>();
+  world.RegisterComponent<CameraComponent>();
+  world.RegisterComponent<MouseInputComponent>();
+  world.RegisterComponent<RigidBodyComponent>();
+  world.RegisterComponent<InputComponent>();
+}
+
+void Game::InitSystems() {
+  auto cameraSystem = world.RegisterSystem<CameraSystem>();
+  Signature cameraSignature;
+  cameraSignature.set(world.GetComponentType<TransformComponent>());
+  cameraSignature.set(world.GetComponentType<CameraComponent>());
+  cameraSignature.set(world.GetComponentType<InputComponent>());
+  world.SetSystemSignature<CameraSystem>(cameraSignature);
+
+  auto renderSystem = world.RegisterSystem<OpenGLRenderSystem>();
+  Signature renderSignature;
+  renderSignature.set(world.GetComponentType<TransformComponent>());
+  renderSignature.set(world.GetComponentType<MeshComponent>());
+  renderSignature.set(world.GetComponentType<MaterialComponent>());
+  world.SetSystemSignature<OpenGLRenderSystem>(renderSignature);
+}
+
+void Game::InitObjects() {
+  EntityID cameraEntity = world.CreateEntity();
+  world.AddComponent(cameraEntity,
+                     TransformComponent{.position = Vec3(0.0f, 0.0f, 5.0f),
+                                        .rotation = Vec3(0.0f, 0.0f, 0.0f),
+                                        .scale = Vec3(1.0f)});
+  world.AddComponent(cameraEntity, CameraComponent{.fov = 45.0f,
+                                                   .aspectRatio = 16.0f / 9.0f,
+                                                   .nearPlane = 0.1f,
+                                                   .farPlane = 100.0f,
+                                                   .isMainCamera = true});
+  world.AddComponent(cameraEntity, InputComponent{.forward = false,
+                                                  .backward = false,
+                                                  .left = false,
+                                                  .right = false,
+                                                  .jump = false,
+                                                  .crouch = false});
+  world.AddComponent(cameraEntity, MouseInputComponent{.deltaX = 0.0f,
+                                                       .deltaY = 0.0f,
+                                                       .leftButton = false,
+                                                       .rightButton = false});
 
   std::default_random_engine generator;
   std::uniform_real_distribution<float> randPosition(-100.0f, 100.0f);
@@ -36,25 +89,28 @@ void InitObjects(World &world) {
   float scale = randScale(generator);
 
   const Model &cubeModel = ResourceManager::GetModel("cube");
-  for (auto &entity : entities) {
-    entity = world.CreateEntity();
+  for (int i = 0; i < 100; ++i) {
+    EntityID entity = world.CreateEntity();
+
+    world.AddComponent(entity,
+                       MeshComponent{.VAO = cubeModel.VAO,
+                                     .VBO = cubeModel.VBO,
+                                     .EBO = cubeModel.EBO,
+                                     .indexCount = cubeModel.indices.size()});
 
     world.AddComponent(
         entity,
-        Mesh{.VAO = cubeModel.VAO, .VBO = cubeModel.VBO, .EBO = cubeModel.EBO});
-
-    gCoordinator.AddComponent(
-        entity, RigidBody{.velocity = Vec3(0.0f, 0.0f, 0.0f),
-                          .acceleration = Vec3(0.0f, 0.0f, 0.0f)});
-
-    gCoordinator.AddComponent(
-        entity,
-        Transform{
+        TransformComponent{
             .position = Vec3(randPosition(generator), randPosition(generator),
                              randPosition(generator)),
             .rotation = Vec3(randRotation(generator), randRotation(generator),
                              randRotation(generator)),
-            .scale = Vec3(scale, scale, scale)});
+            .scale = Vec3(scale)});
+
+    world.AddComponent(entity,
+                       MaterialComponent{.color = Vec3(0.5f, 0.5f, 0.5f),
+                                         .textureName = "white",
+                                         .shaderName = "default"});
   }
 }
 
@@ -69,12 +125,6 @@ void Game::Run() {
   const float timeStep = 1 / 60.0f;
 
   auto window = glfwGetCurrentContext();
-  auto renderSystem = world.RegisterSystem<OpenGLRenderSystem>();
-  Signature renderSignature;
-  renderSignature.set(world.GetComponentType<Transform>());
-  renderSignature.set(world.GetComponentType<Mesh>());
-  renderSignature.set(world.GetComponentType<Material>());
-  world.SetSystemSignature<OpenGLRenderSystem>(renderSignature);
 
   while (!glfwWindowShouldClose(window)) {
     float currentFrame = glfwGetTime();
@@ -83,15 +133,20 @@ void Game::Run() {
     accumulatedTime += deltaTime;
 
     while (accumulatedTime >= timeStep) {
-      // Update game logic here (e.g., physics, input handling)
+      // Fixed step loop
       accumulatedTime -= timeStep;
     }
 
-    // Render the scene
-    renderSystem->Render();
+    world.Update(deltaTime);
 
-    // Swap buffers and poll events
     glfwSwapBuffers(window);
     glfwPollEvents();
+
+    while (GLenum err = glGetError()) {
+      std::cerr << "OpenGL error: " << err << std::endl;
+    }
   }
+
+  glfwDestroyWindow(window);
+  glfwTerminate();
 }

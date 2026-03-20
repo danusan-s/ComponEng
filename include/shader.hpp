@@ -4,8 +4,7 @@
 #include <string>
 
 #include "glad/glad.h"
-#include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
+#include "types.hpp"
 
 // General purpose shader object. Compiles from file, generates
 // compile/link-time error messages and hosts several utility
@@ -28,17 +27,17 @@ public:
   void SetInteger(const char *name, int value, bool useShader = false) const;
   void SetVector2f(const char *name, float x, float y,
                    bool useShader = false) const;
-  void SetVector2f(const char *name, const glm::vec2 &value,
+  void SetVector2f(const char *name, const Vec2 &value,
                    bool useShader = false) const;
   void SetVector3f(const char *name, float x, float y, float z,
                    bool useShader = false) const;
-  void SetVector3f(const char *name, const glm::vec3 &value,
+  void SetVector3f(const char *name, const Vec3 &value,
                    bool useShader = false) const;
   void SetVector4f(const char *name, float x, float y, float z, float w,
                    bool useShader = false) const;
-  void SetVector4f(const char *name, const glm::vec4 &value,
+  void SetVector4f(const char *name, const Vec4 &value,
                    bool useShader = false) const;
-  void SetMatrix4(const char *name, const glm::mat4 &matrix,
+  void SetMatrix4(const char *name, const Mat4 &matrix,
                   bool useShader = false) const;
 
 private:

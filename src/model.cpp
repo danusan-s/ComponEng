@@ -1,4 +1,4 @@
-#include "model.h"
+#include "model.hpp"
 #include <array>
 #include <iostream>
 #include <sstream>

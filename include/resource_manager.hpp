@@ -6,9 +6,9 @@
 
 #include "glad/glad.h"
 
-#include "model.h"
-#include "shader.h"
-#include "texture.h"
+#include "model.hpp"
+#include "shader.hpp"
+#include "texture.hpp"
 
 // A static singleton ResourceManager class that hosts several
 // functions to load Textures and Shaders. Each loaded texture
