@@ -6,7 +6,7 @@
 #include <GLFW/glfw3.h>
 
 static constexpr float DEFAULT_MOVE_SPEED = 10.0f;
-static constexpr float MOUSE_SENSITIVITY = 0.1f;
+static constexpr float MOUSE_SENSITIVITY = 0.5f;
 static constexpr float PITCH_LIMIT = 89.0f;
 
 static void UpdateCameraVectors(const TransformComponent &transform,

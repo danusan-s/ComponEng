@@ -76,4 +76,8 @@ public:
   void Update(float deltaTime) {
     systemManager->UpdateAll(deltaTime);
   }
+
+  void Shutdown() {
+    systemManager->ShutdownAll();
+  }
 };

@@ -12,7 +12,9 @@
 #include "components/rigidbody_component.hpp"
 #include "components/transform_component.hpp"
 #include "systems/camera_system.hpp"
+#include "systems/input_system.hpp"
 #include "systems/render_system.hpp"
+#include "systems/ui_system.hpp"
 
 void Game::Init() {
   world.Init();
@@ -43,6 +45,12 @@ void Game::InitComponents() {
 }
 
 void Game::InitSystems() {
+  auto inputSystem = world.RegisterSystem<InputSystem>();
+  Signature inputSignature;
+  inputSignature.set(world.GetComponentType<InputComponent>());
+  inputSignature.set(world.GetComponentType<MouseInputComponent>());
+  world.SetSystemSignature<InputSystem>(inputSignature);
+
   auto cameraSystem = world.RegisterSystem<CameraSystem>();
   Signature cameraSignature;
   cameraSignature.set(world.GetComponentType<TransformComponent>());
@@ -56,6 +64,12 @@ void Game::InitSystems() {
   renderSignature.set(world.GetComponentType<MeshComponent>());
   renderSignature.set(world.GetComponentType<MaterialComponent>());
   world.SetSystemSignature<OpenGLRenderSystem>(renderSignature);
+
+  auto uiSystem = world.RegisterSystem<UISystem>();
+  Signature uiSignature;
+  uiSignature.set(world.GetComponentType<TransformComponent>());
+  uiSignature.set(world.GetComponentType<CameraComponent>());
+  world.SetSystemSignature<UISystem>(uiSignature);
 }
 
 void Game::InitObjects() {
@@ -67,7 +81,7 @@ void Game::InitObjects() {
   world.AddComponent(cameraEntity, CameraComponent{.fov = 45.0f,
                                                    .aspectRatio = 16.0f / 9.0f,
                                                    .nearPlane = 0.1f,
-                                                   .farPlane = 100.0f,
+                                                   .farPlane = 1000.0f,
                                                    .isMainCamera = true});
   world.AddComponent(cameraEntity, InputComponent{.forward = false,
                                                   .backward = false,
@@ -149,4 +163,9 @@ void Game::Run() {
 
   glfwDestroyWindow(window);
   glfwTerminate();
+}
+
+void Game::Shutdown() {
+  world.Shutdown();
+  ResourceManager::Clear();
 }

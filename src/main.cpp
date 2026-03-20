@@ -1,19 +1,11 @@
 #include "game.hpp"
 #include "glad/glad.h"
-#include "resource_manager.hpp"
 
 #include <GLFW/glfw3.h>
 
 #include <iostream>
 
-// GLFW function declarations
 void letterbox_viewport(int windowWidth, int windowHeight);
-void framebuffer_size_callback(GLFWwindow *window, int width, int height);
-void key_callback(GLFWwindow *window, int key, int scancode, int action,
-                  int mode);
-void mouse_button_callback(GLFWwindow *window, int button, int action,
-                           int mods);
-void mouse_callback(GLFWwindow *window, double xposIn, double yposIn);
 
 // The Width of the screen
 // Modify only width if you want to change size
@@ -55,14 +47,15 @@ int main(int argc, char *argv[]) {
   glEnable(GL_SCISSOR_TEST);
   glEnable(GL_BLEND);
 
-  glfwSetKeyCallback(window, key_callback);
-  glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-  glfwSetMouseButtonCallback(window, mouse_button_callback);
-  glfwSetCursorPosCallback(window, mouse_callback);
-  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+  glfwSetFramebufferSizeCallback(window,
+                                 [](GLFWwindow *window, int width, int height) {
+                                   letterbox_viewport(width, height);
+                                 });
 
   letterbox_viewport(INIT_SCREEN_WIDTH, INIT_SCREEN_HEIGHT);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
   // initialize game
   // ---------------
@@ -70,22 +63,7 @@ int main(int argc, char *argv[]) {
 
   gameObj.Run();
 
-  ResourceManager::Clear();
   return 0;
-}
-
-void key_callback(GLFWwindow *window, int key, int scancode, int action,
-                  int mode) {
-  // // when a user presses the escape key, we set the WindowShouldClose
-  // property
-  // // to true, closing the application
-  // if (key >= 0 && key < 1024) {
-  //   if (action == GLFW_PRESS)
-  //     engineObj.inputState.keys[key] = true;
-  //   else if (action == GLFW_RELEASE)
-  //     engineObj.inputState.keys[key] = false;
-  // }
-  return;
 }
 
 void letterbox_viewport(int windowWidth, int windowHeight) {
@@ -104,27 +82,4 @@ void letterbox_viewport(int windowWidth, int windowHeight) {
   int yOffset = (windowHeight - newHeight) / 2;
   glScissor(0, yOffset, windowWidth, newHeight);
   glViewport(0, yOffset, windowWidth, newHeight);
-}
-
-void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
-  // make sure the viewport matches the new window dimensions; note that width
-  // and height will be significantly larger than specified on retina displays.
-  letterbox_viewport(width, height);
-}
-
-void mouse_button_callback(GLFWwindow *window, int button, int action,
-                           int mods) {
-  // if (button >= 0 && button < 8) {
-  //   engineObj.inputState.mouseButtons[button] = (action == GLFW_PRESS);
-  // }
-  return;
-}
-
-void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
-  float xpos = static_cast<float>(xposIn);
-  float ypos = static_cast<float>(yposIn);
-
-  // engineObj.inputState.mouseX = xpos;
-  // engineObj.inputState.mouseY = ypos;
-  return;
 }

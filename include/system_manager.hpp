@@ -70,4 +70,11 @@ public:
       system->Update(deltaTime);
     }
   }
+
+  void ShutdownAll() {
+    for (auto const &pair : systems) {
+      auto const &system = pair.second;
+      system->Shutdown();
+    }
+  }
 };

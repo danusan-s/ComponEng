@@ -5,6 +5,7 @@ class Game {
 public:
   void Init();
   void Run();
+  void Shutdown();
 
 private:
   void InitSystems();
