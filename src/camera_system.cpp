@@ -4,6 +4,7 @@
 #include "components/transform_component.hpp"
 #include "world.hpp"
 #include <GLFW/glfw3.h>
+#include <cmath>
 
 static constexpr float DEFAULT_MOVE_SPEED = 10.0f;
 static constexpr float MOUSE_SENSITIVITY = 0.5f;
@@ -70,7 +71,13 @@ void CameraSystem::Update(float deltaTime) {
     auto &mouseInput = world->GetComponent<MouseInputComponent>(entity);
 
     ProcessKeyboardInput(transform, input, deltaTime, DEFAULT_MOVE_SPEED);
-    ProcessMouseInput(transform, mouseInput, MOUSE_SENSITIVITY);
+
+    smoothedMouseDelta =
+        mix(smoothedMouseDelta, Vec2(mouseInput.deltaX, mouseInput.deltaY),
+            1.0f - SMOOTHING);
+    ProcessMouseInput(
+        transform, {smoothedMouseDelta.x, smoothedMouseDelta.y, false, false},
+        MOUSE_SENSITIVITY);
 
     Vec3 front, right, up;
     UpdateCameraVectors(transform, front, right, up);

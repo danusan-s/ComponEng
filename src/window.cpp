@@ -3,6 +3,8 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
+static bool mouseLocked = true;
+
 static void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
   float targetAspectRatio = 16.0f / 9.0f;
   float currentAspectRatio = static_cast<float>(width) / height;
@@ -28,12 +30,28 @@ static void KeyCallback(GLFWwindow *window, int key, int scancode, int action,
   if (!inputState)
     return;
 
+  if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
+    if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED) {
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+      mouseLocked = false;
+    } else {
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+      mouseLocked = true;
+    }
+  }
+
+  if (!mouseLocked)
+    return;
+
   if (key >= 0 && key < 1024) {
     if (action == GLFW_PRESS)
       inputState->keys[key] = true;
     else if (action == GLFW_RELEASE)
       inputState->keys[key] = false;
   }
+
+  if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+    glfwSetWindowShouldClose(window, true);
 }
 
 static void MouseButtonCallback(GLFWwindow *window, int button, int action,
@@ -41,6 +59,9 @@ static void MouseButtonCallback(GLFWwindow *window, int button, int action,
   auto *inputState =
       static_cast<InputState *>(glfwGetWindowUserPointer(window));
   if (!inputState)
+    return;
+
+  if (!mouseLocked)
     return;
 
   if (button >= 0 && button < 8) {
@@ -54,6 +75,11 @@ static void CursorPosCallback(GLFWwindow *window, double xposIn,
       static_cast<InputState *>(glfwGetWindowUserPointer(window));
   if (!inputState)
     return;
+
+  if (!mouseLocked) {
+    inputState->firstMouse = true; // reset mouse state when unlocking
+    return;
+  }
 
   float xpos = static_cast<float>(xposIn);
   float ypos = static_cast<float>(yposIn);
