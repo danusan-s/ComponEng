@@ -4,8 +4,6 @@
 #include <map>
 #include <string>
 
-#include "glad/glad.h"
-
 #include "model.hpp"
 #include "shader.hpp"
 #include "texture.hpp"

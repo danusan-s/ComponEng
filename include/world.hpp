@@ -1,6 +1,7 @@
 #pragma once
 #include "component_manager.hpp"
 #include "entity_manager.hpp"
+#include "input_state.hpp"
 #include "system_manager.hpp"
 #include <memory>
 
@@ -11,12 +12,15 @@ private:
   std::unique_ptr<SystemManager> systemManager;
 
 public:
+  // Global cache
   EntityID cameraEntity;
+  InputState *inputState;
 
-  void Init() {
+  void Init(InputState *inputState) {
     componentManager = std::make_unique<ComponentManager>();
     entityManager = std::make_unique<EntityManager>();
     systemManager = std::make_unique<SystemManager>();
+    this->inputState = inputState;
   }
 
   EntityID CreateEntity() {

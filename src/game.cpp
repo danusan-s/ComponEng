@@ -17,7 +17,8 @@
 #include "systems/ui_system.hpp"
 
 void Game::Init() {
-  world.Init();
+  window.Init(1280, 720, "ECS Game", inputState);
+  world.Init(&inputState);
 
   ResourceManager::LoadShader(
       Utils::GetAssetPath("shaders/diffuse.vert").c_str(),
@@ -129,43 +130,27 @@ void Game::InitObjects() {
 }
 
 void Game::Run() {
-  // deltaTime variables
-  // -------------------
   float deltaTime = 0.0f;
   float lastFrame = 0.0f;
-  float accumulatedTime = 0.0f;
 
-  //  240 fps simulation
-  const float timeStep = 1 / 60.0f;
-
-  auto window = glfwGetCurrentContext();
-
-  while (!glfwWindowShouldClose(window)) {
+  while (!window.ShouldClose()) {
     float currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
-    accumulatedTime += deltaTime;
-
-    while (accumulatedTime >= timeStep) {
-      // Fixed step loop
-      accumulatedTime -= timeStep;
-    }
 
     world.Update(deltaTime);
 
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+    window.SwapBuffers();
+    window.PollEvents();
 
     while (GLenum err = glGetError()) {
       std::cerr << "OpenGL error: " << err << std::endl;
     }
   }
-
-  glfwDestroyWindow(window);
-  glfwTerminate();
 }
 
 void Game::Shutdown() {
   world.Shutdown();
   ResourceManager::Clear();
+  window.Shutdown();
 }

@@ -1,4 +1,6 @@
 #pragma once
+#include "input_state.hpp"
+#include "window.hpp"
 #include "world.hpp"
 
 class Game {
@@ -11,5 +13,8 @@ private:
   void InitSystems();
   void InitObjects();
   void InitComponents();
+
+  InputState inputState;
   World world;
+  Window window;
 };
