@@ -2,11 +2,13 @@
 #include "archetype.hpp"
 #include "archetype_manager.hpp"
 #include "component_registry.hpp"
+#include "entity.hpp"
 #include "entity_manager.hpp"
 #include "input_state.hpp"
 #include "query.hpp"
 #include "system_manager.hpp"
 #include "types.hpp"
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -58,18 +60,28 @@ public:
     EntityRecord &record = entityManager->GetRecord(entity);
 
     Signature oldSig = record.signature;
+    Archetype *oldArchetype = archetypeManager->getBySignature(oldSig);
 
     if (oldSig.test(componentID)) {
       throw std::runtime_error("Entity already has component");
     }
 
-    Archetype *oldArchetype = archetypeManager->getBySignature(oldSig);
+    Signature newSig = oldSig;
+    newSig.set(componentID);
 
-    Signature newSig = oldSig.set(componentID);
     Archetype &newArchetype =
-        archetypeManager->getOrCreate(newSig, *componentRegistry.get());
+        archetypeManager->getOrCreate(newSig, componentRegistry.get());
     newArchetype.AddEntity(entity);
+
     std::size_t newRow = newArchetype.GetRowForEntity(entity);
+
+    if (oldArchetype == nullptr) {
+      std::cout << "Adding first component to entity " << entity << std::endl;
+    } else {
+      std::cout << "Moving entity " << entity << " from archetype "
+                << oldArchetype->signature << " to archetype " << newSig
+                << std::endl;
+    }
 
     if (oldArchetype) {
       std::size_t oldRow = record.row;
@@ -98,16 +110,17 @@ public:
     EntityRecord &record = entityManager->GetRecord(entity);
 
     Signature oldSig = record.signature;
+    Archetype *oldArchetype = archetypeManager->getBySignature(oldSig);
 
     if (!oldSig.test(componentID)) {
       throw std::runtime_error("Entity does not have component");
     }
 
-    Archetype *oldArchetype = archetypeManager->getBySignature(oldSig);
+    Signature newSig = oldSig;
+    newSig.reset(componentID);
 
-    Signature newSig = oldSig.reset(componentID);
     Archetype &newArchetype =
-        archetypeManager->getOrCreate(newSig, *componentRegistry.get());
+        archetypeManager->getOrCreate(newSig, componentRegistry.get());
     newArchetype.AddEntity(entity);
     std::size_t newRow = newArchetype.GetRowForEntity(entity);
 
@@ -129,7 +142,8 @@ public:
   }
 
   template <typename... Ts> Query<Ts...> query() {
-    std::vector<Archetype> &archetypes = archetypeManager->getArchetypes();
+    std::array<Archetype, MAX_ARCHETYPES> &archetypes =
+        archetypeManager->getArchetypes();
     return Query<Ts...>(archetypes, *componentRegistry.get());
   }
 

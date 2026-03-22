@@ -27,6 +27,7 @@ public:
 
   void AddEmpty() {
     componentArray.resize(componentArray.size() + stride);
+    ++count;
   }
 
   void Remove(size_t row) {
@@ -53,15 +54,14 @@ private:
       rowToEntity; // maps row index to EntityID for reverse lookup
 
 public:
-  ArchetypeID id;
   Signature signature;
 
-  Archetype(ArchetypeID id, Signature signature, ComponentRegistry &registry)
-      : id(id), signature(signature) {
+  void Init(Signature signature, ComponentRegistry *registry) {
+    this->signature = signature;
+
     for (size_t i = 0; i < MAX_COMPONENTS; ++i) {
       if (signature.test(i)) {
-        ComponentInfo &info =
-            registry.GetComponentInfo(i); // validate component ID
+        ComponentInfo &info = registry->GetComponentInfo(i);
         indexMap[i] = componentColumns.size();
         componentColumns.emplace_back(info.size);
       }
@@ -70,7 +70,7 @@ public:
 
   void AddEntity(EntityID entity) {
     size_t row = componentColumns.empty() ? 0 : componentColumns[0].count;
-    for (auto col : componentColumns) {
+    for (auto &col : componentColumns) {
       col.AddEmpty();
     }
     entityToRow[entity] = row;
@@ -86,7 +86,7 @@ public:
       throw std::runtime_error("Archetype: Entity not found in archetype");
     }
     size_t row = it->second;
-    for (auto col : componentColumns) {
+    for (auto &col : componentColumns) {
       col.Remove(row);
     }
     entityToRow.erase(it);

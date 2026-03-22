@@ -5,12 +5,13 @@
 
 template <typename... Ts> class Query {
 public:
-  Query(std::vector<Archetype> &archetypes, ComponentRegistry &registry)
+  Query(std::array<Archetype, MAX_ARCHETYPES> &archetypes,
+        ComponentRegistry &registry)
       : archetypes(archetypes), registry(registry) {
     required = registry.MakeSignature<Ts...>();
   }
 
-  std::vector<Archetype> &archetypes;
+  std::array<Archetype, MAX_ARCHETYPES> &archetypes;
   ComponentRegistry &registry;
   Signature required;
 

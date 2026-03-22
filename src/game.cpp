@@ -101,10 +101,11 @@ void Game::InitObjects() {
                              randRotation(generator)),
             .scale = Vec3(scale)});
 
-    world.AddComponent(entity,
-                       MaterialComponent{.color = Vec3(0.5f, 0.5f, 0.5f),
-                                         .textureName = "white",
-                                         .shaderName = "default"});
+    world.AddComponent(entity, MaterialComponent{
+                                   .color = Vec3(0.5f, 0.5f, 0.5f),
+                               });
+    // .textureName = "white",
+    // .shaderName = "default"});
   }
 }
 

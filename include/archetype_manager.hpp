@@ -1,31 +1,36 @@
 #pragma once
 
 #include "archetype.hpp"
+#include "entity.hpp"
 #include <stdexcept>
-#include <vector>
 
 class ArchetypeManager {
 private:
-  std::vector<Archetype> archetypes;
+  std::array<Archetype, MAX_ARCHETYPES> archetypes;
   std::unordered_map<Signature, ArchetypeID> signatureToArchetypeID;
+  size_t archetypeCount = 0;
 
 public:
   // Returns existing archetype or creates one for this signature.
   Archetype &getOrCreate(const Signature &signature,
-                         ComponentRegistry &componentRegistry) {
+                         ComponentRegistry *componentRegistry) {
+    if (signature == Signature(0)) {
+      throw std::runtime_error("ArchetypeManager: signature cannot be empty");
+    }
+
     auto it = signatureToArchetypeID.find(signature);
     if (it != signatureToArchetypeID.end()) {
       return archetypes[it->second];
     }
 
-    if (archetypes.size() >= MAX_ARCHETYPES) {
+    if (archetypeCount >= MAX_ARCHETYPES) {
       throw std::runtime_error("ArchetypeManager: MAX_ARCHETYPES exceeded");
     }
 
-    ArchetypeID newID = archetypes.size();
-    archetypes.emplace_back(newID, signature, componentRegistry);
+    ArchetypeID newID = archetypeCount++;
+    archetypes[newID].Init(signature, componentRegistry);
     signatureToArchetypeID[signature] = newID;
-    return archetypes.back();
+    return archetypes[newID];
   }
 
   Archetype *getBySignature(const Signature &signature) {
@@ -37,17 +42,13 @@ public:
   }
 
   Archetype &getByID(ArchetypeID id) {
-    if (id >= archetypes.size()) {
+    if (id >= archetypeCount) {
       throw std::runtime_error("ArchetypeManager: Invalid ArchetypeID");
     }
     return archetypes[id];
   }
 
-  std::vector<Archetype> &getArchetypes() {
+  std::array<Archetype, MAX_ARCHETYPES> &getArchetypes() {
     return archetypes;
-  }
-
-  std::size_t archetypeCount() const {
-    return archetypes.size();
   }
 };

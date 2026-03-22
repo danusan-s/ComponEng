@@ -1,5 +1,4 @@
 #include "systems/render_system.hpp"
-#include "components/camera_component.hpp"
 #include "components/material_component.hpp"
 #include "components/mesh_component.hpp"
 #include "components/transform_component.hpp"
@@ -31,9 +30,8 @@ void OpenGLRenderSystem::Update(float deltaTime) {
   world->query<TransformComponent, MeshComponent, MaterialComponent>().each(
       [&](TransformComponent &transform, MeshComponent &mesh,
           MaterialComponent &material) {
-        const Shader &shader = ResourceManager::GetShader(material.shaderName);
-        const Texture2D &texture =
-            ResourceManager::GetTexture(material.textureName);
+        const Shader &shader = ResourceManager::GetShader("default");
+        const Texture2D &texture = ResourceManager::GetTexture("white");
 
         shader.Use();
         shader.SetMatrix4("viewProj", viewProj);
