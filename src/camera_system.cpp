@@ -60,35 +60,31 @@ static void ProcessMouseInput(TransformComponent &transform,
 }
 
 void CameraSystem::Update(float deltaTime) {
-  for (auto entity : entities) {
-    auto &transform = world->GetComponent<TransformComponent>(entity);
-    auto &camera = world->GetComponent<CameraComponent>(entity);
+  world
+      ->query<TransformComponent, CameraComponent, InputComponent,
+              MouseInputComponent>()
+      .each([&](auto &transform, auto &camera, auto &input, auto &mouseInput) {
+        if (!camera.isMainCamera)
+          return;
 
-    if (!camera.isMainCamera)
-      continue;
+        ProcessKeyboardInput(transform, input, deltaTime, DEFAULT_MOVE_SPEED);
 
-    auto &input = world->GetComponent<InputComponent>(entity);
-    auto &mouseInput = world->GetComponent<MouseInputComponent>(entity);
+        smoothedMouseDelta =
+            mix(smoothedMouseDelta, Vec2(mouseInput.deltaX, mouseInput.deltaY),
+                1.0f - SMOOTHING);
+        ProcessMouseInput(
+            transform,
+            {smoothedMouseDelta.x, smoothedMouseDelta.y, false, false},
+            MOUSE_SENSITIVITY);
 
-    ProcessKeyboardInput(transform, input, deltaTime, DEFAULT_MOVE_SPEED);
+        Vec3 front, right, up;
+        UpdateCameraVectors(transform, front, right, up);
 
-    smoothedMouseDelta =
-        mix(smoothedMouseDelta, Vec2(mouseInput.deltaX, mouseInput.deltaY),
-            1.0f - SMOOTHING);
-    ProcessMouseInput(
-        transform, {smoothedMouseDelta.x, smoothedMouseDelta.y, false, false},
-        MOUSE_SENSITIVITY);
+        this->world->mainCameraData.viewMatrix =
+            lookAt(transform.position, transform.position + front, up);
 
-    Vec3 front, right, up;
-    UpdateCameraVectors(transform, front, right, up);
-
-    camera.viewMatrix =
-        lookAt(transform.position, transform.position + front, up);
-
-    camera.projectionMatrix =
-        perspective(radians(camera.fov), camera.aspectRatio, camera.nearPlane,
-                    camera.farPlane);
-
-    world->cameraEntity = entity;
-  }
+        this->world->mainCameraData.projectionMatrix =
+            perspective(radians(camera.fov), camera.aspectRatio,
+                        camera.nearPlane, camera.farPlane);
+      });
 }

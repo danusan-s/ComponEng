@@ -8,9 +8,13 @@ constexpr EntityID INVALID_ENTITY = 0;
 
 constexpr EntityID MAX_ENTITIES = 10000;
 
-using ComponentTypeID = std::uint8_t; // one byte upto 255 components
+using ComponentID = std::uint8_t; // one byte upto 255 components
 
-constexpr ComponentTypeID MAX_COMPONENTS = 32;
+using ArchetypeID = std::uint8_t; // one byte upto 255 archetypes
+
+constexpr ComponentID MAX_COMPONENTS = 32;
+
+constexpr ArchetypeID MAX_ARCHETYPES = 64;
 
 // set nth bit for presence of component of id n
 using Signature = std::bitset<MAX_COMPONENTS>;

@@ -25,29 +25,26 @@ void OpenGLRenderSystem::Update(float deltaTime) {
   glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  auto &camera = world->GetComponent<CameraComponent>(world->cameraEntity);
+  Mat4 viewProj = this->world->mainCameraData.projectionMatrix *
+                  this->world->mainCameraData.viewMatrix;
 
-  Mat4 viewProj = camera.projectionMatrix * camera.viewMatrix;
+  world->query<TransformComponent, MeshComponent, MaterialComponent>().each(
+      [&](TransformComponent &transform, MeshComponent &mesh,
+          MaterialComponent &material) {
+        const Shader &shader = ResourceManager::GetShader(material.shaderName);
+        const Texture2D &texture =
+            ResourceManager::GetTexture(material.textureName);
 
-  for (auto entity : entities) {
-    auto &transform = world->GetComponent<TransformComponent>(entity);
-    auto &mesh = world->GetComponent<MeshComponent>(entity);
-    auto &material = world->GetComponent<MaterialComponent>(entity);
+        shader.Use();
+        shader.SetMatrix4("viewProj", viewProj);
+        shader.SetMatrix4("model", GetModelMatrix(transform));
+        shader.SetVector3f("objectColor", material.color);
+        shader.SetVector3f("lightPos", DEFAULT_LIGHT_POS);
+        shader.SetVector3f("lightColor", DEFAULT_LIGHT_COLOR);
 
-    const Shader &shader = ResourceManager::GetShader(material.shaderName);
-    const Texture2D &texture =
-        ResourceManager::GetTexture(material.textureName);
-
-    shader.Use();
-    shader.SetMatrix4("viewProj", viewProj);
-    shader.SetMatrix4("model", GetModelMatrix(transform));
-    shader.SetVector3f("objectColor", material.color);
-    shader.SetVector3f("lightPos", DEFAULT_LIGHT_POS);
-    shader.SetVector3f("lightColor", DEFAULT_LIGHT_COLOR);
-
-    texture.Bind();
-    glBindVertexArray(mesh.VAO);
-    glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
-  }
+        texture.Bind();
+        glBindVertexArray(mesh.VAO);
+        glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+      });
 }

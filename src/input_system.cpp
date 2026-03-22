@@ -12,23 +12,18 @@ constexpr auto CROUCH_KEY = GLFW_KEY_LEFT_SHIFT;
 void InputSystem::Update(float deltaTime) {
   auto &state = *world->inputState;
 
-  for (auto entity : entities) {
-    auto &input = world->GetComponent<InputComponent>(entity);
+  world->query<InputComponent, MouseInputComponent>().each(
+      [&](InputComponent &input, MouseInputComponent &mouseInput) {
+        input.forward = false;
+        input.backward = false;
+        input.left = false;
+        input.right = false;
+        input.jump = false;
+        input.crouch = false;
 
-    input.forward = state.keys[FORWARD_KEY];
-    input.backward = state.keys[BACKWARD_KEY];
-    input.left = state.keys[LEFT_KEY];
-    input.right = state.keys[RIGHT_KEY];
-    input.jump = state.keys[JUMP_KEY];
-    input.crouch = state.keys[CROUCH_KEY];
-
-    auto &mouseInput = world->GetComponent<MouseInputComponent>(entity);
-    mouseInput.deltaX = state.mouseDeltaX;
-    mouseInput.deltaY = state.mouseDeltaY;
-    mouseInput.leftButton = state.mouseButtons[GLFW_MOUSE_BUTTON_LEFT];
-    mouseInput.rightButton = state.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT];
-  }
-
-  state.mouseDeltaX = 0.0f;
-  state.mouseDeltaY = 0.0f;
+        mouseInput.deltaX = 0.0f;
+        mouseInput.deltaY = 0.0f;
+        mouseInput.leftButton = false;
+        mouseInput.rightButton = false;
+      });
 }

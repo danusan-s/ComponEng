@@ -3,6 +3,7 @@
 #include "resource_manager.hpp"
 #include "utils.hpp"
 #include <GLFW/glfw3.h>
+#include <iostream>
 #include <random>
 
 #include "components/camera_component.hpp"
@@ -36,41 +37,19 @@ void Game::Init() {
 }
 
 void Game::InitComponents() {
-  world.RegisterComponent<TransformComponent>();
-  world.RegisterComponent<MeshComponent>();
-  world.RegisterComponent<MaterialComponent>();
-  world.RegisterComponent<CameraComponent>();
-  world.RegisterComponent<MouseInputComponent>();
-  world.RegisterComponent<RigidBodyComponent>();
-  world.RegisterComponent<InputComponent>();
+  world.RegisterComponents<TransformComponent, MeshComponent, MaterialComponent,
+                           CameraComponent, MouseInputComponent,
+                           RigidBodyComponent, InputComponent>();
 }
 
 void Game::InitSystems() {
   auto inputSystem = world.RegisterSystem<InputSystem>();
-  Signature inputSignature;
-  inputSignature.set(world.GetComponentType<InputComponent>());
-  inputSignature.set(world.GetComponentType<MouseInputComponent>());
-  world.SetSystemSignature<InputSystem>(inputSignature);
 
   auto cameraSystem = world.RegisterSystem<CameraSystem>();
-  Signature cameraSignature;
-  cameraSignature.set(world.GetComponentType<TransformComponent>());
-  cameraSignature.set(world.GetComponentType<CameraComponent>());
-  cameraSignature.set(world.GetComponentType<InputComponent>());
-  world.SetSystemSignature<CameraSystem>(cameraSignature);
 
   auto renderSystem = world.RegisterSystem<OpenGLRenderSystem>();
-  Signature renderSignature;
-  renderSignature.set(world.GetComponentType<TransformComponent>());
-  renderSignature.set(world.GetComponentType<MeshComponent>());
-  renderSignature.set(world.GetComponentType<MaterialComponent>());
-  world.SetSystemSignature<OpenGLRenderSystem>(renderSignature);
 
   auto uiSystem = world.RegisterSystem<UISystem>();
-  Signature uiSignature;
-  uiSignature.set(world.GetComponentType<TransformComponent>());
-  uiSignature.set(world.GetComponentType<CameraComponent>());
-  world.SetSystemSignature<UISystem>(uiSignature);
 }
 
 void Game::InitObjects() {

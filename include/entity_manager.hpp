@@ -4,10 +4,15 @@
 #include <assert.h>
 #include <queue>
 
+struct EntityRecord {
+  std::size_t row;
+  Signature signature;
+};
+
 class EntityManager {
 private:
   std::queue<EntityID> freeIDs;
-  std::array<Signature, MAX_ENTITIES> entitySignatures;
+  std::array<EntityRecord, MAX_ENTITIES> entityRecords;
   uint32_t livingEntityCount;
 
 public:
@@ -31,20 +36,16 @@ public:
   void DestroyEntity(EntityID id) {
     assert(id < MAX_ENTITIES && "Entity out of range.");
 
-    entitySignatures[id].reset();
+    EntityRecord &record = entityRecords[id];
+    record.row = 0;
+    record.signature.reset();
     freeIDs.push(id);
     --livingEntityCount;
   }
 
-  void SetSignature(EntityID id, Signature signature) {
+  EntityRecord &GetRecord(EntityID id) {
     assert(id < MAX_ENTITIES && "Entity out of range.");
 
-    entitySignatures[id] = signature;
-  }
-
-  Signature GetSignature(EntityID id) {
-    assert(id < MAX_ENTITIES && "Entity out of range.");
-
-    return entitySignatures[id];
+    return entityRecords[id];
   }
 };

@@ -6,6 +6,7 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "world.hpp"
 #include <GLFW/glfw3.h>
+#include <iostream>
 
 static void ShutdownImGui() {
   ImGui_ImplOpenGL3_Shutdown();
@@ -39,29 +40,25 @@ void UISystem::Update(float deltaTime) {
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
 
-  for (auto entity : entities) {
-    auto &camera = world->GetComponent<CameraComponent>(entity);
+  world->query<CameraComponent, TransformComponent>().each(
+      [&](CameraComponent &camera, TransformComponent &transform) {
+        if (!camera.isMainCamera)
+          return;
+        ImGui::Begin("Camera Inspector");
 
-    if (!camera.isMainCamera)
-      continue;
+        ImGui::Text("Position: (%.2f, %.2f, %.2f)", transform.position.x,
+                    transform.position.y, transform.position.z);
+        ImGui::Text("Rotation: (%.2f, %.2f, %.2f)", transform.rotation.x,
+                    transform.rotation.y, transform.rotation.z);
+        ImGui::Text("FOV: %.2f", camera.fov);
+        ImGui::Text("Near/Far: %.2f / %.2f", camera.nearPlane, camera.farPlane);
 
-    auto &transform = world->GetComponent<TransformComponent>(entity);
+        ImGui::Separator();
+        ImGui::Text("Delta Time: %.4f s", deltaTime);
+        ImGui::Text("FPS: %.0f", 1.0f / deltaTime);
 
-    ImGui::Begin("Camera Inspector");
-
-    ImGui::Text("Position: (%.2f, %.2f, %.2f)", transform.position.x,
-                transform.position.y, transform.position.z);
-    ImGui::Text("Rotation: (%.2f, %.2f, %.2f)", transform.rotation.x,
-                transform.rotation.y, transform.rotation.z);
-    ImGui::Text("FOV: %.2f", camera.fov);
-    ImGui::Text("Near/Far: %.2f / %.2f", camera.nearPlane, camera.farPlane);
-
-    ImGui::Separator();
-    ImGui::Text("Delta Time: %.4f s", deltaTime);
-    ImGui::Text("FPS: %.0f", 1.0f / deltaTime);
-
-    ImGui::End();
-  }
+        ImGui::End();
+      });
 
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
