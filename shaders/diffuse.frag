@@ -1,11 +1,11 @@
 #version 330 core
 
 in vec3 FragPos;
+in vec3 ObjectColor;
 in vec3 Normal;
 in vec2 TexCoords;
 
 uniform sampler2D Tex;
-uniform vec3 objectColor;
 
 uniform vec3 lightPos;
 uniform vec3 lightColor;
@@ -30,7 +30,7 @@ void main()
     vec3 ambient = ambi * lightColor;
 
     vec3 textureColor = texture(Tex, TexCoords).rgb;
-    vec3 result = (ambient + diffuse) * textureColor * objectColor;
+    vec3 result = (ambient + diffuse) * textureColor * ObjectColor;
 
     // vec3 rimColor = normalize(objectColor + 0.0001);                      // preserve hue at full brightness
     // float brightness = dot(objectColor, vec3(0.2126, 0.7152, 0.0722));   // perceptual luminance of original color

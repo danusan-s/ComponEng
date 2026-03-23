@@ -1,7 +1,7 @@
 #pragma once
-#include <cstddef>
+#include <GL/gl.h>
+#include <string>
 
 struct MeshComponent {
-  unsigned int VAO, VBO, EBO; // 12 bytes
-  size_t indexCount;          // 8 bytes
+  std::string modelName; // 32 bytes (pointer + size)
 };

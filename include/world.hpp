@@ -10,7 +10,6 @@
 #include "types.hpp"
 #include <iostream>
 #include <memory>
-#include <vector>
 
 struct CameraData {
   Mat4 viewMatrix;
@@ -55,19 +54,23 @@ public:
     (this->RegisterComponent<Components>(), ...);
   }
 
-  template <typename T> void AddComponent(EntityID entity, T component = T{}) {
-    ComponentID componentID = componentRegistry->RegisterComponent<T>();
+  template <typename T> void AddComponent(EntityID entity, T &&component) {
+    AddComponents(entity, std::forward<T>(component));
+  }
+
+  template <typename... Ts>
+  void AddComponents(EntityID entity, Ts &&...components) {
     EntityRecord &record = entityManager->GetRecord(entity);
 
     Signature oldSig = record.signature;
     Archetype *oldArchetype = archetypeManager->getBySignature(oldSig);
 
-    if (oldSig.test(componentID)) {
+    if ((oldSig.test(componentRegistry->GetComponentID<Ts>()) || ...)) {
       throw std::runtime_error("Entity already has component");
     }
 
     Signature newSig = oldSig;
-    newSig.set(componentID);
+    newSig = oldSig | componentRegistry->MakeSignature<Ts...>();
 
     Archetype &newArchetype =
         archetypeManager->getOrCreate(newSig, componentRegistry.get());
@@ -98,8 +101,9 @@ public:
       }
     }
 
-    T *slot = static_cast<T *>(newArchetype.GetColumn(componentID).at(newRow));
-    *slot = std::move(component);
+    (new (newArchetype.GetColumn(componentRegistry->GetComponentID<Ts>())
+              .at(newRow)) Ts(std::forward<Ts>(components)),
+     ...);
 
     record.signature = newSig;
     record.row = newRow;
