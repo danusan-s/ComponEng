@@ -9,7 +9,7 @@ find_package(glfw3 3.3 REQUIRED)
 find_package(OpenGL REQUIRED)
 
 # Collect all source files in src/ folder
-file(GLOB SOURCES "src/*.cpp" "src/*.c" "src/imgui/*.cpp")
+file(GLOB SOURCES "src/*.cpp" "src/*.c" "src/core/*.cpp" "src/renderer/*.cpp" "src/systems/*.cpp" "src/glad/*.c" "src/imgui/*.cpp")
 
 # Include header files from the include/ folder
 include_directories(include)

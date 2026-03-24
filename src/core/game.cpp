@@ -1,9 +1,9 @@
-#include "game.hpp"
+#include "core/game.hpp"
 #include "components/bounding_box_component.hpp"
-#include "entity.hpp"
-#include "resource_manager.hpp"
+#include "ecs/entity.hpp"
+#include "renderer/resource_manager.hpp"
 #include "systems/physics_system.hpp"
-#include "utils.hpp"
+#include "core/utils.hpp"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <random>
@@ -24,16 +24,16 @@ void Game::Init() {
   world.Init(&inputState);
 
   ResourceManager::LoadShader(
-      Utils::GetAssetPath("shaders/diffuse.vert").c_str(),
-      Utils::GetAssetPath("shaders/diffuse.frag").c_str(), nullptr, "default");
+      Utils::GetAssetPath("assets/shaders/diffuse.vert").c_str(),
+      Utils::GetAssetPath("assets/shaders/diffuse.frag").c_str(), nullptr, "default");
 
   ResourceManager::LoadTexture(
-      Utils::GetAssetPath("textures/white.png").c_str(), false, "white");
+      Utils::GetAssetPath("assets/textures/white.png").c_str(), false, "white");
 
-  ResourceManager::LoadModel(Utils::GetAssetPath("models/cube.obj").c_str(),
+  ResourceManager::LoadModel(Utils::GetAssetPath("assets/models/cube.obj").c_str(),
                              "cube");
   ResourceManager::LoadModel(
-      Utils::GetAssetPath("models/sphere_smooth.obj").c_str(), "sphere");
+      Utils::GetAssetPath("assets/models/sphere_smooth.obj").c_str(), "sphere");
 
   InitComponents();
   InitSystems();

@@ -2,7 +2,8 @@
 #include "components/camera_component.hpp"
 #include "components/input_component.hpp"
 #include "components/transform_component.hpp"
-#include "world.hpp"
+#include "core/types.hpp"
+#include "ecs/world.hpp"
 #include <GLFW/glfw3.h>
 #include <cmath>
 

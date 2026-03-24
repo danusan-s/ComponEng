@@ -1,5 +1,5 @@
 #pragma once
-#include "system.hpp"
+#include "ecs/system.hpp"
 
 class PhysicsSystem : public System {
 public:

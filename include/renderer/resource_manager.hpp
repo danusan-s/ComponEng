@@ -4,9 +4,9 @@
 #include <map>
 #include <string>
 
-#include "model.hpp"
-#include "shader.hpp"
-#include "texture.hpp"
+#include "renderer/model.hpp"
+#include "renderer/shader.hpp"
+#include "renderer/texture.hpp"
 
 // A static singleton ResourceManager class that hosts several
 // functions to load Textures and Shaders. Each loaded texture

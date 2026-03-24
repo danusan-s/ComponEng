@@ -2,6 +2,7 @@
 #define MODEL_H
 
 #include "glad/glad.h"
+#include "core/types.hpp"
 #include <string>
 #include <vector>
 

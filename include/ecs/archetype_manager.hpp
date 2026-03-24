@@ -1,7 +1,7 @@
 #pragma once
 
-#include "archetype.hpp"
-#include "entity.hpp"
+#include "ecs/archetype.hpp"
+#include "ecs/entity.hpp"
 #include <stdexcept>
 
 class ArchetypeManager {

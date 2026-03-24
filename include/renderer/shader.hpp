@@ -4,7 +4,7 @@
 #include <string>
 
 #include "glad/glad.h"
-#include "types.hpp"
+#include "core/types.hpp"
 
 // General purpose shader object. Compiles from file, generates
 // compile/link-time error messages and hosts several utility

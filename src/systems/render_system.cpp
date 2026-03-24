@@ -1,9 +1,10 @@
-#include "entity.hpp"
-#include "model.hpp"
-#include "resource_manager.hpp"
-#include "shader.hpp"
-#include "texture.hpp"
-#include "world.hpp"
+#include "core/types.hpp"
+#include "ecs/entity.hpp"
+#include "ecs/world.hpp"
+#include "renderer/model.hpp"
+#include "renderer/resource_manager.hpp"
+#include "renderer/shader.hpp"
+#include "renderer/texture.hpp"
 
 #include "components/bounding_box_component.hpp"
 #include "components/material_component.hpp"
@@ -136,7 +137,7 @@ void OpenGLRenderSystem::Update(float deltaTime) {
   Mat4 viewProj = this->world->mainCameraData.projectionMatrix *
                   this->world->mainCameraData.viewMatrix;
 
-  // Frustum frustum = GenerateFrustum(viewProj);
+  Frustum frustum = GenerateFrustum(viewProj);
 
   int drawCalls = 0;
 
@@ -144,8 +145,16 @@ void OpenGLRenderSystem::Update(float deltaTime) {
     pair.second.instanceDatas.clear();
   }
 
-  world->query<TransformComponent, MeshComponent, MaterialComponent>().each(
-      [&](TransformComponent &t, MeshComponent &m, MaterialComponent &mat) {
+  world
+      ->query<TransformComponent, MeshComponent, MaterialComponent,
+              BoundingBoxComponent>()
+      .each([&](TransformComponent &t, MeshComponent &m, MaterialComponent &mat,
+                BoundingBoxComponent &bbox) {
+        Vec3 worldMin = t.position + bbox.min;
+        Vec3 worldMax = t.position + bbox.max;
+        if (!IsBoxInFrustum(frustum, worldMin, worldMax)) {
+          return;
+        }
         DrawKey key{m.modelName, mat.textureName, mat.shaderName};
         if (batches.find(key) == batches.end()) {
           batches[key] = BatchData();
@@ -202,9 +211,6 @@ void OpenGLRenderSystem::Update(float deltaTime) {
     glBufferSubData(GL_ARRAY_BUFFER, 0,
                     data.instanceDatas.size() * sizeof(InstanceData),
                     data.instanceDatas.data());
-    std::cout << "Drawing " << data.instanceDatas.size() << " instances of "
-              << key.modelName << " with material " << key.textureName
-              << " and shader " << key.shaderName << std::endl;
 
     glDrawElementsInstanced(GL_TRIANGLES, model.indices.size(), GL_UNSIGNED_INT,
                             0, data.instanceDatas.size());

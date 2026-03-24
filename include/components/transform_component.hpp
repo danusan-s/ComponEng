@@ -1,5 +1,5 @@
 #pragma once
-#include "types.hpp"
+#include "core/types.hpp"
 
 struct TransformComponent {
   Vec3 position; // 12 bytes

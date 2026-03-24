@@ -1,4 +1,4 @@
-#include "model.hpp"
+#include "renderer/model.hpp"
 #include <array>
 #include <iostream>
 #include <sstream>

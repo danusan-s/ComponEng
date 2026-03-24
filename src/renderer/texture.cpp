@@ -1,4 +1,4 @@
-#include "texture.hpp"
+#include "renderer/texture.hpp"
 
 Texture2D::Texture2D()
     : ID(0), Width(0), Height(0), Internal_Format(GL_RGB), Image_Format(GL_RGB),

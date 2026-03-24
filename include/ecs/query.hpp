@@ -1,7 +1,7 @@
 #pragma once
-#include "archetype.hpp"
-#include "component_registry.hpp"
-#include "entity.hpp"
+#include "ecs/archetype.hpp"
+#include "ecs/component_registry.hpp"
+#include "ecs/entity.hpp"
 
 template <typename... Ts> class Query {
 public:

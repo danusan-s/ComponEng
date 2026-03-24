@@ -1,5 +1,5 @@
 #pragma once
-#include "system.hpp"
+#include "ecs/system.hpp"
 
 class OpenGLRenderSystem : public System {
 public:

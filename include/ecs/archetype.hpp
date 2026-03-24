@@ -1,7 +1,7 @@
 #pragma once
 
-#include "component_registry.hpp"
-#include "entity.hpp"
+#include "ecs/component_registry.hpp"
+#include "ecs/entity.hpp"
 #include <cstring>
 #include <vector>
 

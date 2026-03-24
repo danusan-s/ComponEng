@@ -1,6 +1,6 @@
 #include "systems/input_system.hpp"
 #include "components/input_component.hpp"
-#include "world.hpp"
+#include "ecs/world.hpp"
 
 constexpr auto FORWARD_KEY = GLFW_KEY_W;
 constexpr auto BACKWARD_KEY = GLFW_KEY_S;

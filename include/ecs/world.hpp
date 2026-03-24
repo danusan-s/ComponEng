@@ -1,13 +1,13 @@
 #pragma once
-#include "archetype.hpp"
-#include "archetype_manager.hpp"
-#include "component_registry.hpp"
-#include "entity.hpp"
-#include "entity_manager.hpp"
-#include "input_state.hpp"
-#include "query.hpp"
-#include "system_manager.hpp"
-#include "types.hpp"
+#include "ecs/archetype.hpp"
+#include "ecs/archetype_manager.hpp"
+#include "ecs/component_registry.hpp"
+#include "ecs/entity_manager.hpp"
+#include "ecs/entity.hpp"
+#include "ecs/query.hpp"
+#include "ecs/system_manager.hpp"
+#include "core/input_state.hpp"
+#include "core/types.hpp"
 #include <iostream>
 #include <memory>
 

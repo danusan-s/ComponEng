@@ -1,5 +1,5 @@
 #pragma once
-#include "system.hpp"
+#include "ecs/system.hpp"
 #include <GLFW/glfw3.h>
 
 class InputSystem : public System {

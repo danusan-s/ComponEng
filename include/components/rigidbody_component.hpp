@@ -1,5 +1,5 @@
 #pragma once
-#include "types.hpp"
+#include "core/types.hpp"
 
 struct RigidBodyComponent {
   Vec3 velocity;     // 12 bytes
