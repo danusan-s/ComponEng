@@ -1,0 +1,35 @@
+#pragma once
+#include <cstdarg>
+#include <cstring>
+#include <iostream>
+
+#define LOG_INFO(fmt, ...)                                                     \
+  Logger::Log(__FILE__, __FUNCTION__, "INFO", fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...)                                                    \
+  Logger::Log(__FILE__, __FUNCTION__, "ERROR", fmt, ##__VA_ARGS__)
+
+class Logger {
+public:
+  static void Log(const char *file, const char *func, const char *prefix,
+                  const char *fmt, ...) {
+    char buffer[512];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buffer, sizeof(buffer), fmt, args);
+    va_end(args);
+
+    const char *filename = strrchr(file, '/');
+    if (filename)
+      file = filename + 1;
+
+    std::string finalMsg;
+    if (prefix[0] != '\0') {
+      finalMsg =
+          std::string("[") + prefix + "] [" + file + ":" + func + "] " + buffer;
+    } else {
+      finalMsg = std::string("[") + file + ":" + func + "] " + buffer;
+    }
+
+    std::cout << finalMsg << std::endl;
+  }
+};

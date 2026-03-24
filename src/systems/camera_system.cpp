@@ -2,6 +2,7 @@
 #include "components/camera_component.hpp"
 #include "components/input_component.hpp"
 #include "components/transform_component.hpp"
+#include "core/debug_ui.hpp"
 #include "core/types.hpp"
 #include "ecs/world.hpp"
 #include <GLFW/glfw3.h>
@@ -87,5 +88,7 @@ void CameraSystem::Update(float deltaTime) {
         this->world->mainCameraData.projectionMatrix =
             perspective(radians(camera.fov), camera.aspectRatio,
                         camera.nearPlane, camera.farPlane);
+
+        DebugUI::AddVec3("Camera Position", transform.position);
       });
 }

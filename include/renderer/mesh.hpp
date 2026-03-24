@@ -1,23 +1,20 @@
-#ifndef MODEL_H
-#define MODEL_H
+#pragma once
 
 #include "glad/glad.h"
-#include "core/types.hpp"
 #include <string>
 #include <vector>
 
 // Parser and initializer for WavefrontOBJ files to be used as 3D models.
-class Model {
+class Mesh {
 public:
   GLuint VAO, VBO, EBO;
   // Holds x y z nx ny nz u v for each vertex
   std::vector<float> vertices;
   std::vector<unsigned int> indices;
 
-  Model();
+  Mesh();
 
   // generates model from obj data
-  void Generate(const std::string &data);
+  void InitializeBuffers();
+  void GenerateFromWavefrontObj(const std::string &data);
 };
-
-#endif

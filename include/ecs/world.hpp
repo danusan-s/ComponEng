@@ -1,14 +1,13 @@
 #pragma once
+#include "core/logger.hpp"
+#include "core/types.hpp"
 #include "ecs/archetype.hpp"
 #include "ecs/archetype_manager.hpp"
 #include "ecs/component_registry.hpp"
-#include "ecs/entity_manager.hpp"
 #include "ecs/entity.hpp"
+#include "ecs/entity_manager.hpp"
 #include "ecs/query.hpp"
 #include "ecs/system_manager.hpp"
-#include "core/input_state.hpp"
-#include "core/types.hpp"
-#include <iostream>
 #include <memory>
 
 struct CameraData {
@@ -26,14 +25,12 @@ private:
 public:
   // Global cache
   CameraData mainCameraData;
-  InputState *inputState;
 
-  void Init(InputState *inputState) {
+  void Init() {
     componentRegistry = std::make_unique<ComponentRegistry>();
     entityManager = std::make_unique<EntityManager>();
     systemManager = std::make_unique<SystemManager>();
     archetypeManager = std::make_unique<ArchetypeManager>();
-    this->inputState = inputState;
   }
 
   EntityID CreateEntity() {
@@ -79,11 +76,10 @@ public:
     std::size_t newRow = newArchetype.GetRowForEntity(entity);
 
     if (oldArchetype == nullptr) {
-      std::cout << "Adding first component to entity " << entity << std::endl;
+      LOG_INFO("Adding first component to entity %llu", (unsigned long long)entity);
     } else {
-      std::cout << "Moving entity " << entity << " from archetype "
-                << oldArchetype->signature << " to archetype " << newSig
-                << std::endl;
+      LOG_INFO("Moving entity %llu to new archetype",
+          (unsigned long long)entity);
     }
 
     if (oldArchetype) {

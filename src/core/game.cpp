@@ -1,11 +1,13 @@
-#include "core/game.hpp"
-#include "components/bounding_box_component.hpp"
-#include "ecs/entity.hpp"
 #include "renderer/resource_manager.hpp"
-#include "systems/physics_system.hpp"
+
+#include "components/bounding_box_component.hpp"
+#include "core/debug_ui.hpp"
+#include "core/game.hpp"
+#include "core/logger.hpp"
 #include "core/utils.hpp"
+#include "ecs/entity.hpp"
+#include "systems/physics_system.hpp"
 #include <GLFW/glfw3.h>
-#include <iostream>
 #include <random>
 
 #include "components/camera_component.hpp"
@@ -14,25 +16,27 @@
 #include "components/mesh_component.hpp"
 #include "components/rigidbody_component.hpp"
 #include "components/transform_component.hpp"
+#include "core/logger.hpp"
 #include "systems/camera_system.hpp"
 #include "systems/input_system.hpp"
 #include "systems/render_system.hpp"
-#include "systems/ui_system.hpp"
 
 void Game::Init() {
-  window.Init(1280, 720, "ECS Game", inputState);
-  world.Init(&inputState);
+  window.Init(1280, 720, "ECS Game");
+  world.Init();
+  DebugUI::Init();
 
   ResourceManager::LoadShader(
       Utils::GetAssetPath("assets/shaders/diffuse.vert").c_str(),
-      Utils::GetAssetPath("assets/shaders/diffuse.frag").c_str(), nullptr, "default");
+      Utils::GetAssetPath("assets/shaders/diffuse.frag").c_str(), nullptr,
+      "default");
 
   ResourceManager::LoadTexture(
       Utils::GetAssetPath("assets/textures/white.png").c_str(), false, "white");
 
-  ResourceManager::LoadModel(Utils::GetAssetPath("assets/models/cube.obj").c_str(),
-                             "cube");
-  ResourceManager::LoadModel(
+  ResourceManager::LoadMesh(
+      Utils::GetAssetPath("assets/models/cube.obj").c_str(), "cube");
+  ResourceManager::LoadMesh(
       Utils::GetAssetPath("assets/models/sphere_smooth.obj").c_str(), "sphere");
 
   InitComponents();
@@ -55,8 +59,6 @@ void Game::InitSystems() {
   auto physicsSystem = world.RegisterSystem<PhysicsSystem>();
 
   auto renderSystem = world.RegisterSystem<OpenGLRenderSystem>();
-
-  auto uiSystem = world.RegisterSystem<UISystem>();
 }
 
 void Game::InitObjects() {
@@ -93,16 +95,15 @@ void Game::InitObjects() {
 
     float scale = randScale(generator);
     world.AddComponents(
-        entity, MeshComponent{.modelName = "cube"},
+        entity, MeshComponent{.meshName = "cube"},
         TransformComponent{
             .position = Vec3(randPosition(generator), randPosition(generator),
                              randPosition(generator)),
             .rotation = Vec3(randRotation(generator), randRotation(generator),
                              randRotation(generator)),
             .scale = Vec3(scale)},
-        RigidBodyComponent{.velocity = Vec3(0.0f),
-                           .acceleration =
-                               Vec3(0.0f, randGravity(generator), 0.0f),
+        RigidBodyComponent{.type = RigidBodyComponent::Dynamic,
+                           .velocity = Vec3(0.0f),
                            .mass = 1.0f},
         BoundingBoxComponent{.min = Vec3(-scale / 2.0f),
                              .max = Vec3(scale / 2.0f)},
@@ -118,16 +119,15 @@ void Game::InitObjects() {
 
     float scale = randScale(generator);
     world.AddComponents(
-        entity, MeshComponent{.modelName = "sphere"},
+        entity, MeshComponent{.meshName = "sphere"},
         TransformComponent{
             .position = Vec3(randPosition(generator), randPosition(generator),
                              randPosition(generator)),
             .rotation = Vec3(randRotation(generator), randRotation(generator),
                              randRotation(generator)),
             .scale = Vec3(scale)},
-        RigidBodyComponent{.velocity = Vec3(0.0f),
-                           .acceleration =
-                               Vec3(0.0f, randGravity(generator), 0.0f),
+        RigidBodyComponent{.type = RigidBodyComponent::Dynamic,
+                           .velocity = Vec3(0.0f),
                            .mass = 1.0f},
         BoundingBoxComponent{.min = Vec3(-scale / 2.0f),
                              .max = Vec3(scale / 2.0f)},
@@ -148,19 +148,22 @@ void Game::Run() {
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 
+    DebugUI::BeginFrame();
     world.Update(deltaTime);
+    DebugUI::EndFrame();
 
     window.SwapBuffers();
     window.PollEvents();
 
     while (GLenum err = glGetError()) {
-      std::cerr << "OpenGL error: " << err << std::endl;
+      LOG_ERROR("OpenGL error: %d", err);
     }
   }
 }
 
 void Game::Shutdown() {
   world.Shutdown();
+  DebugUI::Shutdown();
   ResourceManager::Clear();
   window.Shutdown();
 }

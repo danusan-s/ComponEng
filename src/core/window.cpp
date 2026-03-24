@@ -1,7 +1,9 @@
-#include "core/window.hpp"
 #include "glad/glad.h"
+
+#include "core/input_state.hpp"
+#include "core/logger.hpp"
+#include "core/window.hpp"
 #include <GLFW/glfw3.h>
-#include <iostream>
 
 static bool mouseLocked = true;
 
@@ -96,11 +98,9 @@ static void CursorPosCallback(GLFWwindow *window, double xposIn,
   inputState->lastMouseY = ypos;
 }
 
-void Window::Init(int width, int height, const char *title,
-                  InputState &inputState) {
+void Window::Init(int width, int height, const char *title) {
   this->width = width;
   this->height = height;
-  this->inputState = &inputState;
 
   glfwInit();
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -112,7 +112,7 @@ void Window::Init(int width, int height, const char *title,
 
   handle = glfwCreateWindow(width, height, title, nullptr, nullptr);
   if (!handle) {
-    std::cerr << "Failed to create GLFW window" << std::endl;
+    LOG_ERROR("Failed to create GLFW window");
     glfwTerminate();
     return;
   }
@@ -120,7 +120,7 @@ void Window::Init(int width, int height, const char *title,
   glfwMakeContextCurrent(handle);
 
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-    std::cerr << "Failed to initialize GLAD" << std::endl;
+    LOG_ERROR("Failed to initialize GLAD");
     return;
   }
 

@@ -1,7 +1,6 @@
+#include "core/logger.hpp"
 #include "renderer/resource_manager.hpp"
-
 #include <fstream>
-#include <iostream>
 #include <sstream>
 #include <string>
 
@@ -11,25 +10,23 @@
 // Instantiate static variables
 std::map<std::string, Texture2D> ResourceManager::Textures;
 std::map<std::string, Shader> ResourceManager::Shaders;
-std::map<std::string, Model> ResourceManager::Models;
+std::map<std::string, Mesh> ResourceManager::Meshes;
 
-Shader ResourceManager::LoadShader(const char *vShaderFile,
-                                   const char *fShaderFile,
-                                   const char *gShaderFile, std::string name) {
-  std::cout << "> Loading Shader: " << name << std::endl;
+void ResourceManager::LoadShader(const char *vShaderFile,
+                                 const char *fShaderFile,
+                                 const char *gShaderFile, std::string name) {
+  LOG_INFO("Loading Shader: %s", name.c_str());
   Shaders[name] = loadShaderFromFile(vShaderFile, fShaderFile, gShaderFile);
-  return Shaders[name];
 }
 
 const Shader &ResourceManager::GetShader(std::string name) {
   return Shaders.at(name);
 }
 
-Texture2D ResourceManager::LoadTexture(const char *file, bool alpha,
-                                       std::string name) {
-  std::cout << "> Loading Texture: " << name << std::endl;
+void ResourceManager::LoadTexture(const char *file, bool alpha,
+                                  std::string name) {
+  LOG_INFO("Loading Texture: %s", name.c_str());
   Textures[name] = loadTextureFromFile(file, alpha);
-  return Textures[name];
 }
 
 const Texture2D &ResourceManager::GetTexture(std::string name) {
@@ -40,40 +37,43 @@ bool ResourceManager::TextureExists(std::string name) {
   return Textures.find(name) != Textures.end();
 }
 
-Model ResourceManager::LoadModel(const char *file, std::string name) {
-  std::cout << "> Loading Model: " << name << std::endl;
-  Models[name] = loadModelFromFile(file);
-  return Models[name];
+void ResourceManager::AddMesh(std::string name, Mesh &mesh) {
+  LOG_INFO("Adding Mesh: %s", name.c_str());
+  mesh.InitializeBuffers();
+  Meshes[name] = mesh;
 }
 
-const Model &ResourceManager::GetModel(std::string name) {
-  return Models.at(name);
+void ResourceManager::LoadMesh(const char *file, std::string name) {
+  LOG_INFO("Loading Model: %s", name.c_str());
+  Mesh mesh = loadMeshFromFile(file);
+  AddMesh(name, mesh);
+}
+
+const Mesh &ResourceManager::GetMesh(std::string name) {
+  return Meshes.at(name);
 }
 
 void ResourceManager::Clear() {
-  std::cout << "Deleting loaded resources" << std::endl;
+  LOG_INFO("Deleting loaded resources");
 
-  std::cout << "Attempting to delete shaders" << std::endl;
-  // (properly) delete all shaders
+  LOG_INFO("Attempting to delete shaders");
   for (auto iter : Shaders)
     glDeleteProgram(iter.second.ID);
-  std::cout << "Shaders deleted successfully" << std::endl;
+  LOG_INFO("Shaders deleted successfully");
 
-  std::cout << "Attempting to delete textures" << std::endl;
-  // (properly) delete all textures
+  LOG_INFO("Attempting to delete textures");
   for (auto iter : Textures)
     glDeleteTextures(1, &iter.second.ID);
 
-  std::cout << "Textures deleted successfully" << std::endl;
+  LOG_INFO("Textures deleted successfully");
 
-  std::cout << "Attempting to delete models" << std::endl;
-  // (properly) delete all models
-  for (auto iter : Models) {
+  LOG_INFO("Attempting to delete models");
+  for (auto iter : Meshes) {
     glDeleteVertexArrays(1, &iter.second.VAO);
     glDeleteBuffers(1, &iter.second.VBO);
     glDeleteBuffers(1, &iter.second.EBO);
   }
-  std::cout << "Models deleted successfully" << std::endl;
+  LOG_INFO("Models deleted successfully");
 }
 
 Shader ResourceManager::loadShaderFromFile(const char *vShaderFile,
@@ -106,7 +106,7 @@ Shader ResourceManager::loadShaderFromFile(const char *vShaderFile,
       geometryCode = gShaderStream.str();
     }
   } catch (const std::exception &e) {
-    std::cout << "ERROR::SHADER: Failed to read shader files" << std::endl;
+    LOG_ERROR("ERROR::SHADER: Failed to read shader files");
   }
   const char *vShaderCode = vertexCode.c_str();
   const char *fShaderCode = fragmentCode.c_str();
@@ -125,7 +125,7 @@ Texture2D ResourceManager::loadTextureFromFile(const char *file, bool alpha) {
     texture.Internal_Format = GL_RGBA;
     texture.Image_Format = GL_RGBA;
   }
-  std::cout << "Loading texture file: " << file << std::endl;
+  LOG_INFO("Loading texture file: %s", file);
   // load image
   int width, height, nrChannels;
   unsigned char *data =
@@ -138,7 +138,7 @@ Texture2D ResourceManager::loadTextureFromFile(const char *file, bool alpha) {
   return texture;
 }
 
-Model ResourceManager::loadModelFromFile(const char *file) {
+Mesh ResourceManager::loadMeshFromFile(const char *file) {
   std::string modelData;
   try {
     // open files
@@ -151,10 +151,10 @@ Model ResourceManager::loadModelFromFile(const char *file) {
     // convert stream into string
     modelData = wavefrontObjStream.str();
   } catch (const std::exception &e) {
-    std::cout << "ERROR::MODEL: Failed to read model files" << std::endl;
+    LOG_ERROR("ERROR::MODEL: Failed to read model files");
   }
 
-  Model model;
-  model.Generate(modelData);
+  Mesh model;
+  model.GenerateFromWavefrontObj(modelData);
   return model;
 }

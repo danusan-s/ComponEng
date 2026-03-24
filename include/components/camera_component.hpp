@@ -1,5 +1,4 @@
 #pragma once
-#include "core/types.hpp"
 
 struct CameraComponent {
   float fov;         // 4 bytes

@@ -1,13 +1,62 @@
-#include "renderer/model.hpp"
+#include "core/logger.hpp"
+#include "renderer/mesh.hpp"
 #include <array>
-#include <iostream>
 #include <sstream>
 
-Model::Model() : VAO(0), VBO(0), EBO(0) {
+Mesh::Mesh() : VAO(0), VBO(0), EBO(0) {
 }
 
-void Model::Generate(const std::string &data) {
-  std::cout << "> Generating model" << std::endl;
+void Mesh::InitializeBuffers() {
+  if (VAO != 0) {
+    glDeleteVertexArrays(1, &VAO);
+    VAO = 0;
+  }
+  if (VBO != 0) {
+    glDeleteBuffers(1, &VBO);
+    VBO = 0;
+  }
+  if (EBO != 0) {
+    glDeleteBuffers(1, &EBO);
+    EBO = 0;
+  }
+  if (vertices.empty() || indices.empty()) {
+    LOG_ERROR("Cannot initialize buffers for an empty mesh.");
+    return;
+  }
+
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+  glGenBuffers(1, &EBO);
+
+  glBindVertexArray(VAO);
+
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float),
+               vertices.data(), GL_STATIC_DRAW);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
+               indices.data(), GL_STATIC_DRAW);
+
+  // Position (location = 0)
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+
+  // Normal (location = 1)
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
+  // UV (location = 2)
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
+                        (void *)(6 * sizeof(float)));
+  glEnableVertexAttribArray(2);
+
+  glBindVertexArray(0);
+}
+
+void Mesh::GenerateFromWavefrontObj(const std::string &data) {
+  LOG_INFO("Generating model");
   std::istringstream stream(data);
   std::string line;
 
@@ -61,12 +110,6 @@ void Model::Generate(const std::string &data) {
         vertices.push_back(tex[1]);
 
         ++faceVertCount;
-
-        // std::cout << "Added vertex: pos(" << pos[0] << ", " << pos[1] << ", "
-        //           << pos[2] << ") norm(" << norm[0] << ", " << norm[1] << ",
-        //           "
-        //           << norm[2] << ") tex(" << tex[0] << ", " << tex[1] << ")"
-        //           << std::endl;
       }
       if (faceVertCount == 3) {
         // For triangles, just add the indices
@@ -85,34 +128,4 @@ void Model::Generate(const std::string &data) {
       }
     }
   }
-
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-  glGenBuffers(1, &EBO);
-
-  glBindVertexArray(VAO);
-
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float),
-               vertices.data(), GL_STATIC_DRAW);
-
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
-               indices.data(), GL_STATIC_DRAW);
-
-  // Position (location = 0)
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
-  glEnableVertexAttribArray(0);
-
-  // Normal (location = 1)
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
-                        (void *)(3 * sizeof(float)));
-  glEnableVertexAttribArray(1);
-
-  // UV (location = 2)
-  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
-                        (void *)(6 * sizeof(float)));
-  glEnableVertexAttribArray(2);
-
-  glBindVertexArray(0);
 }

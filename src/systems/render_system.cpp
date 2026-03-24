@@ -1,10 +1,9 @@
+#include "core/debug_ui.hpp"
+#include "core/logger.hpp"
 #include "core/types.hpp"
 #include "ecs/entity.hpp"
 #include "ecs/world.hpp"
-#include "renderer/model.hpp"
 #include "renderer/resource_manager.hpp"
-#include "renderer/shader.hpp"
-#include "renderer/texture.hpp"
 
 #include "components/bounding_box_component.hpp"
 #include "components/material_component.hpp"
@@ -25,19 +24,19 @@ struct Frustum {
 };
 
 struct DrawKey {
-  std::string modelName;
+  std::string meshName;
   std::string textureName;
   std::string shaderName;
 
   bool operator==(const DrawKey &other) const {
-    return modelName == other.modelName && textureName == other.textureName &&
+    return meshName == other.meshName && textureName == other.textureName &&
            shaderName == other.shaderName;
   }
 };
 
 struct DrawKeyHash {
   std::size_t operator()(const DrawKey &k) const {
-    return std::hash<std::string>()(k.modelName) ^
+    return std::hash<std::string>()(k.meshName) ^
            (std::hash<std::string>()(k.textureName) << 1) ^
            (std::hash<std::string>()(k.shaderName) << 2);
   }
@@ -155,12 +154,12 @@ void OpenGLRenderSystem::Update(float deltaTime) {
         if (!IsBoxInFrustum(frustum, worldMin, worldMax)) {
           return;
         }
-        DrawKey key{m.modelName, mat.textureName, mat.shaderName};
+        DrawKey key{m.meshName, mat.textureName, mat.shaderName};
         if (batches.find(key) == batches.end()) {
           batches[key] = BatchData();
-          const Model &model = ResourceManager::GetModel(key.modelName);
+          const Mesh &mesh = ResourceManager::GetMesh(key.meshName);
           glGenBuffers(1, &batches[key].instanceVBO);
-          glBindVertexArray(model.VAO);
+          glBindVertexArray(mesh.VAO);
           glBindBuffer(GL_ARRAY_BUFFER, batches[key].instanceVBO);
           glBufferData(GL_ARRAY_BUFFER, MAX_ENTITIES * sizeof(InstanceData),
                        nullptr, GL_DYNAMIC_DRAW);
@@ -180,10 +179,9 @@ void OpenGLRenderSystem::Update(float deltaTime) {
           glVertexAttribDivisor(7, 1);
           glBindVertexArray(0);
 
-          std::cout << "Created batch for mesh " << key.modelName
-                    << ", material " << key.textureName << ", shader "
-                    << key.shaderName << " with VBO "
-                    << batches[key].instanceVBO << std::endl;
+          LOG_INFO("Created batch for mesh %s, material %s, shader %s with VBO %u",
+              key.meshName.c_str(), key.textureName.c_str(),
+              key.shaderName.c_str(), batches[key].instanceVBO);
         }
         batches[key].instanceDatas.push_back({GetModelMatrix(t), mat.color});
       });
@@ -194,7 +192,7 @@ void OpenGLRenderSystem::Update(float deltaTime) {
 
     const Shader &shader = ResourceManager::GetShader(key.shaderName);
     const Texture2D &texture = ResourceManager::GetTexture(key.textureName);
-    const Model &model = ResourceManager::GetModel(key.modelName);
+    const Mesh &model = ResourceManager::GetMesh(key.meshName);
 
     shader.Use();
     shader.SetMatrix4("viewProj", viewProj);
@@ -219,5 +217,6 @@ void OpenGLRenderSystem::Update(float deltaTime) {
     ++drawCalls;
   }
 
-  printf("Draw Calls: %d\n", drawCalls);
+  DebugUI::AddValue("Instances Rendered", batches.size());
+  DebugUI::AddValue("Draw Calls", drawCalls);
 }

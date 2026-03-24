@@ -1,6 +1,5 @@
+#include "core/logger.hpp"
 #include "renderer/shader.hpp"
-
-#include <iostream>
 
 void Shader::Use() const {
   glUseProgram(this->ID);
@@ -110,21 +109,15 @@ void Shader::checkCompileErrors(unsigned int object, std::string type) {
     glGetShaderiv(object, GL_COMPILE_STATUS, &success);
     if (!success) {
       glGetShaderInfoLog(object, 1024, NULL, infoLog);
-      std::cout
-          << "| ERROR::SHADER: Compile-time error: Type: " << type << "\n"
-          << infoLog
-          << "\n -- --------------------------------------------------- -- "
-          << std::endl;
+      LOG_ERROR("ERROR::SHADER: Compile-time error: Type: %s\n%s", type.c_str(),
+          infoLog);
     }
   } else {
     glGetProgramiv(object, GL_LINK_STATUS, &success);
     if (!success) {
       glGetProgramInfoLog(object, 1024, NULL, infoLog);
-      std::cout
-          << "| ERROR::Shader: Link-time error: Type: " << type << "\n"
-          << infoLog
-          << "\n -- --------------------------------------------------- -- "
-          << std::endl;
+      LOG_ERROR("ERROR::Shader: Link-time error: Type: %s\n%s", type.c_str(),
+          infoLog);
     }
   }
 }

@@ -2,5 +2,5 @@
 #include <string>
 
 struct MeshComponent {
-  std::string modelName; // 32 bytes (pointer + size)
+  std::string meshName; // 32 bytes (pointer + size)
 };
