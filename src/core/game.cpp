@@ -1,3 +1,4 @@
+#include "components/plane_component.hpp"
 #include "renderer/resource_manager.hpp"
 
 #include "components/bounding_box_component.hpp"
@@ -6,6 +7,7 @@
 #include "core/logger.hpp"
 #include "core/utils.hpp"
 #include "ecs/entity.hpp"
+#include "systems/mesh_generator.hpp"
 #include "systems/physics_system.hpp"
 #include <GLFW/glfw3.h>
 #include <random>
@@ -30,6 +32,10 @@ void Game::Init() {
       Utils::GetAssetPath("assets/shaders/diffuse.vert").c_str(),
       Utils::GetAssetPath("assets/shaders/diffuse.frag").c_str(), nullptr,
       "default");
+  ResourceManager::LoadShader(
+      Utils::GetAssetPath("assets/shaders/water.vert").c_str(),
+      Utils::GetAssetPath("assets/shaders/water.frag").c_str(), nullptr,
+      "water");
 
   ResourceManager::LoadTexture(
       Utils::GetAssetPath("assets/textures/white.png").c_str(), false, "white");
@@ -40,31 +46,29 @@ void Game::Init() {
       Utils::GetAssetPath("assets/models/sphere_smooth.obj").c_str(), "sphere");
 
   InitComponents();
-  InitSystems();
   InitObjects();
+  InitSystems();
 }
 
 void Game::InitComponents() {
   world.RegisterComponents<TransformComponent, MeshComponent, MaterialComponent,
                            CameraComponent, MouseInputComponent,
                            RigidBodyComponent, InputComponent,
-                           BoundingBoxComponent>();
+                           BoundingBoxComponent, PlaneComponent>();
 }
 
 void Game::InitSystems() {
-  auto inputSystem = world.RegisterSystem<InputSystem>();
-
-  auto cameraSystem = world.RegisterSystem<CameraSystem>();
-
-  auto physicsSystem = world.RegisterSystem<PhysicsSystem>();
-
-  auto renderSystem = world.RegisterSystem<OpenGLRenderSystem>();
+  world.RegisterSystem<MeshGenerator>();
+  world.RegisterSystem<InputSystem>();
+  world.RegisterSystem<CameraSystem>();
+  world.RegisterSystem<PhysicsSystem>();
+  world.RegisterSystem<OpenGLRenderSystem>();
 }
 
 void Game::InitObjects() {
   EntityID cameraEntity = world.CreateEntity();
   world.AddComponents(cameraEntity,
-                      TransformComponent{.position = Vec3(0.0f, 0.0f, 5.0f),
+                      TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
                                          .rotation = Vec3(0.0f, 0.0f, 0.0f),
                                          .scale = Vec3(1.0f)},
                       CameraComponent{.fov = 45.0f,
@@ -82,6 +86,21 @@ void Game::InitObjects() {
                                           .deltaY = 0.0f,
                                           .leftButton = false,
                                           .rightButton = false});
+
+  EntityID floor = world.CreateEntity();
+  world.AddComponents(floor,
+                      PlaneComponent{.width = 100.0f,
+                                     .height = 100.0f,
+                                     .widthSegments = 100,
+                                     .heightSegments = 100,
+                                     .normal = Vec3(0.0f, 1.0f, 0.0f),
+                                     .meshName = "generated_plane"},
+                      RigidBodyComponent{.type = RigidBodyComponent::Static,
+                                         .velocity = Vec3(0.0f),
+                                         .mass = 1.0f},
+                      MaterialComponent{.color = Vec3(0.6f, 0.6f, 1.0f),
+                                        .textureName = "white",
+                                        .shaderName = "water"});
 
   std::default_random_engine generator;
   std::uniform_real_distribution<float> randPosition(-100.0f, 100.0f);
@@ -147,6 +166,7 @@ void Game::Run() {
     float currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
+    world.time += deltaTime;
 
     DebugUI::BeginFrame();
     world.Update(deltaTime);

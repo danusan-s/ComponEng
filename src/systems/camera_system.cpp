@@ -8,7 +8,7 @@
 #include <GLFW/glfw3.h>
 #include <cmath>
 
-static constexpr float DEFAULT_MOVE_SPEED = 10.0f;
+static constexpr float DEFAULT_MOVE_SPEED = 100.0f;
 static constexpr float MOUSE_SENSITIVITY = 0.5f;
 static constexpr float PITCH_LIMIT = 89.0f;
 
@@ -88,6 +88,7 @@ void CameraSystem::Update(float deltaTime) {
         this->world->mainCameraData.projectionMatrix =
             perspective(radians(camera.fov), camera.aspectRatio,
                         camera.nearPlane, camera.farPlane);
+        this->world->mainCameraData.position = transform.position;
 
         DebugUI::AddVec3("Camera Position", transform.position);
       });

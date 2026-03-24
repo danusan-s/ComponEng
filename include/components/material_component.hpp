@@ -1,9 +1,8 @@
 #pragma once
 #include "core/types.hpp"
-#include <string>
 
 struct MaterialComponent {
   Vec3 color; // 12 bytes
-  std::string textureName;
-  std::string shaderName;
+  const char *textureName;
+  const char *shaderName;
 };

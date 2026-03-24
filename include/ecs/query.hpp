@@ -26,4 +26,17 @@ public:
                .template Get<Ts>(i)...);
     }
   }
+
+  template <typename Fn> void eachWithEntity(Fn fn) {
+    for (Archetype &archetype : archetypes) {
+      if ((archetype.signature & required) != required)
+        continue;
+
+      size_t n = archetype.GetEntityCount();
+      for (size_t i = 0; i < n; ++i)
+        fn(archetype.GetEntityForRow(i),
+           archetype.GetColumn(registry.GetComponentID<Ts>())
+               .template Get<Ts>(i)...);
+    }
+  }
 };

@@ -11,12 +11,24 @@
 #include "components/transform_component.hpp"
 #include "systems/render_system.hpp"
 
-static constexpr Vec3 DEFAULT_LIGHT_POS = Vec3(10.0f, 10.0f, 10.0f);
+static constexpr Vec3 DEFAULT_LIGHT_POS = Vec3(1000.0f, 1000.0f, 1000.0f);
 static constexpr Vec3 DEFAULT_LIGHT_COLOR = Vec3(1.0f, 1.0f, 1.0f);
+
+float randf() {
+  return rand() / (float)RAND_MAX; // [0,1]
+}
 
 struct Plane {
   Vec3 normal;
   float distance;
+};
+
+struct Wave {
+  Vec2 direction;
+  float amplitude;
+  float frequency;
+  float speed;
+  float phase;
 };
 
 struct Frustum {
@@ -151,7 +163,8 @@ void OpenGLRenderSystem::Update(float deltaTime) {
                 BoundingBoxComponent &bbox) {
         Vec3 worldMin = t.position + bbox.min;
         Vec3 worldMax = t.position + bbox.max;
-        if (!IsBoxInFrustum(frustum, worldMin, worldMax)) {
+        if (bbox.min != bbox.max &&
+            !IsBoxInFrustum(frustum, worldMin, worldMax)) {
           return;
         }
         DrawKey key{m.meshName, mat.textureName, mat.shaderName};
@@ -179,7 +192,8 @@ void OpenGLRenderSystem::Update(float deltaTime) {
           glVertexAttribDivisor(7, 1);
           glBindVertexArray(0);
 
-          LOG_INFO("Created batch for mesh %s, material %s, shader %s with VBO %u",
+          LOG_INFO(
+              "Created batch for mesh %s, material %s, shader %s with VBO %u",
               key.meshName.c_str(), key.textureName.c_str(),
               key.shaderName.c_str(), batches[key].instanceVBO);
         }
@@ -198,6 +212,39 @@ void OpenGLRenderSystem::Update(float deltaTime) {
     shader.SetMatrix4("viewProj", viewProj);
     shader.SetVector3f("lightPos", DEFAULT_LIGHT_POS);
     shader.SetVector3f("lightColor", DEFAULT_LIGHT_COLOR);
+    shader.SetVector3f("cameraPos", world->mainCameraData.position);
+    shader.SetFloat("time", world->time);
+
+    if (key.shaderName == "water") {
+      continue;
+
+      int NUM_WAVES = 4;
+      std::vector<Wave> waves(NUM_WAVES);
+      for (int i = 0; i < NUM_WAVES; ++i) {
+        waves[i].direction = glm::normalize(glm::vec2(randf(), randf()));
+        waves[i].amplitude = 0.1f + randf() * 0.2f;
+        waves[i].frequency = 1.0f + randf() * 2.0f;
+        waves[i].speed = 0.5f + randf();
+        waves[i].phase = randf() * 6.2831f;
+
+        shader.SetFloat(("waves[" + std::to_string(i) + "].amplitude").c_str(),
+                        waves[i].amplitude);
+        shader.SetFloat(("waves[" + std::to_string(i) + "].frequency").c_str(),
+                        waves[i].frequency);
+        shader.SetFloat(("waves[" + std::to_string(i) + "].speed").c_str(),
+                        waves[i].speed);
+        shader.SetFloat(("waves[" + std::to_string(i) + "].phase").c_str(),
+                        waves[i].phase);
+
+        // Direction components
+        shader.SetFloat(
+            ("waves[" + std::to_string(i) + "].direction.x").c_str(),
+            waves[i].direction.x);
+        shader.SetFloat(
+            ("waves[" + std::to_string(i) + "].direction.y").c_str(),
+            waves[i].direction.y);
+      }
+    }
 
     texture.Bind();
     glBindVertexArray(model.VAO);

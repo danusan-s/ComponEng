@@ -11,6 +11,7 @@
 #include <memory>
 
 struct CameraData {
+  Vec3 position;
   Mat4 viewMatrix;
   Mat4 projectionMatrix;
 };
@@ -25,12 +26,14 @@ private:
 public:
   // Global cache
   CameraData mainCameraData;
+  float time = 0.0f;
 
   void Init() {
     componentRegistry = std::make_unique<ComponentRegistry>();
     entityManager = std::make_unique<EntityManager>();
     systemManager = std::make_unique<SystemManager>();
     archetypeManager = std::make_unique<ArchetypeManager>();
+    time = 0.0f;
   }
 
   EntityID CreateEntity() {
@@ -76,10 +79,12 @@ public:
     std::size_t newRow = newArchetype.GetRowForEntity(entity);
 
     if (oldArchetype == nullptr) {
-      LOG_INFO("Adding first component to entity %llu", (unsigned long long)entity);
+      LOG_INFO("Adding first component to entity %llu",
+               (unsigned long long)entity);
     } else {
-      LOG_INFO("Moving entity %llu to new archetype",
-          (unsigned long long)entity);
+      LOG_INFO("Moving entity %llu to new archetype %s from old archetype %s",
+               (unsigned long long)entity, newSig.to_string(),
+               oldSig.to_string());
     }
 
     if (oldArchetype) {

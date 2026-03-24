@@ -112,6 +112,13 @@ public:
     return entityToRow[id];
   }
 
+  EntityID GetEntityForRow(size_t row) {
+    if (rowToEntity.find(row) == rowToEntity.end()) {
+      throw std::runtime_error("Archetype: Row index out of bounds");
+    }
+    return rowToEntity[row];
+  }
+
   size_t GetEntityCount() const {
     return componentColumns.empty() ? 0 : componentColumns[0].count;
   }

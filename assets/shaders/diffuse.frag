@@ -10,9 +10,6 @@ uniform sampler2D Tex;
 uniform vec3 lightPos;
 uniform vec3 lightColor;
 
-// uniform vec3 viewPos;
-// uniform float rimPower    = 3.0; // Sharpness of the fresnel falloff
-
 out vec4 FragColor;
 
 void main()
@@ -31,12 +28,6 @@ void main()
 
     vec3 textureColor = texture(Tex, TexCoords).rgb;
     vec3 result = (ambient + diffuse) * textureColor * ObjectColor;
-
-    // vec3 rimColor = normalize(objectColor + 0.0001);                      // preserve hue at full brightness
-    // float brightness = dot(objectColor, vec3(0.2126, 0.7152, 0.0722));   // perceptual luminance of original color
-    // float rimStrength = mix(1.0, 0.0, brightness);                        // darker objects get stronger rim
-    // float rim = pow(1.0 - max(dot(normal, viewDir), 0.0), rimPower) * rimStrength;
-    // result += rimColor * rim;
 
     FragColor = vec4(result, 1.0);
 }
