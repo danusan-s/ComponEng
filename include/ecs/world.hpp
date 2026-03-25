@@ -83,8 +83,8 @@ public:
                (unsigned long long)entity);
     } else {
       LOG_INFO("Moving entity %llu to new archetype %s from old archetype %s",
-               (unsigned long long)entity, newSig.to_string(),
-               oldSig.to_string());
+               (unsigned long long)entity, newSig.to_string().c_str(),
+               oldSig.to_string().c_str());
     }
 
     if (oldArchetype) {
