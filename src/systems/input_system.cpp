@@ -1,6 +1,6 @@
 #include "systems/input_system.hpp"
 #include "components/input_component.hpp"
-#include "core/game.hpp"
+#include "core/engine.hpp"
 #include "ecs/world.hpp"
 
 constexpr auto FORWARD_KEY = GLFW_KEY_W;
@@ -11,7 +11,7 @@ constexpr auto JUMP_KEY = GLFW_KEY_SPACE;
 constexpr auto CROUCH_KEY = GLFW_KEY_LEFT_SHIFT;
 
 void InputSystem::Update(float deltaTime) {
-  auto &state = Game::Get().window.inputState;
+  auto &state = Engine::Get().window.inputState;
 
   world->query<InputComponent, MouseInputComponent>().eachOptional(
       [&](InputComponent &input, MouseInputComponent &mouseInput) {

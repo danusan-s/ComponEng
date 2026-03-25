@@ -153,14 +153,18 @@ public:
   }
 
   template <typename T> std::shared_ptr<T> RegisterSystem() {
-    return systemManager->RegisterSystem<T>(*this);
+    return systemManager->RegisterSystem<T>();
   }
 
-  void Update(float deltaTime) {
+  void InitSystems() {
+    systemManager->InitAll(*this);
+  }
+
+  void UpdateSystems(float deltaTime) {
     systemManager->UpdateAll(deltaTime);
   }
 
-  void Shutdown() {
+  void ShutdownSystems() {
     systemManager->ShutdownAll();
   }
 };

@@ -6,7 +6,7 @@
 Vec3 GRAVITY = Vec3(0.0f, -9.81f, 0.0f);
 
 void PhysicsSystem::Update(float deltaTime) {
-  world->query<TransformComponent, RigidBodyComponent>().each(
+  world->query<TransformComponent, RigidBodyComponent>().eachOptional(
       [&](TransformComponent &transform, RigidBodyComponent &rigidbody) {
         if (rigidbody.type == RigidBodyComponent::Static)
           return;

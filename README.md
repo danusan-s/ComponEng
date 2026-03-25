@@ -88,5 +88,4 @@ The following are the components and systems along with the example scene that a
 | CameraSystem | WASD movement, mouse look, view/projection matrices |
 | PhysicsSystem | Velocity/acceleration integration with gravity |
 | RenderSystem | Instanced rendering with batching and frustum culling |
-| UISystem | ImGui debug overlay |
 

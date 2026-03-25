@@ -18,16 +18,22 @@ private:
   }
 
 public:
-  template <typename T> std::shared_ptr<T> RegisterSystem(World &world) {
+  template <typename T> std::shared_ptr<T> RegisterSystem() {
     const char *typeName = typeid(T).name();
 
     assert(find(typeName) == systems.size() &&
            "Registering system more than once.");
 
     auto system = std::make_shared<T>();
-    system->Init(world);
     systems.emplace_back(typeName, system);
     return system;
+  }
+
+  void InitAll(World &world) {
+    for (auto const &pair : systems) {
+      auto const &system = pair.second;
+      system->Init(world);
+    }
   }
 
   void UpdateAll(float deltaTime) {

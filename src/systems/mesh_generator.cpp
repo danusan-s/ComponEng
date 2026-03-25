@@ -1,5 +1,4 @@
 #include "systems/mesh_generator.hpp"
-#include "components/bounding_box_component.hpp"
 #include "components/mesh_component.hpp"
 #include "components/plane_component.hpp"
 #include "components/transform_component.hpp"
@@ -11,6 +10,7 @@
 void MeshGenerator::Init(World &world) {
   world.query<PlaneComponent>().eachWithEntityOptional(
       [&](EntityID e, PlaneComponent &plane) {
+        LOG_INFO("Generating mesh for plane entity {}", e);
         Mesh mesh;
         Vec3 normal = plane.normal;
 
