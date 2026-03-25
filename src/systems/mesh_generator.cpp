@@ -9,7 +9,7 @@
 #include "renderer/resource_manager.hpp"
 
 void MeshGenerator::Init(World &world) {
-  world.query<PlaneComponent>().eachWithEntity(
+  world.query<PlaneComponent>().eachWithEntityOptional(
       [&](EntityID e, PlaneComponent &plane) {
         Mesh mesh;
         Vec3 normal = plane.normal;
@@ -74,8 +74,6 @@ void MeshGenerator::Init(World &world) {
                                   .rotation = Vec3(0.0f, 0.0f, 0.0f),
                                   .scale = Vec3(1.0f),
                               });
-        world.AddComponent(
-            e, BoundingBoxComponent{.min = Vec3(0.0f), .max = Vec3(0.0f)});
         world.RemoveComponent<PlaneComponent>(e);
       });
 }

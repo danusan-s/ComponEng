@@ -13,7 +13,7 @@ constexpr auto CROUCH_KEY = GLFW_KEY_LEFT_SHIFT;
 void InputSystem::Update(float deltaTime) {
   auto &state = Game::Get().window.inputState;
 
-  world->query<InputComponent, MouseInputComponent>().each(
+  world->query<InputComponent, MouseInputComponent>().eachOptional(
       [&](InputComponent &input, MouseInputComponent &mouseInput) {
         input.forward = state.keys[FORWARD_KEY];
         input.backward = state.keys[BACKWARD_KEY];

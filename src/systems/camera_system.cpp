@@ -9,7 +9,7 @@
 #include <cmath>
 
 static constexpr float DEFAULT_MOVE_SPEED = 100.0f;
-static constexpr float MOUSE_SENSITIVITY = 0.5f;
+static constexpr float MOUSE_SENSITIVITY = 200.0f;
 static constexpr float PITCH_LIMIT = 89.0f;
 
 static void UpdateCameraVectors(const TransformComponent &transform,
@@ -65,19 +65,14 @@ void CameraSystem::Update(float deltaTime) {
   world
       ->query<TransformComponent, CameraComponent, InputComponent,
               MouseInputComponent>()
-      .each([&](auto &transform, auto &camera, auto &input, auto &mouseInput) {
+      .eachOptional([&](auto &transform, auto &camera, auto &input,
+                        auto &mouseInput) {
         if (!camera.isMainCamera)
           return;
 
         ProcessKeyboardInput(transform, input, deltaTime, DEFAULT_MOVE_SPEED);
 
-        smoothedMouseDelta =
-            mix(smoothedMouseDelta, Vec2(mouseInput.deltaX, mouseInput.deltaY),
-                1.0f - SMOOTHING);
-        ProcessMouseInput(
-            transform,
-            {smoothedMouseDelta.x, smoothedMouseDelta.y, false, false},
-            MOUSE_SENSITIVITY);
+        ProcessMouseInput(transform, mouseInput, MOUSE_SENSITIVITY * deltaTime);
 
         Vec3 front, right, up;
         UpdateCameraVectors(transform, front, right, up);

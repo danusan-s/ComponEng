@@ -100,7 +100,7 @@ void Game::InitObjects() {
                                          .mass = 1.0f},
                       MaterialComponent{.color = Vec3(0.6f, 0.6f, 1.0f),
                                         .textureName = "white",
-                                        .shaderName = "water"});
+                                        .shaderName = "default"});
 
   std::default_random_engine generator;
   std::uniform_real_distribution<float> randPosition(-100.0f, 100.0f);
@@ -124,8 +124,6 @@ void Game::InitObjects() {
         RigidBodyComponent{.type = RigidBodyComponent::Dynamic,
                            .velocity = Vec3(0.0f),
                            .mass = 1.0f},
-        BoundingBoxComponent{.min = Vec3(-scale / 2.0f),
-                             .max = Vec3(scale / 2.0f)},
         MaterialComponent{.color =
                               Vec4(randColor(generator), randColor(generator),
                                    randColor(generator), 1.0f),
@@ -170,6 +168,7 @@ void Game::Run() {
 
     DebugUI::BeginFrame();
     world.Update(deltaTime);
+    DebugUI::AddValue("FPS", 1.0f / deltaTime);
     DebugUI::EndFrame();
 
     window.SwapBuffers();

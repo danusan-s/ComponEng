@@ -118,6 +118,7 @@ void Window::Init(int width, int height, const char *title) {
   }
 
   glfwMakeContextCurrent(handle);
+  glfwSwapInterval(0); // disables VSync → uncapped FPS
 
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     LOG_ERROR("Failed to initialize GLAD");

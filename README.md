@@ -12,7 +12,9 @@ An ECS-based game engine built in C++ using modern OpenGL.
 
 ComponEng is a learning project demonstrating core game engine architecture through an **Entity-Component-System (ECS)** pattern. It features an archetype-based ECS (similar to Unity DOTS or Flecs) with cache-efficient component storage, instanced rendering, and a debug overlay.
 
-The engine renders 200 instanced objects (cubes and spheres) with physics simulation, diffuse lighting, camera controls, and real-time debug UI.
+## Why ?
+
+Well the project initially started for a really silly reason. Unity was buggy on linux wayland and I couldn't get my lsp to work with unity packages. So I decided to just build my own engine because why not. I was always intrigued by how the big engines work and had found that most big games use their own engines. Having your own engine comes with many advantages, no license fees, full control over the codebase, and a deeper understanding of how games work under the hood.
 
 ## Features
 
