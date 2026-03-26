@@ -2,7 +2,7 @@
 #include "ecs/system.hpp"
 #include <GLFW/glfw3.h>
 
-class InputSystem : public System {
+class InputSystem : public ISystem {
 public:
-  void Update(float deltaTime) override;
+  void onUpdate(const SystemState& state) override;
 };

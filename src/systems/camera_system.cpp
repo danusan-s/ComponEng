@@ -61,30 +61,32 @@ static void ProcessMouseInput(TransformComponent &transform,
     transform.rotation.x = -PITCH_LIMIT;
 }
 
-void CameraSystem::Update(float deltaTime) {
-  world
-      ->query<TransformComponent, CameraComponent, InputComponent,
-              MouseInputComponent>()
-      .eachOptional([&](auto &transform, auto &camera, auto &input,
-                        auto &mouseInput) {
-        if (!camera.isMainCamera)
-          return;
+void CameraSystem::onUpdate(const SystemState &state) {
+  EntityID mainCameraEntity =
+      state.world->GetSingleton<MainCameraSingleton>().entity;
 
-        ProcessKeyboardInput(transform, input, deltaTime, DEFAULT_MOVE_SPEED);
+  TransformComponent &transform =
+      state.world->GetComponent<TransformComponent>(mainCameraEntity);
+  CameraComponent &camera =
+      state.world->GetComponent<CameraComponent>(mainCameraEntity);
+  InputComponent &input =
+      state.world->GetComponent<InputComponent>(mainCameraEntity);
+  MouseInputComponent &mouseInput =
+      state.world->GetComponent<MouseInputComponent>(mainCameraEntity);
 
-        ProcessMouseInput(transform, mouseInput, MOUSE_SENSITIVITY * deltaTime);
+  ProcessKeyboardInput(transform, input, state.deltaTime, DEFAULT_MOVE_SPEED);
 
-        Vec3 front, right, up;
-        UpdateCameraVectors(transform, front, right, up);
+  ProcessMouseInput(transform, mouseInput, MOUSE_SENSITIVITY * state.deltaTime);
 
-        this->world->mainCameraData.viewMatrix =
-            lookAt(transform.position, transform.position + front, up);
+  Vec3 front, right, up;
+  UpdateCameraVectors(transform, front, right, up);
 
-        this->world->mainCameraData.projectionMatrix =
-            perspective(radians(camera.fov), camera.aspectRatio,
-                        camera.nearPlane, camera.farPlane);
-        this->world->mainCameraData.position = transform.position;
+  Mat4 viewMatrix = lookAt(transform.position, transform.position + front, up);
 
-        DebugUI::AddVec3("Camera Position", transform.position);
-      });
+  Mat4 projectionMatrix = perspective(radians(camera.fov), camera.aspectRatio,
+                                      camera.nearPlane, camera.farPlane);
+
+  camera.viewProjectionMatrix = projectionMatrix * viewMatrix;
+
+  DebugUI::AddVec3("Camera Position", transform.position);
 }

@@ -1,7 +1,7 @@
 #pragma once
 #include "ecs/system.hpp"
 
-class CameraSystem : public System {
+class CameraSystem : public ISystem {
 public:
-  void Update(float deltaTime) override;
+  void onUpdate(const SystemState &state) override;
 };

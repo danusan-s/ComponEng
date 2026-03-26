@@ -1,6 +1,5 @@
 #pragma once
 #include "core/logger.hpp"
-#include "core/types.hpp"
 #include "ecs/archetype.hpp"
 #include "ecs/archetype_manager.hpp"
 #include "ecs/component_registry.hpp"
@@ -10,12 +9,6 @@
 #include "ecs/system_manager.hpp"
 #include <memory>
 
-struct CameraData {
-  Vec3 position;
-  Mat4 viewMatrix;
-  Mat4 projectionMatrix;
-};
-
 class World {
 private:
   std::unique_ptr<ComponentRegistry> componentRegistry;
@@ -23,9 +16,9 @@ private:
   std::unique_ptr<SystemManager> systemManager;
   std::unique_ptr<ArchetypeManager> archetypeManager;
 
+  std::unordered_map<ComponentID, std::vector<uint8_t>> singletons;
+
 public:
-  // Global cache
-  CameraData mainCameraData;
   float time = 0.0f;
 
   void Init() {
@@ -54,6 +47,18 @@ public:
     (this->RegisterComponent<Components>(), ...);
   }
 
+  template <typename T> T &GetComponent(EntityID entity) {
+    EntityRecord &record = entityManager->GetRecord(entity);
+    ComponentID componentID = componentRegistry->GetComponentID<T>();
+
+    if (!record.signature.test(componentID)) {
+      throw std::runtime_error("Entity does not have component");
+    }
+
+    Archetype *archetype = archetypeManager->getBySignature(record.signature);
+    return archetype->Get<T>(componentID, record.row);
+  }
+
   template <typename T> void AddComponent(EntityID entity, T &&component) {
     AddComponents(entity, std::forward<T>(component));
   }
@@ -65,7 +70,7 @@ public:
     Signature oldSig = record.signature;
     Archetype *oldArchetype = archetypeManager->getBySignature(oldSig);
 
-    if ((oldSig.test(componentRegistry->GetComponentID<Ts>()) || ...)) {
+    if ((oldSig & componentRegistry->MakeSignature<Ts...>()).any()) {
       throw std::runtime_error("Entity already has component");
     }
 
@@ -146,25 +151,56 @@ public:
     record.row = newRow;
   }
 
+  template <typename T> bool HasComponent(EntityID entity) {
+    ComponentID componentID = componentRegistry->GetComponentID<T>();
+    EntityRecord &record = entityManager->GetRecord(entity);
+    return record.signature.test(componentID);
+  }
+
+  template <typename T> T &GetSingleton() {
+    ComponentID componentID = componentRegistry->GetComponentID<T>();
+    auto it = singletons.find(componentID);
+    if (it == singletons.end()) {
+      throw std::runtime_error("Singleton not found");
+    }
+    return *reinterpret_cast<T *>(singletons[componentID].data());
+  }
+
+  template <typename T> void SetSingleton(const T &value) {
+    ComponentID componentID = componentRegistry->GetComponentID<T>();
+    std::vector<uint8_t> &storage = singletons[componentID];
+    if (storage.empty()) {
+      storage.resize(sizeof(T));
+    }
+    *reinterpret_cast<T *>(storage.data()) = value;
+  }
+
+  template <typename T> bool HasSingleton() {
+    ComponentID componentID = componentRegistry->GetComponentID<T>();
+    return singletons.find(componentID) != singletons.end();
+  }
+
   template <typename... Ts> Query<Ts...> query() {
     std::array<Archetype, MAX_ARCHETYPES> &archetypes =
         archetypeManager->getArchetypes();
     return Query<Ts...>(archetypes, *componentRegistry.get());
   }
 
-  template <typename T> std::shared_ptr<T> RegisterSystem() {
-    return systemManager->RegisterSystem<T>();
+  template <typename T>
+  std::shared_ptr<T>
+  RegisterSystem(SystemGroup group = SystemGroup::Simulation) {
+    return systemManager->RegisterSystem<T>(group);
   }
 
-  void InitSystems() {
-    systemManager->InitAll(*this);
+  void CreateSystems() {
+    systemManager->CreateAll(this);
   }
 
   void UpdateSystems(float deltaTime) {
-    systemManager->UpdateAll(deltaTime);
+    systemManager->UpdateAll(this, deltaTime);
   }
 
-  void ShutdownSystems() {
-    systemManager->ShutdownAll();
+  void DestroySystems() {
+    systemManager->DestroyAll(this);
   }
 };

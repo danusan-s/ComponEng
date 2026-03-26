@@ -1,52 +1,78 @@
 #pragma once
 #include "ecs/system.hpp"
+#include <array>
 #include <assert.h>
 #include <memory>
 #include <vector>
 
+enum SystemGroup { Initialization, Simulation, Presentation };
+
+constexpr SystemGroup GROUP_ORDER[] = {Initialization, Simulation,
+                                       Presentation};
+constexpr size_t NUM_GROUPS = sizeof(GROUP_ORDER) / sizeof(SystemGroup);
+
+struct SystemRecord {
+  const char *typeName;
+  std::shared_ptr<ISystem> system;
+};
+
 class SystemManager {
 private:
-  std::vector<std::pair<const char *, std::shared_ptr<System>>> systems;
+  std::array<std::vector<SystemRecord>, NUM_GROUPS> systems;
 
-  size_t find(const char *typeName) {
-    for (size_t i = 0; i < systems.size(); ++i) {
-      if (systems[i].first == typeName) {
-        return i;
+  bool hasSystem(const char *typeName) {
+    for (SystemGroup group : GROUP_ORDER) {
+      auto &groupSystems = systems[group];
+      for (size_t i = 0; i < groupSystems.size(); ++i) {
+        if (groupSystems[i].typeName == typeName) {
+          return true;
+        }
       }
     }
-    return systems.size();
+    return false;
   }
 
 public:
-  template <typename T> std::shared_ptr<T> RegisterSystem() {
+  template <typename T> std::shared_ptr<T> RegisterSystem(SystemGroup group) {
     const char *typeName = typeid(T).name();
 
-    assert(find(typeName) == systems.size() &&
-           "Registering system more than once.");
+    assert(!hasSystem(typeName) && "Registering system more than once.");
 
     auto system = std::make_shared<T>();
-    systems.emplace_back(typeName, system);
+    systems[group].push_back({typeName, system});
     return system;
   }
 
-  void InitAll(World &world) {
-    for (auto const &pair : systems) {
-      auto const &system = pair.second;
-      system->Init(world);
+  void CreateAll(World *world) {
+    SystemState state{world, 0.0f};
+    for (SystemGroup group : GROUP_ORDER) {
+      auto &groupSystems = systems[group];
+      for (auto const &sysRec : groupSystems) {
+        auto const &system = sysRec.system;
+        system->onCreate(state);
+      }
     }
   }
 
-  void UpdateAll(float deltaTime) {
-    for (auto const &pair : systems) {
-      auto const &system = pair.second;
-      system->Update(deltaTime);
+  void UpdateAll(World *world, float deltaTime) {
+    SystemState state{world, deltaTime};
+    for (SystemGroup group : GROUP_ORDER) {
+      auto &groupSystems = systems[group];
+      for (auto const &sysRec : groupSystems) {
+        auto const &system = sysRec.system;
+        system->onUpdate(state);
+      }
     }
   }
 
-  void ShutdownAll() {
-    for (auto const &pair : systems) {
-      auto const &system = pair.second;
-      system->Shutdown();
+  void DestroyAll(World *world) {
+    SystemState state{world, 0.0f};
+    for (SystemGroup group : GROUP_ORDER) {
+      auto &groupSystems = systems[group];
+      for (auto const &sysRec : groupSystems) {
+        auto const &system = sysRec.system;
+        system->onDestroy(state);
+      }
     }
   }
 };

@@ -2,19 +2,17 @@
 
 class World;
 
-class System {
-  friend class SystemManager;
+struct SystemState {
+  World *world;
+  float deltaTime;
+};
 
+class ISystem {
 public:
-  virtual ~System() = default;
-  virtual void Update(float deltaTime) = 0;
-  virtual void Shutdown() {
-    return;
-  };
-
-protected:
-  World *world = nullptr;
-  virtual void Init(World &world) {
-    this->world = &world;
+  virtual ~ISystem() = default;
+  virtual void onUpdate(const SystemState &state) = 0;
+  virtual void onCreate(const SystemState &state) {
+  }
+  virtual void onDestroy(const SystemState &state) {
   }
 };

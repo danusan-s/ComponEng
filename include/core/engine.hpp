@@ -32,7 +32,6 @@ private:
   Engine() = default;
   ~Engine() = default;
   void RegisterSystems();
-  void RegisterLaterSystems();
   void RegisterComponents();
   void InitObjects();
 };

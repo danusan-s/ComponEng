@@ -1,3 +1,4 @@
+#include "components/camera_component.hpp"
 #include "core/debug_ui.hpp"
 #include "core/logger.hpp"
 #include "core/types.hpp"
@@ -141,12 +142,51 @@ static Frustum GenerateFrustum(const Mat4 &m) {
   return f;
 }
 
-void OpenGLRenderSystem::Update(float deltaTime) {
+static void PopulateBatch(const TransformComponent &t, const MeshComponent &m,
+                          const MaterialComponent &mat) {
+  DrawKey key{m.meshName, mat.textureName, mat.shaderName};
+  if (batches.find(key) == batches.end()) {
+    batches[key] = BatchData();
+    const Mesh &mesh = ResourceManager::GetMesh(key.meshName);
+    glGenBuffers(1, &batches[key].instanceVBO);
+    glBindVertexArray(mesh.VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, batches[key].instanceVBO);
+    glBufferData(GL_ARRAY_BUFFER, MAX_ENTITIES * sizeof(InstanceData), nullptr,
+                 GL_DYNAMIC_DRAW);
+
+    // Model matrix (4 vec4)
+    for (int i = 0; i < 4; ++i) {
+      glVertexAttribPointer(
+          3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
+          (void *)(offsetof(InstanceData, modelMatrix) + sizeof(Vec4) * i));
+      glEnableVertexAttribArray(3 + i);
+      glVertexAttribDivisor(3 + i, 1);
+    }
+    glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
+                          (void *)offsetof(InstanceData, color));
+    glEnableVertexAttribArray(7);
+    glVertexAttribDivisor(7, 1);
+    glBindVertexArray(0);
+
+    LOG_INFO("Created batch for mesh %s, material %s, shader %s "
+             "with VBO %u",
+             key.meshName.c_str(), key.textureName.c_str(),
+             key.shaderName.c_str(), batches[key].instanceVBO);
+  }
+  batches[key].instanceDatas.push_back({GetModelMatrix(t), mat.color});
+}
+
+void OpenGLRenderSystem::onUpdate(const SystemState &state) {
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  Mat4 viewProj = this->world->mainCameraData.projectionMatrix *
-                  this->world->mainCameraData.viewMatrix;
+  EntityID mainCameraID =
+      state.world->GetSingleton<MainCameraSingleton>().entity;
+
+  Vec3 &cameraPos =
+      state.world->GetComponent<TransformComponent>(mainCameraID).position;
+  Mat4 &viewProj = state.world->GetComponent<CameraComponent>(mainCameraID)
+                       .viewProjectionMatrix;
 
   Frustum frustum = GenerateFrustum(viewProj);
 
@@ -156,49 +196,22 @@ void OpenGLRenderSystem::Update(float deltaTime) {
     pair.second.instanceDatas.clear();
   }
 
-  world->query<TransformComponent, MeshComponent, MaterialComponent>()
-      .eachOptional<BoundingBoxComponent>([&](TransformComponent &t,
-                                              MeshComponent &m,
-                                              MaterialComponent &mat,
-                                              BoundingBoxComponent *bbox) {
-        if (bbox) {
-          Vec3 worldMin = t.position + bbox->min;
-          Vec3 worldMax = t.position + bbox->max;
-          if (!IsBoxInFrustum(frustum, worldMin, worldMax))
-            return;
-        }
-        DrawKey key{m.meshName, mat.textureName, mat.shaderName};
-        if (batches.find(key) == batches.end()) {
-          batches[key] = BatchData();
-          const Mesh &mesh = ResourceManager::GetMesh(key.meshName);
-          glGenBuffers(1, &batches[key].instanceVBO);
-          glBindVertexArray(mesh.VAO);
-          glBindBuffer(GL_ARRAY_BUFFER, batches[key].instanceVBO);
-          glBufferData(GL_ARRAY_BUFFER, MAX_ENTITIES * sizeof(InstanceData),
-                       nullptr, GL_DYNAMIC_DRAW);
-
-          // Model matrix (4 vec4)
-          for (int i = 0; i < 4; ++i) {
-            glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE,
-                                  sizeof(InstanceData),
-                                  (void *)(offsetof(InstanceData, modelMatrix) +
-                                           sizeof(Vec4) * i));
-            glEnableVertexAttribArray(3 + i);
-            glVertexAttribDivisor(3 + i, 1);
-          }
-          glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-                                (void *)offsetof(InstanceData, color));
-          glEnableVertexAttribArray(7);
-          glVertexAttribDivisor(7, 1);
-          glBindVertexArray(0);
-
-          LOG_INFO("Created batch for mesh %s, material %s, shader %s "
-                   "with VBO %u",
-                   key.meshName.c_str(), key.textureName.c_str(),
-                   key.shaderName.c_str(), batches[key].instanceVBO);
-        }
-        batches[key].instanceDatas.push_back({GetModelMatrix(t), mat.color});
+  state.world
+      ->query<TransformComponent, MeshComponent, MaterialComponent,
+              BoundingBoxComponent>()
+      .each([&](TransformComponent &t, MeshComponent &m, MaterialComponent &mat,
+                BoundingBoxComponent &bbox) {
+        Vec3 worldMin = t.position + bbox.min;
+        Vec3 worldMax = t.position + bbox.max;
+        if (!IsBoxInFrustum(frustum, worldMin, worldMax))
+          return;
+        PopulateBatch(t, m, mat);
       });
+
+  state.world->query<TransformComponent, MeshComponent, MaterialComponent>()
+      .Exclude<BoundingBoxComponent>()
+      .each([&](TransformComponent &t, MeshComponent &m,
+                MaterialComponent &mat) { PopulateBatch(t, m, mat); });
 
   for (const auto &pair : batches) {
     const DrawKey &key = pair.first;
@@ -212,8 +225,8 @@ void OpenGLRenderSystem::Update(float deltaTime) {
     shader.SetMatrix4("viewProj", viewProj);
     shader.SetVector3f("lightPos", DEFAULT_LIGHT_POS);
     shader.SetVector3f("lightColor", DEFAULT_LIGHT_COLOR);
-    shader.SetVector3f("cameraPos", world->mainCameraData.position);
-    shader.SetFloat("time", world->time);
+    shader.SetVector3f("cameraPos", cameraPos);
+    shader.SetFloat("time", state.world->time);
 
     texture.Bind();
     glBindVertexArray(model.VAO);

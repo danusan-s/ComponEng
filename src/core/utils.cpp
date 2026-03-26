@@ -44,11 +44,14 @@ std::string Utils::GetExecutableDir() {
 }
 
 std::string Utils::GetAssetPath(const std::string &relativePath) {
-  std::filesystem::path baseDir = GetExecutableDir();
+  static std::filesystem::path root = [] {
+    std::filesystem::path p = __FILE__;
+    return p.parent_path().parent_path().parent_path(); // adjust as needed
+  }();
 
   // Assuming the executable is built in `<project_root>/build/`
   // we resolve the asset path relative to `<project_root>`
-  std::filesystem::path assetPath = baseDir / ".." / relativePath;
+  std::filesystem::path assetPath = root / relativePath;
 
   // weakly_canonical normalizes the path (resolves "..") without needing the
   // target to exist

@@ -38,16 +38,14 @@ void Engine::RegisterComponents() {
                            CameraComponent, MouseInputComponent,
                            RigidBodyComponent, InputComponent,
                            BoundingBoxComponent>();
+  world.RegisterComponents<MainCameraSingleton>();
 }
 
 void Engine::RegisterSystems() {
-  world.RegisterSystem<InputSystem>();
-}
-
-void Engine::RegisterLaterSystems() {
-  world.RegisterSystem<CameraSystem>();
-  world.RegisterSystem<PhysicsSystem>();
-  world.RegisterSystem<OpenGLRenderSystem>();
+  world.RegisterSystem<InputSystem>(SystemGroup::Initialization);
+  world.RegisterSystem<CameraSystem>(SystemGroup::Simulation);
+  world.RegisterSystem<PhysicsSystem>(SystemGroup::Simulation);
+  world.RegisterSystem<OpenGLRenderSystem>(SystemGroup::Presentation);
 }
 
 void Engine::InitObjects() {
@@ -59,8 +57,7 @@ void Engine::InitObjects() {
                       CameraComponent{.fov = 45.0f,
                                       .aspectRatio = 16.0f / 9.0f,
                                       .nearPlane = 0.1f,
-                                      .farPlane = 1000.0f,
-                                      .isMainCamera = true},
+                                      .farPlane = 1000.0f},
                       InputComponent{.forward = false,
                                      .backward = false,
                                      .left = false,
@@ -71,12 +68,13 @@ void Engine::InitObjects() {
                                           .deltaY = 0.0f,
                                           .leftButton = false,
                                           .rightButton = false});
+  world.SetSingleton<MainCameraSingleton>(
+      MainCameraSingleton{.entity = cameraEntity});
 }
 
 void Engine::Run(IGame &game) {
-  game.onInit();
-  RegisterLaterSystems();
-  world.InitSystems();
+  game.Init(world);
+  world.CreateSystems();
 
   float deltaTime = 0.0f;
   float lastFrame = 0.0f;
@@ -89,7 +87,6 @@ void Engine::Run(IGame &game) {
 
     DebugUI::BeginFrame();
     world.UpdateSystems(deltaTime);
-    game.onUpdate(deltaTime);
     DebugUI::AddValue("FPS", 1.0f / deltaTime);
     DebugUI::EndFrame();
 
@@ -101,11 +98,11 @@ void Engine::Run(IGame &game) {
     }
   }
 
-  game.onShutdown();
+  game.Shutdown(world);
+  world.DestroySystems();
 }
 
 void Engine::Shutdown() {
-  world.ShutdownSystems();
   DebugUI::Shutdown();
   ResourceManager::Clear();
   window.Shutdown();

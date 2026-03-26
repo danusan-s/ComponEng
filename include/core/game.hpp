@@ -1,8 +1,8 @@
 #pragma once
+#include "ecs/world.hpp"
 
 class IGame {
 public:
-  virtual void onInit() = 0;
-  virtual void onUpdate(float deltaTime) = 0;
-  virtual void onShutdown() = 0;
+  virtual void Init(World &world) = 0;
+  virtual void Shutdown(World &world) = 0;
 };
