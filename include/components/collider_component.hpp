@@ -4,14 +4,14 @@
 
 // Take object transform as center
 struct AABB {
-  Vec3 halfExtents;
   Vec3 localCenter; // offset from object transform to OBB center
+  Vec3 halfExtents;
 };
 
 struct OBB {
-  Vec3 halfExtents;
   Vec3 localCenter;   // offset from object transform to OBB center
   Vec3 localRotation; // rotation from local space to world space
+  Vec3 halfExtents;
 };
 
 struct Sphere {

@@ -3,17 +3,17 @@
 #include "core/window.hpp"
 #include "ecs/world.hpp"
 
-#include "components/bounding_box_component.hpp"
 #include "components/camera_component.hpp"
+#include "components/collider_component.hpp"
 #include "components/input_component.hpp"
 #include "components/material_component.hpp"
 #include "components/mesh_component.hpp"
 #include "components/rigidbody_component.hpp"
 #include "components/transform_component.hpp"
+#include "physics/physics_system.hpp"
+#include "renderer/render_system.hpp"
 #include "systems/camera_system.hpp"
 #include "systems/input_system.hpp"
-#include "systems/physics_system.hpp"
-#include "systems/render_system.hpp"
 
 class Engine {
 public:

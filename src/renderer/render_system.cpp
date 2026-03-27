@@ -1,4 +1,5 @@
 #include "components/camera_component.hpp"
+#include "components/collider_component.hpp"
 #include "core/debug_ui.hpp"
 #include "core/logger.hpp"
 #include "core/types.hpp"
@@ -6,11 +7,10 @@
 #include "ecs/world.hpp"
 #include "renderer/resource_manager.hpp"
 
-#include "components/bounding_box_component.hpp"
 #include "components/material_component.hpp"
 #include "components/mesh_component.hpp"
 #include "components/transform_component.hpp"
-#include "systems/render_system.hpp"
+#include "renderer/render_system.hpp"
 
 static constexpr Vec3 DEFAULT_LIGHT_POS = Vec3(1000.0f, 1000.0f, 1000.0f);
 static constexpr Vec3 DEFAULT_LIGHT_COLOR = Vec3(1.0f, 1.0f, 1.0f);
@@ -19,7 +19,7 @@ float randf() {
   return rand() / (float)RAND_MAX; // [0,1]
 }
 
-struct Plane {
+struct FrustumPlane {
   Vec3 normal;
   float distance;
 };
@@ -198,18 +198,32 @@ void OpenGLRenderSystem::onUpdate(const SystemState &state) {
 
   state.world
       ->query<TransformComponent, MeshComponent, MaterialComponent,
-              BoundingBoxComponent>()
+              ColliderComponent>()
       .each([&](TransformComponent &t, MeshComponent &m, MaterialComponent &mat,
-                BoundingBoxComponent &bbox) {
-        Vec3 worldMin = t.position + bbox.min;
-        Vec3 worldMax = t.position + bbox.max;
+                ColliderComponent &col) {
+        Vec3 center, worldMin, worldMax;
+        if (col.type == ColliderType::AABB) {
+          center = t.position + std::get<AABB>(col.shape).localCenter;
+          worldMin = center - std::get<AABB>(col.shape).halfExtents;
+          worldMax = center + std::get<AABB>(col.shape).halfExtents;
+        } else if (col.type == ColliderType::Sphere) {
+          center = t.position + std::get<Sphere>(col.shape).localCenter;
+          float radius = std::get<Sphere>(col.shape).radius;
+          worldMin = center - Vec3(radius);
+          worldMax = center + Vec3(radius);
+        } else {
+          // If no collider, just use position as point
+          center = t.position;
+          worldMin = center - t.scale;
+          worldMax = center + t.scale;
+        }
         if (!IsBoxInFrustum(frustum, worldMin, worldMax))
           return;
         PopulateBatch(t, m, mat);
       });
 
   state.world->query<TransformComponent, MeshComponent, MaterialComponent>()
-      .Exclude<BoundingBoxComponent>()
+      .Exclude<ColliderComponent>()
       .each([&](TransformComponent &t, MeshComponent &m,
                 MaterialComponent &mat) { PopulateBatch(t, m, mat); });
 
@@ -246,6 +260,10 @@ void OpenGLRenderSystem::onUpdate(const SystemState &state) {
     ++drawCalls;
   }
 
-  DebugUI::AddValue("Instances Rendered", batches.size());
+  int instancesRendered = 0;
+  for (const auto &pair : batches) {
+    instancesRendered += pair.second.instanceDatas.size();
+  }
+  DebugUI::AddValue("Instances Rendered", instancesRendered);
   DebugUI::AddValue("Draw Calls", drawCalls);
 }

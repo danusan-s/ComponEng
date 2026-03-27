@@ -13,6 +13,7 @@ file(GLOB ENGINE_SOURCES
     "src/core/*.cpp"
     "src/renderer/*.cpp"
     "src/systems/*.cpp"
+    "src/physics/*.cpp"
     "src/glad/*.c"
     "src/imgui/*.cpp"
 )

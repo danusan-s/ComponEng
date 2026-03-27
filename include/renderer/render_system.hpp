@@ -3,5 +3,5 @@
 
 class OpenGLRenderSystem : public ISystem {
 public:
-  void onUpdate(const SystemState& state) override;
+  void onUpdate(const SystemState &state) override;
 };

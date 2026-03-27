@@ -8,7 +8,7 @@
 #include <GLFW/glfw3.h>
 
 #include "core/logger.hpp"
-#include "systems/render_system.hpp"
+#include "renderer/render_system.hpp"
 
 void Engine::Init() {
   window.Init(1280, 720, "ECS Game");
@@ -37,7 +37,7 @@ void Engine::RegisterComponents() {
   world.RegisterComponents<TransformComponent, MeshComponent, MaterialComponent,
                            CameraComponent, MouseInputComponent,
                            RigidBodyComponent, InputComponent,
-                           BoundingBoxComponent>();
+                           ColliderComponent>();
   world.RegisterComponents<MainCameraSingleton>();
 }
 
