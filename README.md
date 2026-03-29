@@ -6,15 +6,15 @@
 ![GLFW](https://img.shields.io/badge/GLFW-3.3-20232A)
 ![Status](https://img.shields.io/badge/Project-Learning%20Project-6C8E5E)
 
-An ECS-based game engine built in C++ using modern OpenGL.
+An ECS-based game engine built in C++ using modern OpenGL. With an ImGui editor further down the line.
 
 ## What This Project Does
 
-ComponEng is a learning project demonstrating core game engine architecture through an **Entity-Component-System (ECS)** pattern. It features an archetype-based ECS (similar to Unity DOTS or Flecs) with cache-efficient component storage, instanced rendering, and a debug overlay.
+ComponEng is a learning project demonstrating core game engine architecture through an **Entity-Component-System (ECS)** pattern. It features an archetype-based ECS (similar to Unity DOTS or Flecs or EnTT) with cache-efficient component storage, instanced rendering, and a debug overlay.
 
 ## Why ?
 
-Well the project initially started for a really silly reason. Unity was buggy on linux wayland and I couldn't get my lsp to work with unity packages. So I decided to just build my own engine because why not. I was always intrigued by how the big engines work and had found that most big games use their own engines. Having your own engine comes with many advantages, no license fees, full control over the codebase, and a deeper understanding of how games work under the hood.
+Well the project initially started for a really silly reason. I was kinda tired of reading through documentation and I was overwhelmed from all the different features engines like unity provide.  So I decided to just build my own engine because it was simpler to understand what I wrote. I was always intrigued by how the big engines work and had found that most big games use their own engines. Having your own engine comes with many advantages, no license fees, full control over the codebase, and a deeper understanding of how games work under the hood.
 
 ## Features
 
@@ -38,6 +38,9 @@ Well the project initially started for a really silly reason. Unity was buggy on
 
 ## Dependencies
 
+I tried to keep dependencies minimal to focus on learning core engine architecture.
+GLM will likely be phased out in the future when I implement my own math library and OpenGL might be replaced with Vulkan or added as a seperate implementation.
+
 Ensure these are available before building:
 
 - `CMake` 3.10+
@@ -51,7 +54,7 @@ Ensure these are available before building:
 
 ```bash
 git clone <repository-url>
-cd Game-Engine
+cd ComponEng
 mkdir build && cd build
 cmake ..
 make
