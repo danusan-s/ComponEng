@@ -4,7 +4,9 @@
 
 using EntityID = std::uint32_t;
 
-constexpr EntityID INVALID_ENTITY = 0;
+// Sentinel value for invalid/empty entity references.
+// Uses max uint32 so that ID 0 remains a valid entity.
+constexpr EntityID INVALID_ENTITY = 0xFFFFFFFFu;
 
 constexpr EntityID MAX_ENTITIES = 10000;
 

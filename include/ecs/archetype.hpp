@@ -8,12 +8,14 @@
 class ComponentColumn {
 private:
   std::vector<std::byte> m_componentArray;
+  void (*m_destructor)(void*) = nullptr;
 
 public:
   size_t m_stride;
   size_t m_count;
 
-  ComponentColumn(size_t componentSize) : m_count(0), m_stride(componentSize) {
+  ComponentColumn(size_t componentSize, void (*destructor)(void*) = nullptr)
+      : m_count(0), m_stride(componentSize), m_destructor(destructor) {
   }
 
   void* at(std::size_t index) {
@@ -34,6 +36,10 @@ public:
       throw std::runtime_error("ComponentColumn: Invalid row index");
     }
     if (row < m_count - 1) {
+      // Call destructor on the component being overwritten to avoid
+      // resource leaks if the component type manages heap memory.
+      if (m_destructor)
+        m_destructor(at(row));
       std::memcpy(at(row), at(m_count - 1),
                   m_stride);
     }
@@ -59,7 +65,7 @@ public:
       if (signature.test(i)) {
         ComponentInfo& info = registry->getComponentInfo(i);
         m_indexMap[i] = m_columns.size();
-        m_columns.emplace_back(info.size);
+        m_columns.emplace_back(info.size, info.destructor);
       }
     }
   }

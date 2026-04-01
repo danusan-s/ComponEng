@@ -9,6 +9,7 @@
 struct ComponentInfo {
   const char* name;
   size_t size;
+  void (*destructor)(void*) = nullptr;
 };
 
 class ComponentRegistry {
@@ -38,6 +39,12 @@ public:
     m_typeToID[key] = id;
     m_componentInfos[id].name = key.name();
     m_componentInfos[id].size = sizeof(T);
+    // Store destructor for non-trivial types so archetype moves can clean up.
+    if constexpr (!std::is_trivially_destructible_v<T>) {
+      m_componentInfos[id].destructor = [](void* ptr) {
+        static_cast<T*>(ptr)->~T();
+      };
+    }
     return id;
   }
 
