@@ -102,7 +102,11 @@ void Window::Init(int width, int height, const char *title) {
   this->width = width;
   this->height = height;
 
-  glfwInit();
+  if (glfwInit() != GLFW_TRUE) {
+    LOG_ERROR("Failed to initialize GLFW");
+    return;
+  }
+
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);

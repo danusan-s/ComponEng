@@ -34,8 +34,11 @@ public:
   }
 
   void DestroyEntity(EntityID entity) {
-    archetypeManager->getBySignature(entityManager->GetRecord(entity).signature)
-        ->RemoveEntity(entity);
+    Archetype *currArchetype = archetypeManager->getBySignature(
+        entityManager->GetRecord(entity).signature);
+    if (currArchetype) {
+      currArchetype->RemoveEntity(entity);
+    }
     entityManager->DestroyEntity(entity);
   }
 

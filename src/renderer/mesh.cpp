@@ -1,5 +1,5 @@
-#include "core/logger.hpp"
 #include "renderer/mesh.hpp"
+#include "core/logger.hpp"
 #include <array>
 #include <sstream>
 
@@ -92,9 +92,32 @@ void Mesh::GenerateFromWavefrontObj(const std::string &data) {
         std::getline(vertexStream, texIndexStr, '/');
         std::getline(vertexStream, normIndexStr, '/');
 
+        if (posIndexStr.empty() || texIndexStr.empty() ||
+            normIndexStr.empty()) {
+          LOG_ERROR("Invalid vertex format in OBJ file: %s.",
+                    vertexStr.c_str());
+          continue;
+        }
+
         int posIndex = std::stoi(posIndexStr) - 1;
-        int texIndex = texIndexStr.empty() ? -1 : std::stoi(texIndexStr) - 1;
-        int normIndex = normIndexStr.empty() ? -1 : std::stoi(normIndexStr) - 1;
+        int texIndex = std::stoi(texIndexStr) - 1;
+        int normIndex = std::stoi(normIndexStr) - 1;
+
+        if (posIndex < 0 || posIndex >= (int)positions.size()) {
+          LOG_ERROR("Invalid position index in OBJ file: %s.",
+                    posIndexStr.c_str());
+          continue;
+        }
+        if (texIndex < 0 || texIndex >= (int)texCoords.size()) {
+          LOG_ERROR("Invalid texture coordinate index in OBJ file: %s.",
+                    texIndexStr.c_str());
+          continue;
+        }
+        if (normIndex < 0 || normIndex >= (int)normals.size()) {
+          LOG_ERROR("Invalid normal index in OBJ file: %s.",
+                    normIndexStr.c_str());
+          continue;
+        }
 
         const auto &pos = positions[posIndex];
         const auto &norm = normals[normIndex];

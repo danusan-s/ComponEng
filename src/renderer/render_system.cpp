@@ -267,3 +267,12 @@ void OpenGLRenderSystem::onUpdate(const SystemState &state) {
   DebugUI::AddValue("Instances Rendered", instancesRendered);
   DebugUI::AddValue("Draw Calls", drawCalls);
 }
+
+void OpenGLRenderSystem::onDestroy(const SystemState &state) {
+  for (auto &pair : batches) {
+    if (pair.second.instanceVBO != 0) {
+      glDeleteBuffers(1, &pair.second.instanceVBO);
+      pair.second.instanceVBO = 0;
+    }
+  }
+}

@@ -14,7 +14,6 @@ public:
   size_t count;
 
   ComponentColumn(size_t componentSize) : count(0), stride(componentSize) {
-    componentArray.resize(stride * MAX_ENTITIES);
   }
 
   void *at(std::size_t index) {
