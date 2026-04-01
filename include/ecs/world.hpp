@@ -1,4 +1,5 @@
 #pragma once
+
 #include "core/logger.hpp"
 #include "ecs/archetype.hpp"
 #include "ecs/archetype_manager.hpp"
@@ -11,80 +12,80 @@
 
 class World {
 private:
-  std::unique_ptr<ComponentRegistry> componentRegistry;
-  std::unique_ptr<EntityManager> entityManager;
-  std::unique_ptr<SystemManager> systemManager;
-  std::unique_ptr<ArchetypeManager> archetypeManager;
+  std::unique_ptr<ComponentRegistry> m_componentRegistry;
+  std::unique_ptr<EntityManager> m_entityManager;
+  std::unique_ptr<SystemManager> m_systemManager;
+  std::unique_ptr<ArchetypeManager> m_archetypeManager;
 
-  std::unordered_map<ComponentID, std::vector<uint8_t>> singletons;
+  std::unordered_map<ComponentID, std::vector<uint8_t>> m_singletons;
 
 public:
   double time = 0.0f;
 
-  void Init() {
-    componentRegistry = std::make_unique<ComponentRegistry>();
-    entityManager = std::make_unique<EntityManager>();
-    systemManager = std::make_unique<SystemManager>();
-    archetypeManager = std::make_unique<ArchetypeManager>();
+  void init() {
+    m_componentRegistry = std::make_unique<ComponentRegistry>();
+    m_entityManager = std::make_unique<EntityManager>();
+    m_systemManager = std::make_unique<SystemManager>();
+    m_archetypeManager = std::make_unique<ArchetypeManager>();
     time = 0.0f;
   }
 
-  EntityID CreateEntity() {
-    return entityManager->CreateEntity();
+  EntityID createEntity() {
+    return m_entityManager->createEntity();
   }
 
-  void DestroyEntity(EntityID entity) {
-    Archetype *currArchetype = archetypeManager->getBySignature(
-        entityManager->GetRecord(entity).signature);
+  void destroyEntity(EntityID entity) {
+    Archetype* currArchetype = m_archetypeManager->getBySignature(
+        m_entityManager->getRecord(entity).signature);
     if (currArchetype) {
-      currArchetype->RemoveEntity(entity);
+      currArchetype->removeEntity(entity);
     }
-    entityManager->DestroyEntity(entity);
+    m_entityManager->destroyEntity(entity);
   }
 
-  template <typename T> void RegisterComponent() {
-    componentRegistry->RegisterComponent<T>();
+  template <typename T> void registerComponent() {
+    m_componentRegistry->registerComponent<T>();
   }
 
-  template <typename... Components> void RegisterComponents() {
-    (this->RegisterComponent<Components>(), ...);
+  template <typename... Components> void registerComponents() {
+    (this->registerComponent<Components>(), ...);
   }
 
-  template <typename T> T &GetComponent(EntityID entity) {
-    EntityRecord &record = entityManager->GetRecord(entity);
-    ComponentID componentID = componentRegistry->GetComponentID<T>();
+  template <typename T> T& getComponent(EntityID entity) {
+    EntityRecord& record = m_entityManager->getRecord(entity);
+    ComponentID componentID = m_componentRegistry->getComponentID<T>();
 
     if (!record.signature.test(componentID)) {
       throw std::runtime_error("Entity does not have component");
     }
 
-    Archetype *archetype = archetypeManager->getBySignature(record.signature);
-    return archetype->Get<T>(componentID, record.row);
+    Archetype* archetype = m_archetypeManager->getBySignature(record.signature);
+    return archetype->get<T>(componentID, record.row);
   }
 
-  template <typename T> void AddComponent(EntityID entity, T &&component) {
-    AddComponents(entity, std::forward<T>(component));
+  template <typename T> void addComponent(EntityID entity, T&& component) {
+    addComponents(entity, std::forward<T>(component));
   }
 
   template <typename... Ts>
-  void AddComponents(EntityID entity, Ts &&...components) {
-    EntityRecord &record = entityManager->GetRecord(entity);
+  void addComponents(EntityID entity, Ts&&...components) {
+    EntityRecord& record = m_entityManager->getRecord(entity);
 
     Signature oldSig = record.signature;
-    Archetype *oldArchetype = archetypeManager->getBySignature(oldSig);
+    Archetype* oldArchetype = m_archetypeManager->getBySignature(oldSig);
 
-    if ((oldSig & componentRegistry->MakeSignature<Ts...>()).any()) {
+    if ((oldSig & m_componentRegistry->makeSignature<Ts...>()).any()) {
       throw std::runtime_error("Entity already has component");
     }
 
     Signature newSig = oldSig;
-    newSig = oldSig | componentRegistry->MakeSignature<Ts...>();
+    newSig = oldSig | m_componentRegistry->makeSignature<Ts...>();
 
-    Archetype &newArchetype =
-        archetypeManager->getOrCreate(newSig, componentRegistry.get());
-    newArchetype.AddEntity(entity);
+    Archetype& newArchetype =
+        m_archetypeManager->getOrCreate(newSig, m_componentRegistry.get());
+    newArchetype.addEntity(entity);
 
-    std::size_t newRow = newArchetype.GetRowForEntity(entity);
+    std::size_t newRow = newArchetype.getRowForEntity(entity);
 
     if (oldArchetype == nullptr) {
       LOG_INFO("Adding first component to entity %llu",
@@ -100,17 +101,17 @@ public:
       for (ComponentID c = 0; c < MAX_COMPONENTS; ++c) {
         if (!oldSig.test(c))
           continue;
-        auto &src = oldArchetype->GetColumn(c);
-        auto &dst = newArchetype.GetColumn(c);
-        std::memcpy(dst.at(newRow), src.at(oldRow), src.stride);
+        auto& src = oldArchetype->getColumn(c);
+        auto& dst = newArchetype.getColumn(c);
+        std::memcpy(dst.at(newRow), src.at(oldRow), src.m_stride);
       }
-      EntityID moved = oldArchetype->RemoveEntity(entity);
+      EntityID moved = oldArchetype->removeEntity(entity);
       if (moved != entity) {
-        entityManager->GetRecord(moved).row = oldRow;
+        m_entityManager->getRecord(moved).row = oldRow;
       }
     }
 
-    (new (newArchetype.GetColumn(componentRegistry->GetComponentID<Ts>())
+    (new (newArchetype.getColumn(m_componentRegistry->getComponentID<Ts>())
               .at(newRow)) Ts(std::forward<Ts>(components)),
      ...);
 
@@ -118,12 +119,12 @@ public:
     record.row = newRow;
   }
 
-  template <typename T> void RemoveComponent(EntityID entity) {
-    ComponentID componentID = componentRegistry->GetComponentID<T>();
-    EntityRecord &record = entityManager->GetRecord(entity);
+  template <typename T> void removeComponent(EntityID entity) {
+    ComponentID componentID = m_componentRegistry->getComponentID<T>();
+    EntityRecord& record = m_entityManager->getRecord(entity);
 
     Signature oldSig = record.signature;
-    Archetype *oldArchetype = archetypeManager->getBySignature(oldSig);
+    Archetype* oldArchetype = m_archetypeManager->getBySignature(oldSig);
 
     if (!oldSig.test(componentID)) {
       throw std::runtime_error("Entity does not have component");
@@ -132,78 +133,78 @@ public:
     Signature newSig = oldSig;
     newSig.reset(componentID);
 
-    Archetype &newArchetype =
-        archetypeManager->getOrCreate(newSig, componentRegistry.get());
-    newArchetype.AddEntity(entity);
-    std::size_t newRow = newArchetype.GetRowForEntity(entity);
+    Archetype& newArchetype =
+        m_archetypeManager->getOrCreate(newSig, m_componentRegistry.get());
+    newArchetype.addEntity(entity);
+    std::size_t newRow = newArchetype.getRowForEntity(entity);
 
     std::size_t oldRow = record.row;
     for (ComponentID c = 0; c < MAX_COMPONENTS; ++c) {
       if (!newSig.test(c))
         continue;
-      auto &src = oldArchetype->GetColumn(c);
-      auto &dst = newArchetype.GetColumn(c);
-      std::memcpy(dst.at(newRow), src.at(oldRow), src.stride);
+      auto& src = oldArchetype->getColumn(c);
+      auto& dst = newArchetype.getColumn(c);
+      std::memcpy(dst.at(newRow), src.at(oldRow), src.m_stride);
     }
-    EntityID moved = oldArchetype->RemoveEntity(entity);
+    EntityID moved = oldArchetype->removeEntity(entity);
     if (moved != entity) {
-      entityManager->GetRecord(moved).row = oldRow;
+      m_entityManager->getRecord(moved).row = oldRow;
     }
 
     record.signature = newSig;
     record.row = newRow;
   }
 
-  template <typename T> bool HasComponent(EntityID entity) {
-    ComponentID componentID = componentRegistry->GetComponentID<T>();
-    EntityRecord &record = entityManager->GetRecord(entity);
+  template <typename T> bool hasComponent(EntityID entity) {
+    ComponentID componentID = m_componentRegistry->getComponentID<T>();
+    EntityRecord& record = m_entityManager->getRecord(entity);
     return record.signature.test(componentID);
   }
 
-  template <typename T> T &GetSingleton() {
-    ComponentID componentID = componentRegistry->GetComponentID<T>();
-    auto it = singletons.find(componentID);
-    if (it == singletons.end()) {
+  template <typename T> T& getSingleton() {
+    ComponentID componentID = m_componentRegistry->getComponentID<T>();
+    auto it = m_singletons.find(componentID);
+    if (it == m_singletons.end()) {
       throw std::runtime_error("Singleton not found");
     }
-    return *reinterpret_cast<T *>(singletons[componentID].data());
+    return *reinterpret_cast<T*>(m_singletons[componentID].data());
   }
 
-  template <typename T> void SetSingleton(const T &value) {
-    ComponentID componentID = componentRegistry->GetComponentID<T>();
-    std::vector<uint8_t> &storage = singletons[componentID];
+  template <typename T> void setSingleton(const T& value) {
+    ComponentID componentID = m_componentRegistry->getComponentID<T>();
+    std::vector<uint8_t>& storage = m_singletons[componentID];
     if (storage.empty()) {
       storage.resize(sizeof(T));
     }
-    *reinterpret_cast<T *>(storage.data()) = value;
+    *reinterpret_cast<T*>(storage.data()) = value;
   }
 
-  template <typename T> bool HasSingleton() {
-    ComponentID componentID = componentRegistry->GetComponentID<T>();
-    return singletons.find(componentID) != singletons.end();
+  template <typename T> bool hasSingleton() {
+    ComponentID componentID = m_componentRegistry->getComponentID<T>();
+    return m_singletons.find(componentID) != m_singletons.end();
   }
 
   template <typename... Ts> Query<Ts...> query() {
-    std::array<Archetype, MAX_ARCHETYPES> &archetypes =
-        archetypeManager->getArchetypes();
-    return Query<Ts...>(archetypes, *componentRegistry.get());
+    std::array<Archetype, MAX_ARCHETYPES>& archetypes =
+        m_archetypeManager->getArchetypes();
+    return Query<Ts...>(archetypes, *m_componentRegistry.get());
   }
 
   template <typename T>
   std::shared_ptr<T>
-  RegisterSystem(SystemGroup group = SystemGroup::Simulation) {
-    return systemManager->RegisterSystem<T>(group);
+  registerSystem(SystemGroup group = SystemGroup::Simulation) {
+    return m_systemManager->registerSystem<T>(group);
   }
 
-  void CreateSystems() {
-    systemManager->CreateAll(this);
+  void createSystems() {
+    m_systemManager->createAll(this);
   }
 
-  void UpdateSystems(float deltaTime) {
-    systemManager->UpdateAll(this, deltaTime);
+  void updateSystems(float deltaTime) {
+    m_systemManager->updateAll(this, deltaTime);
   }
 
-  void DestroySystems() {
-    systemManager->DestroyAll(this);
+  void destroySystems() {
+    m_systemManager->destroyAll(this);
   }
 };

@@ -1,4 +1,5 @@
 #pragma once
+
 #include "entity.hpp"
 #include <array>
 #include <assert.h>
@@ -11,41 +12,41 @@ struct EntityRecord {
 
 class EntityManager {
 private:
-  std::queue<EntityID> freeIDs;
-  std::array<EntityRecord, MAX_ENTITIES> entityRecords;
-  uint32_t livingEntityCount;
+  std::queue<EntityID> m_freeIDs;
+  std::array<EntityRecord, MAX_ENTITIES> m_entityRecords;
+  uint32_t m_livingEntityCount;
 
 public:
-  EntityManager() : livingEntityCount(0) {
+  EntityManager() : m_livingEntityCount(0) {
     for (EntityID id = 0; id < MAX_ENTITIES; ++id) {
-      freeIDs.push(id);
+      m_freeIDs.push(id);
     }
   }
 
-  EntityID CreateEntity() {
-    assert(livingEntityCount < MAX_ENTITIES &&
+  EntityID createEntity() {
+    assert(m_livingEntityCount < MAX_ENTITIES &&
            "Too many entities in existence.");
 
-    EntityID id = freeIDs.front();
-    freeIDs.pop();
-    ++livingEntityCount;
+    EntityID id = m_freeIDs.front();
+    m_freeIDs.pop();
+    ++m_livingEntityCount;
 
     return id;
   }
 
-  void DestroyEntity(EntityID id) {
+  void destroyEntity(EntityID id) {
     assert(id < MAX_ENTITIES && "Entity out of range.");
 
-    EntityRecord &record = entityRecords[id];
+    EntityRecord& record = m_entityRecords[id];
     record.row = 0;
     record.signature.reset();
-    freeIDs.push(id);
-    --livingEntityCount;
+    m_freeIDs.push(id);
+    --m_livingEntityCount;
   }
 
-  EntityRecord &GetRecord(EntityID id) {
+  EntityRecord& getRecord(EntityID id) {
     assert(id < MAX_ENTITIES && "Entity out of range.");
 
-    return entityRecords[id];
+    return m_entityRecords[id];
   }
 };

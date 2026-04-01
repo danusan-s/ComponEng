@@ -4,7 +4,7 @@
 
 class Game : public IGame {
 public:
-  void Init(World &world) override {
+  void init(World& world) override {
     std::default_random_engine generator;
     std::uniform_real_distribution<float> randPosition(-100.0f, 100.0f);
     std::uniform_real_distribution<float> randScale(1.0f, 5.0f);
@@ -14,10 +14,10 @@ public:
     std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);
 
     for (int i = 0; i < 100; ++i) {
-      EntityID entity = world.CreateEntity();
+      EntityID entity = world.createEntity();
 
       float scale = randScale(generator);
-      world.AddComponents(
+      world.addComponents(
           entity, MeshComponent{.meshName = "cube"},
           TransformComponent{.position = Vec3(randPosition(generator),
                                               randPosition(generator),
@@ -38,10 +38,10 @@ public:
     }
 
     for (int i = 0; i < 100; ++i) {
-      EntityID entity = world.CreateEntity();
+      EntityID entity = world.createEntity();
 
       float scale = randScale(generator);
-      world.AddComponents(
+      world.addComponents(
           entity, MeshComponent{.meshName = "sphere"},
           TransformComponent{.position = Vec3(randPosition(generator),
                                               randPosition(generator),
@@ -63,9 +63,8 @@ public:
               .shape = Sphere{.localCenter = Vec3(0.0f), .radius = scale}});
     }
 
-    // Create a large static plane as the ground
-    EntityID ground = world.CreateEntity();
-    world.AddComponents(
+    EntityID ground = world.createEntity();
+    world.addComponents(
         ground,
         TransformComponent{.position = Vec3(0.0f, -100.0f, 0.0f),
                            .rotation = Vec3(0.0f),
@@ -82,17 +81,17 @@ public:
                                    .halfExtents = Vec3(100.0f, 1.0f, 100.0f)}});
   }
 
-  void Shutdown(World &world) override {
+  void shutdown(World& world) override {
   }
 };
 
 int main() {
-  Engine &engine = Engine::Get();
-  engine.Init();
+  Engine& engine = Engine::get();
+  engine.init();
 
   Game testScene;
-  engine.Run(testScene);
+  engine.run(testScene);
 
-  engine.Shutdown();
+  engine.shutdown();
   return 0;
 }

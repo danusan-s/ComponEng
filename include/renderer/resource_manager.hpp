@@ -1,5 +1,4 @@
-#ifndef RESOURCE_MANAGER_H
-#define RESOURCE_MANAGER_H
+#pragma once
 
 #include <map>
 #include <string>
@@ -15,45 +14,27 @@
 // public constructor is defined.
 class ResourceManager {
 public:
-  // resource storage
-  static std::map<std::string, Shader> Shaders;
-  static std::map<std::string, Texture2D> Textures;
-  static std::map<std::string, Mesh> Meshes;
-  // loads (and generates) a shader program from file loading vertex, fragment
-  // (and geometry) shader's source code. If gShaderFile is not nullptr, it also
-  // loads a geometry shader
-  static void LoadShader(const char *vShaderFile, const char *fShaderFile,
-                         const char *gShaderFile, std::string name);
-  // retrieves a stored shader
-  static const Shader &GetShader(std::string name);
-  // loads (and generates) a texture from file
-  static void LoadTexture(const char *file, bool alpha, std::string name);
-  // retrieves a stored texture
-  static const Texture2D &GetTexture(std::string name);
-  // returns true if texture exists, false otherwise
-  static bool TextureExists(std::string name);
-  // add a mesh to the resource manager, and initialize its GL buffers
-  static void AddMesh(std::string name, Mesh &mesh);
-  // loads (and generates) a model from wavefront obj file
-  static void LoadMesh(const char *file, std::string name);
-  // retrieves a stored model
-  static const Mesh &GetMesh(std::string name);
-  // properly de-allocates all loaded resources
-  static void Clear();
+  static std::map<std::string, Shader> s_shaders;
+  static std::map<std::string, Texture2D> s_textures;
+  static std::map<std::string, Mesh> s_meshes;
+
+  static void loadShader(const char* vShaderFile, const char* fShaderFile,
+                         const char* gShaderFile, std::string name);
+  static const Shader& getShader(std::string name);
+  static void loadTexture(const char* file, bool alpha, std::string name);
+  static const Texture2D& getTexture(std::string name);
+  static bool textureExists(std::string name);
+  static void addMesh(std::string name, Mesh& mesh);
+  static void loadMesh(const char* file, std::string name);
+  static const Mesh& getMesh(std::string name);
+  static void clear();
 
 private:
-  // private constructor, that is we do not want any actual resource manager
-  // objects. Its members and functions should be publicly available (static).
-  ResourceManager() {
-  }
-  // loads and generates a shader from file
-  static Shader loadShaderFromFile(const char *vShaderFile,
-                                   const char *fShaderFile,
-                                   const char *gShaderFile = nullptr);
-  // loads a single texture from file
-  static Texture2D loadTextureFromFile(const char *file, bool alpha);
-  // loads a single model from file
-  static Mesh loadMeshFromFile(const char *file);
-};
+  ResourceManager() {}
 
-#endif
+  static Shader loadShaderFromFile(const char* vShaderFile,
+                                   const char* fShaderFile,
+                                   const char* gShaderFile = nullptr);
+  static Texture2D loadTextureFromFile(const char* file, bool alpha);
+  static Mesh loadMeshFromFile(const char* file);
+};

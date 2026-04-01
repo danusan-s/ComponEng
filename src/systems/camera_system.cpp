@@ -12,8 +12,8 @@ static constexpr float DEFAULT_MOVE_SPEED = 100.0f;
 static constexpr float MOUSE_SENSITIVITY = 200.0f;
 static constexpr float PITCH_LIMIT = 89.0f;
 
-static void UpdateCameraVectors(const TransformComponent &transform,
-                                Vec3 &front, Vec3 &right, Vec3 &up) {
+static void updateCameraVectors(const TransformComponent& transform,
+                                Vec3& front, Vec3& right, Vec3& up) {
   float cosYaw = cos(radians(transform.rotation.y));
   float sinYaw = sin(radians(transform.rotation.y));
   float cosPitch = cos(radians(transform.rotation.x));
@@ -28,12 +28,12 @@ static void UpdateCameraVectors(const TransformComponent &transform,
   up = normalize(cross(right, front));
 }
 
-static void ProcessKeyboardInput(TransformComponent &transform,
-                                 const InputComponent &input, float deltaTime,
+static void processKeyboardInput(TransformComponent& transform,
+                                 const InputComponent& input, float deltaTime,
                                  float speed) {
   float velocity = speed * deltaTime;
   Vec3 front, right, up;
-  UpdateCameraVectors(transform, front, right, up);
+  updateCameraVectors(transform, front, right, up);
 
   if (input.forward)
     transform.position = transform.position + front * velocity;
@@ -49,10 +49,10 @@ static void ProcessKeyboardInput(TransformComponent &transform,
     transform.position = transform.position - Vec3(0.0f, 1.0f, 0.0f) * velocity;
 }
 
-static void ProcessMouseInput(TransformComponent &transform,
-                              const MouseInputComponent &mouseInput,
+static void processMouseInput(TransformComponent& transform,
+                              const MouseInputComponent& mouseInput,
                               float sensitivity) {
-  transform.rotation.y += mouseInput.deltaX * sensitivity; // Invert y
+  transform.rotation.y += mouseInput.deltaX * sensitivity;
   transform.rotation.x -= mouseInput.deltaY * sensitivity;
 
   if (transform.rotation.x > PITCH_LIMIT)
@@ -61,25 +61,25 @@ static void ProcessMouseInput(TransformComponent &transform,
     transform.rotation.x = -PITCH_LIMIT;
 }
 
-void CameraSystem::onUpdate(const SystemState &state) {
+void CameraSystem::onUpdate(const SystemState& state) {
   EntityID mainCameraEntity =
-      state.world->GetSingleton<MainCameraSingleton>().entity;
+      state.world->getSingleton<MainCameraSingleton>().entity;
 
-  TransformComponent &transform =
-      state.world->GetComponent<TransformComponent>(mainCameraEntity);
-  CameraComponent &camera =
-      state.world->GetComponent<CameraComponent>(mainCameraEntity);
-  InputComponent &input =
-      state.world->GetComponent<InputComponent>(mainCameraEntity);
-  MouseInputComponent &mouseInput =
-      state.world->GetComponent<MouseInputComponent>(mainCameraEntity);
+  TransformComponent& transform =
+      state.world->getComponent<TransformComponent>(mainCameraEntity);
+  CameraComponent& camera =
+      state.world->getComponent<CameraComponent>(mainCameraEntity);
+  InputComponent& input =
+      state.world->getComponent<InputComponent>(mainCameraEntity);
+  MouseInputComponent& mouseInput =
+      state.world->getComponent<MouseInputComponent>(mainCameraEntity);
 
-  ProcessKeyboardInput(transform, input, state.deltaTime, DEFAULT_MOVE_SPEED);
+  processKeyboardInput(transform, input, state.deltaTime, DEFAULT_MOVE_SPEED);
 
-  ProcessMouseInput(transform, mouseInput, MOUSE_SENSITIVITY * state.deltaTime);
+  processMouseInput(transform, mouseInput, MOUSE_SENSITIVITY * state.deltaTime);
 
   Vec3 front, right, up;
-  UpdateCameraVectors(transform, front, right, up);
+  updateCameraVectors(transform, front, right, up);
 
   Mat4 viewMatrix = lookAt(transform.position, transform.position + front, up);
 
@@ -88,5 +88,5 @@ void CameraSystem::onUpdate(const SystemState &state) {
 
   camera.viewProjectionMatrix = projectionMatrix * viewMatrix;
 
-  DebugUI::AddVec3("Camera Position", transform.position);
+  DebugUI::addVec3("Camera Position", transform.position);
 }

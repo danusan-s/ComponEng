@@ -1,37 +1,31 @@
 #include "renderer/texture.hpp"
 
 Texture2D::Texture2D()
-    : ID(0), Width(0), Height(0), Internal_Format(GL_RGB), Image_Format(GL_RGB),
-      Wrap_S(GL_CLAMP_TO_EDGE), Wrap_T(GL_CLAMP_TO_EDGE),
-      Filter_Min(GL_LINEAR_MIPMAP_LINEAR), Filter_Max(GL_LINEAR) {
+    : m_id(0), m_width(0), m_height(0), m_internalFormat(GL_RGB), m_imageFormat(GL_RGB),
+      m_wrapS(GL_CLAMP_TO_EDGE), m_wrapT(GL_CLAMP_TO_EDGE),
+      m_filterMin(GL_LINEAR_MIPMAP_LINEAR), m_filterMax(GL_LINEAR) {
 }
 
-void Texture2D::Generate(unsigned int width, unsigned int height,
-                         unsigned char *data) {
-  this->Width = width;
-  this->Height = height;
-  // create Texture
-  if (this->ID == 0)
-    glGenTextures(1, &this->ID);
-  // Bind the texture
-  glBindTexture(GL_TEXTURE_2D, this->ID);
+void Texture2D::generate(GLuint width, GLuint height,
+                         unsigned char* data) {
+  this->m_width = width;
+  this->m_height = height;
+  if (this->m_id == 0)
+    glGenTextures(1, &this->m_id);
+  glBindTexture(GL_TEXTURE_2D, this->m_id);
 
-  // Had an error here due to images not being in a size that is power of 2
-  // Specify the texture image
-  glTexImage2D(GL_TEXTURE_2D, 0, this->Internal_Format, width, height, 0,
-               this->Image_Format, GL_UNSIGNED_BYTE, data);
+  glTexImage2D(GL_TEXTURE_2D, 0, this->m_internalFormat, width, height, 0,
+               this->m_imageFormat, GL_UNSIGNED_BYTE, data);
 
   glGenerateMipmap(GL_TEXTURE_2D);
-  // set Texture wrap and filter modes
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, this->Wrap_S);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, this->Wrap_T);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, this->Filter_Min);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, this->Filter_Max);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, this->m_wrapS);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, this->m_wrapT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, this->m_filterMin);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, this->m_filterMax);
 
-  // unbind texture
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void Texture2D::Bind() const {
-  glBindTexture(GL_TEXTURE_2D, this->ID);
+void Texture2D::bind() const {
+  glBindTexture(GL_TEXTURE_2D, this->m_id);
 }

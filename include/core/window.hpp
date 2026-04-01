@@ -1,27 +1,29 @@
 #pragma once
+
+#include "glad/glad.h"
 #include "input_state.hpp"
 #include <GLFW/glfw3.h>
 
 class Window {
 public:
-  void Init(int width, int height, const char *title);
-  void Shutdown();
+  void init(int width, int height, const char* title);
+  void shutdown();
 
-  bool ShouldClose() const;
-  void SwapBuffers();
-  void PollEvents();
+  bool shouldClose() const;
+  void swapBuffers();
+  void pollEvents();
 
-  GLFWwindow *GetHandle() const {
-    return handle;
+  GLFWwindow* getHandle() const {
+    return m_handle;
   }
 
-  InputState inputState;
+  InputState m_inputState;
 
 private:
-  GLFWwindow *handle = nullptr;
-  int width = 0;
-  int height = 0;
+  GLFWwindow* m_handle = nullptr;
+  int m_width = 0;
+  int m_height = 0;
 
-  void InitOpenGL();
-  void SetViewport(int w, int h);
+  void initOpenGL();
+  void setViewport(int w, int h);
 };

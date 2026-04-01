@@ -1,4 +1,5 @@
 #pragma once
+
 #include "ecs/system.hpp"
 #include <array>
 #include <assert.h>
@@ -12,17 +13,17 @@ constexpr SystemGroup GROUP_ORDER[] = {Initialization, Simulation,
 constexpr size_t NUM_GROUPS = sizeof(GROUP_ORDER) / sizeof(SystemGroup);
 
 struct SystemRecord {
-  const char *typeName;
+  const char* typeName;
   std::shared_ptr<ISystem> system;
 };
 
 class SystemManager {
 private:
-  std::array<std::vector<SystemRecord>, NUM_GROUPS> systems;
+  std::array<std::vector<SystemRecord>, NUM_GROUPS> m_systems;
 
-  bool hasSystem(const char *typeName) {
+  bool hasSystem(const char* typeName) {
     for (SystemGroup group : GROUP_ORDER) {
-      auto &groupSystems = systems[group];
+      auto& groupSystems = m_systems[group];
       for (size_t i = 0; i < groupSystems.size(); ++i) {
         if (groupSystems[i].typeName == typeName) {
           return true;
@@ -33,44 +34,44 @@ private:
   }
 
 public:
-  template <typename T> std::shared_ptr<T> RegisterSystem(SystemGroup group) {
-    const char *typeName = typeid(T).name();
+  template <typename T> std::shared_ptr<T> registerSystem(SystemGroup group) {
+    const char* typeName = typeid(T).name();
 
     assert(!hasSystem(typeName) && "Registering system more than once.");
 
     auto system = std::make_shared<T>();
-    systems[group].push_back({typeName, system});
+    m_systems[group].push_back({typeName, system});
     return system;
   }
 
-  void CreateAll(World *world) {
+  void createAll(World* world) {
     SystemState state{world, 0.0f};
     for (SystemGroup group : GROUP_ORDER) {
-      auto &groupSystems = systems[group];
-      for (auto const &sysRec : groupSystems) {
-        auto const &system = sysRec.system;
+      auto& groupSystems = m_systems[group];
+      for (auto const& sysRec : groupSystems) {
+        auto const& system = sysRec.system;
         system->onCreate(state);
       }
     }
   }
 
-  void UpdateAll(World *world, float deltaTime) {
+  void updateAll(World* world, float deltaTime) {
     SystemState state{world, deltaTime};
     for (SystemGroup group : GROUP_ORDER) {
-      auto &groupSystems = systems[group];
-      for (auto const &sysRec : groupSystems) {
-        auto const &system = sysRec.system;
+      auto& groupSystems = m_systems[group];
+      for (auto const& sysRec : groupSystems) {
+        auto const& system = sysRec.system;
         system->onUpdate(state);
       }
     }
   }
 
-  void DestroyAll(World *world) {
+  void destroyAll(World* world) {
     SystemState state{world, 0.0f};
     for (SystemGroup group : GROUP_ORDER) {
-      auto &groupSystems = systems[group];
-      for (auto const &sysRec : groupSystems) {
-        auto const &system = sysRec.system;
+      auto& groupSystems = m_systems[group];
+      for (auto const& sysRec : groupSystems) {
+        auto const& system = sysRec.system;
         system->onDestroy(state);
       }
     }

@@ -4,17 +4,16 @@
 #include <string>
 #include <vector>
 
-// Parser and initializer for WavefrontOBJ files to be used as 3D models.
 class Mesh {
 public:
-  GLuint VAO, VBO, EBO;
-  // Holds x y z nx ny nz u v for each vertex
-  std::vector<float> vertices;
-  std::vector<unsigned int> indices;
+  GLuint m_vao;
+  GLuint m_vbo;
+  GLuint m_ebo;
+  std::vector<float> m_vertices;
+  std::vector<unsigned int> m_indices;
 
   Mesh();
 
-  // generates model from obj data
-  void InitializeBuffers();
-  void GenerateFromWavefrontObj(const std::string &data);
+  void initializeBuffers();
+  void generateFromWavefrontObj(const std::string& data);
 };

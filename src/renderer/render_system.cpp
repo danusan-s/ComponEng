@@ -15,21 +15,9 @@
 static constexpr Vec3 DEFAULT_LIGHT_POS = Vec3(1000.0f, 1000.0f, 1000.0f);
 static constexpr Vec3 DEFAULT_LIGHT_COLOR = Vec3(1.0f, 1.0f, 1.0f);
 
-float randf() {
-  return rand() / (float)RAND_MAX; // [0,1]
-}
-
 struct FrustumPlane {
   Vec3 normal;
   float distance;
-};
-
-struct Wave {
-  Vec2 direction;
-  float amplitude;
-  float frequency;
-  float speed;
-  float phase;
 };
 
 struct Frustum {
@@ -41,14 +29,14 @@ struct DrawKey {
   std::string textureName;
   std::string shaderName;
 
-  bool operator==(const DrawKey &other) const {
+  bool operator==(const DrawKey& other) const {
     return meshName == other.meshName && textureName == other.textureName &&
            shaderName == other.shaderName;
   }
 };
 
 struct DrawKeyHash {
-  std::size_t operator()(const DrawKey &k) const {
+  std::size_t operator()(const DrawKey& k) const {
     return std::hash<std::string>()(k.meshName) ^
            (std::hash<std::string>()(k.textureName) << 1) ^
            (std::hash<std::string>()(k.shaderName) << 2);
@@ -65,9 +53,9 @@ struct BatchData {
   std::vector<InstanceData> instanceDatas;
 };
 
-static std::unordered_map<DrawKey, BatchData, DrawKeyHash> batches;
+static std::unordered_map<DrawKey, BatchData, DrawKeyHash> g_batches;
 
-static Mat4 GetModelMatrix(const TransformComponent &transform) {
+static Mat4 getModelMatrix(const TransformComponent& transform) {
   Mat4 model = Mat4(1.0f);
   model = translate(model, transform.position);
   model = rotate(model, transform.rotation.x, Vec3(1.0f, 0.0f, 0.0f));
@@ -77,10 +65,10 @@ static Mat4 GetModelMatrix(const TransformComponent &transform) {
   return model;
 }
 
-static bool IsBoxInFrustum(const Frustum &frustum, const Vec3 &boxMin,
-                           const Vec3 &boxMax) {
+static bool isBoxInFrustum(const Frustum& frustum, const Vec3& boxMin,
+                           const Vec3& boxMax) {
   for (int i = 0; i < 6; i++) {
-    const Plane &plane = frustum.planes[i];
+    const Plane& plane = frustum.planes[i];
     Vec3 positiveVertex;
     positiveVertex.x = (plane.normal.x >= 0) ? boxMax.x : boxMin.x;
     positiveVertex.y = (plane.normal.y >= 0) ? boxMax.y : boxMin.y;
@@ -93,46 +81,39 @@ static bool IsBoxInFrustum(const Frustum &frustum, const Vec3 &boxMin,
   return true;
 }
 
-static Frustum GenerateFrustum(const Mat4 &m) {
+static Frustum generateFrustum(const Mat4& m) {
   Frustum f;
 
-  // Left
   f.planes[0].normal.x = m[0][3] + m[0][0];
   f.planes[0].normal.y = m[1][3] + m[1][0];
   f.planes[0].normal.z = m[2][3] + m[2][0];
   f.planes[0].distance = m[3][3] + m[3][0];
 
-  // Right
   f.planes[1].normal.x = m[0][3] - m[0][0];
   f.planes[1].normal.y = m[1][3] - m[1][0];
   f.planes[1].normal.z = m[2][3] - m[2][0];
   f.planes[1].distance = m[3][3] - m[3][0];
 
-  // Bottom
   f.planes[2].normal.x = m[0][3] + m[0][1];
   f.planes[2].normal.y = m[1][3] + m[1][1];
   f.planes[2].normal.z = m[2][3] + m[2][1];
   f.planes[2].distance = m[3][3] + m[3][1];
 
-  // Top
   f.planes[3].normal.x = m[0][3] - m[0][1];
   f.planes[3].normal.y = m[1][3] - m[1][1];
   f.planes[3].normal.z = m[2][3] - m[2][1];
   f.planes[3].distance = m[3][3] - m[3][1];
 
-  // Near
   f.planes[4].normal.x = m[0][3] + m[0][2];
   f.planes[4].normal.y = m[1][3] + m[1][2];
   f.planes[4].normal.z = m[2][3] + m[2][2];
   f.planes[4].distance = m[3][3] + m[3][2];
 
-  // Far
   f.planes[5].normal.x = m[0][3] - m[0][2];
   f.planes[5].normal.y = m[1][3] - m[1][2];
   f.planes[5].normal.z = m[2][3] - m[2][2];
   f.planes[5].distance = m[3][3] - m[3][2];
 
-  // Normalize
   for (int i = 0; i < 6; i++) {
     float len = glm::length(f.planes[i].normal);
     f.planes[i].normal /= len;
@@ -142,28 +123,27 @@ static Frustum GenerateFrustum(const Mat4 &m) {
   return f;
 }
 
-static void PopulateBatch(const TransformComponent &t, const MeshComponent &m,
-                          const MaterialComponent &mat) {
+static void populateBatch(const TransformComponent& t, const MeshComponent& m,
+                          const MaterialComponent& mat) {
   DrawKey key{m.meshName, mat.textureName, mat.shaderName};
-  if (batches.find(key) == batches.end()) {
-    batches[key] = BatchData();
-    const Mesh &mesh = ResourceManager::GetMesh(key.meshName);
-    glGenBuffers(1, &batches[key].instanceVBO);
-    glBindVertexArray(mesh.VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, batches[key].instanceVBO);
+  if (g_batches.find(key) == g_batches.end()) {
+    g_batches[key] = BatchData();
+    const Mesh& mesh = ResourceManager::getMesh(key.meshName);
+    glGenBuffers(1, &g_batches[key].instanceVBO);
+    glBindVertexArray(mesh.m_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, g_batches[key].instanceVBO);
     glBufferData(GL_ARRAY_BUFFER, MAX_ENTITIES * sizeof(InstanceData), nullptr,
                  GL_DYNAMIC_DRAW);
 
-    // Model matrix (4 vec4)
     for (int i = 0; i < 4; ++i) {
       glVertexAttribPointer(
           3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-          (void *)(offsetof(InstanceData, modelMatrix) + sizeof(Vec4) * i));
+          (void*)(offsetof(InstanceData, modelMatrix) + sizeof(Vec4) * i));
       glEnableVertexAttribArray(3 + i);
       glVertexAttribDivisor(3 + i, 1);
     }
     glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-                          (void *)offsetof(InstanceData, color));
+                          (void*)offsetof(InstanceData, color));
     glEnableVertexAttribArray(7);
     glVertexAttribDivisor(7, 1);
     glBindVertexArray(0);
@@ -171,36 +151,36 @@ static void PopulateBatch(const TransformComponent &t, const MeshComponent &m,
     LOG_INFO("Created batch for mesh %s, material %s, shader %s "
              "with VBO %u",
              key.meshName.c_str(), key.textureName.c_str(),
-             key.shaderName.c_str(), batches[key].instanceVBO);
+             key.shaderName.c_str(), g_batches[key].instanceVBO);
   }
-  batches[key].instanceDatas.push_back({GetModelMatrix(t), mat.color});
+  g_batches[key].instanceDatas.push_back({getModelMatrix(t), mat.color});
 }
 
-void OpenGLRenderSystem::onUpdate(const SystemState &state) {
+void OpenGLRenderSystem::onUpdate(const SystemState& state) {
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   EntityID mainCameraID =
-      state.world->GetSingleton<MainCameraSingleton>().entity;
+      state.world->getSingleton<MainCameraSingleton>().entity;
 
-  Vec3 &cameraPos =
-      state.world->GetComponent<TransformComponent>(mainCameraID).position;
-  Mat4 &viewProj = state.world->GetComponent<CameraComponent>(mainCameraID)
+  Vec3& cameraPos =
+      state.world->getComponent<TransformComponent>(mainCameraID).position;
+  Mat4& viewProj = state.world->getComponent<CameraComponent>(mainCameraID)
                        .viewProjectionMatrix;
 
-  Frustum frustum = GenerateFrustum(viewProj);
+  Frustum frustum = generateFrustum(viewProj);
 
   int drawCalls = 0;
 
-  for (auto &pair : batches) {
+  for (auto& pair : g_batches) {
     pair.second.instanceDatas.clear();
   }
 
   state.world
       ->query<TransformComponent, MeshComponent, MaterialComponent,
               ColliderComponent>()
-      .each([&](TransformComponent &t, MeshComponent &m, MaterialComponent &mat,
-                ColliderComponent &col) {
+      .each([&](TransformComponent& t, MeshComponent& m, MaterialComponent& mat,
+                ColliderComponent& col) {
         Vec3 center, worldMin, worldMax;
         if (col.type == ColliderType::AABB) {
           center = t.position + std::get<AABB>(col.shape).localCenter;
@@ -212,48 +192,46 @@ void OpenGLRenderSystem::onUpdate(const SystemState &state) {
           worldMin = center - Vec3(radius);
           worldMax = center + Vec3(radius);
         } else {
-          // If no collider, just use position as point
           center = t.position;
           worldMin = center - t.scale;
           worldMax = center + t.scale;
         }
-        if (!IsBoxInFrustum(frustum, worldMin, worldMax))
+        if (!isBoxInFrustum(frustum, worldMin, worldMax))
           return;
-        PopulateBatch(t, m, mat);
+        populateBatch(t, m, mat);
       });
 
   state.world->query<TransformComponent, MeshComponent, MaterialComponent>()
-      .Exclude<ColliderComponent>()
-      .each([&](TransformComponent &t, MeshComponent &m,
-                MaterialComponent &mat) { PopulateBatch(t, m, mat); });
+      .exclude<ColliderComponent>()
+      .each([&](TransformComponent& t, MeshComponent& m,
+                MaterialComponent& mat) { populateBatch(t, m, mat); });
 
-  for (const auto &pair : batches) {
-    const DrawKey &key = pair.first;
-    const BatchData &data = pair.second;
+  for (const auto& pair : g_batches) {
+    const DrawKey& key = pair.first;
+    const BatchData& data = pair.second;
 
-    const Shader &shader = ResourceManager::GetShader(key.shaderName);
-    const Texture2D &texture = ResourceManager::GetTexture(key.textureName);
-    const Mesh &model = ResourceManager::GetMesh(key.meshName);
+    const Shader& shader = ResourceManager::getShader(key.shaderName);
+    const Texture2D& texture = ResourceManager::getTexture(key.textureName);
+    const Mesh& model = ResourceManager::getMesh(key.meshName);
 
-    shader.Use();
-    shader.SetMatrix4("viewProj", viewProj);
-    shader.SetVector3f("lightPos", DEFAULT_LIGHT_POS);
-    shader.SetVector3f("lightColor", DEFAULT_LIGHT_COLOR);
-    shader.SetVector3f("cameraPos", cameraPos);
-    shader.SetFloat("time", state.world->time);
+    shader.use();
+    shader.setMatrix4("viewProj", viewProj);
+    shader.setVector3f("lightPos", DEFAULT_LIGHT_POS);
+    shader.setVector3f("lightColor", DEFAULT_LIGHT_COLOR);
+    shader.setVector3f("cameraPos", cameraPos);
+    shader.setFloat("time", state.world->time);
 
-    texture.Bind();
-    glBindVertexArray(model.VAO);
+    texture.bind();
+    glBindVertexArray(model.m_vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, data.instanceVBO);
 
-    // Upload instance data
     glBindBuffer(GL_ARRAY_BUFFER, data.instanceVBO);
     glBufferSubData(GL_ARRAY_BUFFER, 0,
                     data.instanceDatas.size() * sizeof(InstanceData),
                     data.instanceDatas.data());
 
-    glDrawElementsInstanced(GL_TRIANGLES, model.indices.size(), GL_UNSIGNED_INT,
+    glDrawElementsInstanced(GL_TRIANGLES, model.m_indices.size(), GL_UNSIGNED_INT,
                             0, data.instanceDatas.size());
 
     glBindVertexArray(0);
@@ -261,15 +239,15 @@ void OpenGLRenderSystem::onUpdate(const SystemState &state) {
   }
 
   int instancesRendered = 0;
-  for (const auto &pair : batches) {
+  for (const auto& pair : g_batches) {
     instancesRendered += pair.second.instanceDatas.size();
   }
-  DebugUI::AddValue("Instances Rendered", instancesRendered);
-  DebugUI::AddValue("Draw Calls", drawCalls);
+  DebugUI::addValue("Instances Rendered", instancesRendered);
+  DebugUI::addValue("Draw Calls", drawCalls);
 }
 
-void OpenGLRenderSystem::onDestroy(const SystemState &state) {
-  for (auto &pair : batches) {
+void OpenGLRenderSystem::onDestroy(const SystemState& state) {
+  for (auto& pair : g_batches) {
     if (pair.second.instanceVBO != 0) {
       glDeleteBuffers(1, &pair.second.instanceVBO);
       pair.second.instanceVBO = 0;

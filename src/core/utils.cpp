@@ -10,7 +10,7 @@
 #include <unistd.h>
 #endif
 
-std::string Utils::GetExecutablePath() {
+std::string Utils::getExecutablePath() {
 #if defined(_WIN32)
   char buffer[MAX_PATH];
   GetModuleFileNameA(NULL, buffer, MAX_PATH);
@@ -34,26 +34,22 @@ std::string Utils::GetExecutablePath() {
 #endif
 }
 
-std::string Utils::GetExecutableDir() {
-  std::filesystem::path exePath = GetExecutablePath();
+std::string Utils::getExecutableDir() {
+  std::filesystem::path exePath = getExecutablePath();
   if (exePath.empty()) {
     return std::filesystem::current_path()
-        .string(); // Fallback to current working directory
+        .string();
   }
   return exePath.parent_path().string();
 }
 
-std::string Utils::GetAssetPath(const std::string &relativePath) {
+std::string Utils::getAssetPath(const std::string& relativePath) {
   static std::filesystem::path root = [] {
     std::filesystem::path p = __FILE__;
-    return p.parent_path().parent_path().parent_path(); // adjust as needed
+    return p.parent_path().parent_path().parent_path();
   }();
 
-  // Assuming the executable is built in `<project_root>/build/`
-  // we resolve the asset path relative to `<project_root>`
   std::filesystem::path assetPath = root / relativePath;
 
-  // weakly_canonical normalizes the path (resolves "..") without needing the
-  // target to exist
   return std::filesystem::weakly_canonical(assetPath).string();
 }

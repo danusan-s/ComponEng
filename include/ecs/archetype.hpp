@@ -7,118 +7,115 @@
 
 class ComponentColumn {
 private:
-  std::vector<std::byte> componentArray; // raw byte array to store components
+  std::vector<std::byte> m_componentArray;
 
 public:
-  size_t stride;
-  size_t count;
+  size_t m_stride;
+  size_t m_count;
 
-  ComponentColumn(size_t componentSize) : count(0), stride(componentSize) {
+  ComponentColumn(size_t componentSize) : m_count(0), m_stride(componentSize) {
   }
 
-  void *at(std::size_t index) {
-    return componentArray.data() + index * stride;
+  void* at(std::size_t index) {
+    return m_componentArray.data() + index * m_stride;
   }
 
-  template <typename T> T &Get(size_t row) {
-    return *reinterpret_cast<T *>(at(row));
+  template <typename T> T& get(size_t row) {
+    return *reinterpret_cast<T*>(at(row));
   }
 
-  void AddEmpty() {
-    componentArray.resize(componentArray.size() + stride);
-    ++count;
+  void addEmpty() {
+    m_componentArray.resize(m_componentArray.size() + m_stride);
+    ++m_count;
   }
 
-  void Remove(size_t row) {
-    if (row >= count) {
+  void remove(size_t row) {
+    if (row >= m_count) {
       throw std::runtime_error("ComponentColumn: Invalid row index");
     }
-    if (row < count - 1) {
-      std::memcpy(at(row), at(count - 1),
-                  stride); // move last component to removed spot
+    if (row < m_count - 1) {
+      std::memcpy(at(row), at(m_count - 1),
+                  m_stride);
     }
-    --count;
+    --m_count;
   }
 };
 
 class Archetype {
 private:
-  std::vector<ComponentColumn> componentColumns;
+  std::vector<ComponentColumn> m_columns;
 
-  uint8_t indexMap[MAX_COMPONENTS] = {
-      0}; // maps ComponentID to column index in componentColumns
-  std::unordered_map<EntityID, size_t>
-      entityToRow; // maps EntityID to row index in columns
-  std::unordered_map<size_t, EntityID>
-      rowToEntity; // maps row index to EntityID for reverse lookup
+  uint8_t m_indexMap[MAX_COMPONENTS] = {0};
+  std::unordered_map<EntityID, size_t> m_entityToRow;
+  std::unordered_map<size_t, EntityID> m_rowToEntity;
 
 public:
-  Signature signature;
+  Signature m_signature;
 
-  void Init(Signature signature, ComponentRegistry *registry) {
-    this->signature = signature;
+  void init(Signature signature, ComponentRegistry* registry) {
+    this->m_signature = signature;
 
     for (size_t i = 0; i < MAX_COMPONENTS; ++i) {
       if (signature.test(i)) {
-        ComponentInfo &info = registry->GetComponentInfo(i);
-        indexMap[i] = componentColumns.size();
-        componentColumns.emplace_back(info.size);
+        ComponentInfo& info = registry->getComponentInfo(i);
+        m_indexMap[i] = m_columns.size();
+        m_columns.emplace_back(info.size);
       }
     }
   }
 
-  void AddEntity(EntityID entity) {
-    size_t row = componentColumns.empty() ? 0 : componentColumns[0].count;
-    for (auto &col : componentColumns) {
-      col.AddEmpty();
+  void addEntity(EntityID entity) {
+    size_t row = m_columns.empty() ? 0 : m_columns[0].m_count;
+    for (auto& col : m_columns) {
+      col.addEmpty();
     }
-    entityToRow[entity] = row;
-    rowToEntity[row] = entity;
+    m_entityToRow[entity] = row;
+    m_rowToEntity[row] = entity;
   }
 
-  EntityID RemoveEntity(EntityID entity) {
-    auto it = entityToRow.find(entity);
-    EntityID lastRowEntity = rowToEntity[componentColumns[0].count - 1];
-    rowToEntity.erase(componentColumns[0].count - 1);
+  EntityID removeEntity(EntityID entity) {
+    auto it = m_entityToRow.find(entity);
+    EntityID lastRowEntity = m_rowToEntity[m_columns[0].m_count - 1];
+    m_rowToEntity.erase(m_columns[0].m_count - 1);
 
-    if (it == entityToRow.end()) {
+    if (it == m_entityToRow.end()) {
       throw std::runtime_error("Archetype: Entity not found in archetype");
     }
     size_t row = it->second;
-    for (auto &col : componentColumns) {
-      col.Remove(row);
+    for (auto& col : m_columns) {
+      col.remove(row);
     }
-    entityToRow.erase(it);
-    rowToEntity[row] = lastRowEntity;
+    m_entityToRow.erase(it);
+    m_rowToEntity[row] = lastRowEntity;
     return lastRowEntity;
   }
 
-  ComponentColumn &GetColumn(ComponentID c) {
-    if (!signature.test(c)) {
+  ComponentColumn& getColumn(ComponentID c) {
+    if (!m_signature.test(c)) {
       throw std::runtime_error("Archetype: Component not in archetype");
     }
-    return componentColumns[indexMap[c]];
+    return m_columns[m_indexMap[c]];
   }
 
-  template <typename T> T &Get(ComponentID c, std::size_t row) {
-    return GetColumn(c).Get<T>(row);
+  template <typename T> T& get(ComponentID c, std::size_t row) {
+    return getColumn(c).get<T>(row);
   }
 
-  size_t GetRowForEntity(EntityID id) {
-    if (entityToRow.find(id) == entityToRow.end()) {
+  size_t getRowForEntity(EntityID id) {
+    if (m_entityToRow.find(id) == m_entityToRow.end()) {
       throw std::runtime_error("Archetype: Entity not found in archetype");
     }
-    return entityToRow[id];
+    return m_entityToRow[id];
   }
 
-  EntityID GetEntityForRow(size_t row) {
-    if (rowToEntity.find(row) == rowToEntity.end()) {
+  EntityID getEntityForRow(size_t row) {
+    if (m_rowToEntity.find(row) == m_rowToEntity.end()) {
       throw std::runtime_error("Archetype: Row index out of bounds");
     }
-    return rowToEntity[row];
+    return m_rowToEntity[row];
   }
 
-  size_t GetEntityCount() const {
-    return componentColumns.empty() ? 0 : componentColumns[0].count;
+  size_t getEntityCount() const {
+    return m_columns.empty() ? 0 : m_columns[0].m_count;
   }
 };

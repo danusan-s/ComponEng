@@ -6,49 +6,48 @@
 
 class ArchetypeManager {
 private:
-  std::array<Archetype, MAX_ARCHETYPES> archetypes;
-  std::unordered_map<Signature, ArchetypeID> signatureToArchetypeID;
-  size_t archetypeCount = 0;
+  std::array<Archetype, MAX_ARCHETYPES> m_archetypes;
+  std::unordered_map<Signature, ArchetypeID> m_signatureToArchetypeID;
+  size_t m_archetypeCount = 0;
 
 public:
-  // Returns existing archetype or creates one for this signature.
-  Archetype &getOrCreate(const Signature &signature,
-                         ComponentRegistry *componentRegistry) {
+  Archetype& getOrCreate(const Signature& signature,
+                         ComponentRegistry* componentRegistry) {
     if (signature == Signature(0)) {
       throw std::runtime_error("ArchetypeManager: signature cannot be empty");
     }
 
-    auto it = signatureToArchetypeID.find(signature);
-    if (it != signatureToArchetypeID.end()) {
-      return archetypes[it->second];
+    auto it = m_signatureToArchetypeID.find(signature);
+    if (it != m_signatureToArchetypeID.end()) {
+      return m_archetypes[it->second];
     }
 
-    if (archetypeCount >= MAX_ARCHETYPES) {
+    if (m_archetypeCount >= MAX_ARCHETYPES) {
       throw std::runtime_error("ArchetypeManager: MAX_ARCHETYPES exceeded");
     }
 
-    ArchetypeID newID = archetypeCount++;
-    archetypes[newID].Init(signature, componentRegistry);
-    signatureToArchetypeID[signature] = newID;
-    return archetypes[newID];
+    ArchetypeID newID = m_archetypeCount++;
+    m_archetypes[newID].init(signature, componentRegistry);
+    m_signatureToArchetypeID[signature] = newID;
+    return m_archetypes[newID];
   }
 
-  Archetype *getBySignature(const Signature &signature) {
-    auto it = signatureToArchetypeID.find(signature);
-    if (it != signatureToArchetypeID.end()) {
-      return &archetypes[it->second];
+  Archetype* getBySignature(const Signature& signature) {
+    auto it = m_signatureToArchetypeID.find(signature);
+    if (it != m_signatureToArchetypeID.end()) {
+      return &m_archetypes[it->second];
     }
     return nullptr;
   }
 
-  Archetype &getByID(ArchetypeID id) {
-    if (id >= archetypeCount) {
+  Archetype& getByID(ArchetypeID id) {
+    if (id >= m_archetypeCount) {
       throw std::runtime_error("ArchetypeManager: Invalid ArchetypeID");
     }
-    return archetypes[id];
+    return m_archetypes[id];
   }
 
-  std::array<Archetype, MAX_ARCHETYPES> &getArchetypes() {
-    return archetypes;
+  std::array<Archetype, MAX_ARCHETYPES>& getArchetypes() {
+    return m_archetypes;
   }
 };

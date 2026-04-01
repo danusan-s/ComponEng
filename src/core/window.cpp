@@ -1,13 +1,12 @@
 #include "glad/glad.h"
-
 #include "core/input_state.hpp"
 #include "core/logger.hpp"
 #include "core/window.hpp"
 #include <GLFW/glfw3.h>
 
-static bool mouseLocked = true;
+static bool g_mouseLocked = true;
 
-static void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
+static void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
   float targetAspectRatio = 16.0f / 9.0f;
   float currentAspectRatio = static_cast<float>(width) / height;
 
@@ -25,24 +24,24 @@ static void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
   glViewport(0, yOffset, width, newHeight);
 }
 
-static void KeyCallback(GLFWwindow *window, int key, int scancode, int action,
+static void keyCallback(GLFWwindow* window, int key, int scancode, int action,
                         int mode) {
-  auto *inputState =
-      static_cast<InputState *>(glfwGetWindowUserPointer(window));
+  auto* inputState =
+      static_cast<InputState*>(glfwGetWindowUserPointer(window));
   if (!inputState)
     return;
 
   if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
     if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED) {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-      mouseLocked = false;
+      g_mouseLocked = false;
     } else {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-      mouseLocked = true;
+      g_mouseLocked = true;
     }
   }
 
-  if (!mouseLocked)
+  if (!g_mouseLocked)
     return;
 
   if (key >= 0 && key < 1024) {
@@ -56,14 +55,14 @@ static void KeyCallback(GLFWwindow *window, int key, int scancode, int action,
     glfwSetWindowShouldClose(window, true);
 }
 
-static void MouseButtonCallback(GLFWwindow *window, int button, int action,
+static void mouseButtonCallback(GLFWwindow* window, int button, int action,
                                 int mods) {
-  auto *inputState =
-      static_cast<InputState *>(glfwGetWindowUserPointer(window));
+  auto* inputState =
+      static_cast<InputState*>(glfwGetWindowUserPointer(window));
   if (!inputState)
     return;
 
-  if (!mouseLocked)
+  if (!g_mouseLocked)
     return;
 
   if (button >= 0 && button < 8) {
@@ -71,15 +70,15 @@ static void MouseButtonCallback(GLFWwindow *window, int button, int action,
   }
 }
 
-static void CursorPosCallback(GLFWwindow *window, double xposIn,
+static void cursorPosCallback(GLFWwindow* window, double xposIn,
                               double yposIn) {
-  auto *inputState =
-      static_cast<InputState *>(glfwGetWindowUserPointer(window));
+  auto* inputState =
+      static_cast<InputState*>(glfwGetWindowUserPointer(window));
   if (!inputState)
     return;
 
-  if (!mouseLocked) {
-    inputState->firstMouse = true; // reset mouse state when unlocking
+  if (!g_mouseLocked) {
+    inputState->firstMouse = true;
     return;
   }
 
@@ -98,9 +97,9 @@ static void CursorPosCallback(GLFWwindow *window, double xposIn,
   inputState->mouseY = ypos;
 }
 
-void Window::Init(int width, int height, const char *title) {
-  this->width = width;
-  this->height = height;
+void Window::init(int width, int height, const char* title) {
+  this->m_width = width;
+  this->m_height = height;
 
   if (glfwInit() != GLFW_TRUE) {
     LOG_ERROR("Failed to initialize GLFW");
@@ -114,15 +113,15 @@ void Window::Init(int width, int height, const char *title) {
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-  handle = glfwCreateWindow(width, height, title, nullptr, nullptr);
-  if (!handle) {
+  m_handle = glfwCreateWindow(width, height, title, nullptr, nullptr);
+  if (!m_handle) {
     LOG_ERROR("Failed to create GLFW window");
     glfwTerminate();
     return;
   }
 
-  glfwMakeContextCurrent(handle);
-  glfwSwapInterval(0); // disables VSync → uncapped FPS
+  glfwMakeContextCurrent(m_handle);
+  glfwSwapInterval(0);
 
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     LOG_ERROR("Failed to initialize GLAD");
@@ -135,17 +134,17 @@ void Window::Init(int width, int height, const char *title) {
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-  glfwSetWindowUserPointer(handle, &inputState);
-  glfwSetKeyCallback(handle, KeyCallback);
-  glfwSetMouseButtonCallback(handle, MouseButtonCallback);
-  glfwSetCursorPosCallback(handle, CursorPosCallback);
-  glfwSetFramebufferSizeCallback(handle, FramebufferSizeCallback);
-  glfwSetInputMode(handle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  glfwSetWindowUserPointer(m_handle, &m_inputState);
+  glfwSetKeyCallback(m_handle, keyCallback);
+  glfwSetMouseButtonCallback(m_handle, mouseButtonCallback);
+  glfwSetCursorPosCallback(m_handle, cursorPosCallback);
+  glfwSetFramebufferSizeCallback(m_handle, framebufferSizeCallback);
+  glfwSetInputMode(m_handle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-  SetViewport(width, height);
+  setViewport(width, height);
 }
 
-void Window::SetViewport(int w, int h) {
+void Window::setViewport(int w, int h) {
   float targetAspectRatio = 16.0f / 9.0f;
   float currentAspectRatio = static_cast<float>(w) / h;
 
@@ -163,23 +162,23 @@ void Window::SetViewport(int w, int h) {
   glViewport(0, yOffset, w, newHeight);
 }
 
-void Window::Shutdown() {
-  if (handle) {
-    glfwDestroyWindow(handle);
-    handle = nullptr;
+void Window::shutdown() {
+  if (m_handle) {
+    glfwDestroyWindow(m_handle);
+    m_handle = nullptr;
   }
   glfwTerminate();
 }
 
-bool Window::ShouldClose() const {
-  return handle ? glfwWindowShouldClose(handle) : true;
+bool Window::shouldClose() const {
+  return m_handle ? glfwWindowShouldClose(m_handle) : true;
 }
 
-void Window::SwapBuffers() {
-  if (handle)
-    glfwSwapBuffers(handle);
+void Window::swapBuffers() {
+  if (m_handle)
+    glfwSwapBuffers(m_handle);
 }
 
-void Window::PollEvents() {
+void Window::pollEvents() {
   glfwPollEvents();
 }
