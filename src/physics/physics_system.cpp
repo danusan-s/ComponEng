@@ -7,20 +7,20 @@
 #include "physics/collision_detection.hpp"
 #include <vector>
 
-Vec3 g_gravity = Vec3(0.0f, -9.81f, 0.0f);
+constexpr Vec3 g_gravity = Vec3(0.0f, -9.81f, 0.0f);
 
 struct EntityPhysicsData {
   EntityID entity;
-  TransformComponent* transform;
-  RigidBodyComponent* rigidbody;
-  ColliderComponent* collider;
+  TransformComponent *transform;
+  RigidBodyComponent *rigidbody;
+  ColliderComponent *collider;
 };
 
 static double g_accumulatedTime = 0.0f;
 
-void PhysicsSystem::onUpdate(const SystemState& state) {
+void PhysicsSystem::onUpdate(const SystemState &state) {
   g_accumulatedTime += state.deltaTime;
-  const float fixedTimeStep = 1 / 60.0f;
+  constexpr float fixedTimeStep = 1 / 60.0f;
   if (g_accumulatedTime < fixedTimeStep)
     return;
 
@@ -28,7 +28,7 @@ void PhysicsSystem::onUpdate(const SystemState& state) {
     g_accumulatedTime -= fixedTimeStep;
 
     state.world->query<TransformComponent, RigidBodyComponent>().each(
-        [&](TransformComponent& transform, RigidBodyComponent& rigidbody) {
+        [&](TransformComponent &transform, RigidBodyComponent &rigidbody) {
           if (rigidbody.type == RigidBodyComponent::Static)
             return;
           if (rigidbody.type == RigidBodyComponent::Dynamic) {
@@ -37,7 +37,7 @@ void PhysicsSystem::onUpdate(const SystemState& state) {
         });
 
     state.world->query<TransformComponent, RigidBodyComponent>().each(
-        [&](TransformComponent& transform, RigidBodyComponent& rigidbody) {
+        [&](TransformComponent &transform, RigidBodyComponent &rigidbody) {
           if (rigidbody.type == RigidBodyComponent::Static)
             return;
           transform.position += rigidbody.velocity * fixedTimeStep;
@@ -47,23 +47,23 @@ void PhysicsSystem::onUpdate(const SystemState& state) {
 
     state.world
         ->query<TransformComponent, RigidBodyComponent, ColliderComponent>()
-        .eachWithEntity([&](EntityID entity, TransformComponent& transform,
-                            RigidBodyComponent& rigidbody,
-                            ColliderComponent& collider) {
+        .eachWithEntity([&](EntityID entity, TransformComponent &transform,
+                            RigidBodyComponent &rigidbody,
+                            ColliderComponent &collider) {
           colliders.push_back({entity, &transform, &rigidbody, &collider});
         });
 
     state.world->query<TransformComponent, ColliderComponent>()
         .exclude<RigidBodyComponent>()
-        .eachWithEntity([&](EntityID entity, TransformComponent& transform,
-                            ColliderComponent& collider) {
+        .eachWithEntity([&](EntityID entity, TransformComponent &transform,
+                            ColliderComponent &collider) {
           colliders.push_back({entity, &transform, nullptr, &collider});
         });
 
     for (size_t i = 0; i < colliders.size(); ++i) {
       for (size_t k = i + 1; k < colliders.size(); ++k) {
-        EntityPhysicsData& a = colliders[i];
-        EntityPhysicsData& b = colliders[k];
+        EntityPhysicsData &a = colliders[i];
+        EntityPhysicsData &b = colliders[k];
 
         CollisionInfo info;
         if (!testCollision(*a.collider, *a.transform, *b.collider, *b.transform,
@@ -116,8 +116,8 @@ void PhysicsSystem::onUpdate(const SystemState& state) {
           b.rigidbody->velocity += impulse * inverseMassB;
         }
 
-        const float percent = 0.2f;
-        const float slop = 0.01f;
+        constexpr float percent = 0.2f;
+        constexpr float slop = 0.01f;
         float correctionMagnitude = std::max(info.penetration - slop, 0.0f) *
                                     percent / (inverseMassA + inverseMassB);
         Vec3 correction = correctionMagnitude * info.normal;

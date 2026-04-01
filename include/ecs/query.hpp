@@ -11,38 +11,38 @@ struct QueryDesc {
 
 template <typename... Req> class Query {
 public:
-  Query(std::array<Archetype, MAX_ARCHETYPES>& archetypes,
-        ComponentRegistry& registry)
+  Query(std::array<Archetype, MAX_ARCHETYPES> &archetypes,
+        ComponentRegistry &registry)
       : archetypes(archetypes), registry(registry) {
     desc.required = registry.makeSignature<Req...>();
   }
 
-  std::array<Archetype, MAX_ARCHETYPES>& archetypes;
-  ComponentRegistry& registry;
+  std::array<Archetype, MAX_ARCHETYPES> &archetypes;
+  ComponentRegistry &registry;
   QueryDesc desc;
 
-  bool matches(Archetype& archetype) {
+  bool matches(const Archetype &archetype) {
     return (archetype.m_signature & desc.required) == desc.required &&
            (archetype.m_signature & desc.excluded).none();
   }
 
-  template <typename... Excl> Query<Req...>& exclude() {
+  template <typename... Excl> Query<Req...> &exclude() {
     desc.excluded = registry.makeSignature<Excl...>();
     return *this;
   }
 
   template <typename Fn, size_t... I>
-  void callEach(Fn& fn, ComponentColumn** reqCols, size_t i,
+  void callEach(Fn &fn, ComponentColumn **reqCols, size_t i,
                 std::index_sequence<I...>) {
     fn(reqCols[I]->template get<Req>(i)...);
   }
 
   template <typename Fn> void each(Fn fn) {
-    for (Archetype& archetype : archetypes) {
+    for (Archetype &archetype : archetypes) {
       if (!matches(archetype))
         continue;
 
-      ComponentColumn* reqCols[] = {
+      ComponentColumn *reqCols[] = {
           &archetype.getColumn(registry.getComponentID<Req>())...};
 
       size_t n = archetype.getEntityCount();
@@ -52,17 +52,17 @@ public:
   }
 
   template <typename Fn, size_t... I>
-  void callEachWithEntity(Fn& fn, EntityID entity, ComponentColumn** reqCols,
+  void callEachWithEntity(Fn &fn, EntityID entity, ComponentColumn **reqCols,
                           size_t i, std::index_sequence<I...>) {
     fn(entity, reqCols[I]->template get<Req>(i)...);
   }
 
   template <typename Fn> void eachWithEntity(Fn fn) {
-    for (Archetype& archetype : archetypes) {
+    for (Archetype &archetype : archetypes) {
       if (!matches(archetype))
         continue;
 
-      ComponentColumn* reqCols[] = {
+      ComponentColumn *reqCols[] = {
           &archetype.getColumn(registry.getComponentID<Req>())...};
 
       size_t n = archetype.getEntityCount();

@@ -2,13 +2,13 @@
 #include <algorithm>
 #include <cmath>
 
-Vec3 getColliderWorldPosition(const TransformComponent& transform,
-                              const Vec3& localCenter) {
+Vec3 getColliderWorldPosition(const TransformComponent &transform,
+                              const Vec3 &localCenter) {
   return transform.position + localCenter;
 }
 
-bool testAABBAABB(const AABB& a, const Vec3& posA, const AABB& b,
-                  const Vec3& posB, CollisionInfo& info) {
+bool testAABBAABB(const AABB &a, const Vec3 &posA, const AABB &b,
+                  const Vec3 &posB, CollisionInfo &info) {
   Vec3 centerA = posA + a.localCenter;
   Vec3 centerB = posB + b.localCenter;
 
@@ -40,8 +40,8 @@ bool testAABBAABB(const AABB& a, const Vec3& posA, const AABB& b,
   return true;
 }
 
-bool testSphereSphere(const Sphere& a, const Vec3& posA, const Sphere& b,
-                      const Vec3& posB, CollisionInfo& info) {
+bool testSphereSphere(const Sphere &a, const Vec3 &posA, const Sphere &b,
+                      const Vec3 &posB, CollisionInfo &info) {
   Vec3 centerA = posA + a.localCenter;
   Vec3 centerB = posB + b.localCenter;
 
@@ -63,8 +63,8 @@ bool testSphereSphere(const Sphere& a, const Vec3& posA, const Sphere& b,
   return true;
 }
 
-bool testAABBSphere(const AABB& a, const Vec3& posA, const Sphere& b,
-                    const Vec3& posB, CollisionInfo& info) {
+bool testAABBSphere(const AABB &a, const Vec3 &posA, const Sphere &b,
+                    const Vec3 &posB, CollisionInfo &info) {
   Vec3 centerA = posA + a.localCenter;
   Vec3 sphereCenter = posB + b.localCenter;
 
@@ -105,42 +105,42 @@ bool testAABBSphere(const AABB& a, const Vec3& posA, const Sphere& b,
   return true;
 }
 
-bool testSphereAABB(const Sphere& a, const Vec3& posA, const AABB& b,
-                    const Vec3& posB, CollisionInfo& info) {
+bool testSphereAABB(const Sphere &a, const Vec3 &posA, const AABB &b,
+                    const Vec3 &posB, CollisionInfo &info) {
   bool res = testAABBSphere(b, posB, a, posA, info);
   info.normal = -info.normal;
   return res;
 }
 
-bool testCollision(const ColliderComponent& colliderA,
-                   const TransformComponent& transformA,
-                   const ColliderComponent& colliderB,
-                   const TransformComponent& transformB, CollisionInfo& info) {
+bool testCollision(const ColliderComponent &colliderA,
+                   const TransformComponent &transformA,
+                   const ColliderComponent &colliderB,
+                   const TransformComponent &transformB, CollisionInfo &info) {
   if (colliderA.type == ColliderType::AABB &&
       colliderB.type == ColliderType::AABB) {
-    const AABB& a = std::get<AABB>(colliderA.shape);
-    const AABB& b = std::get<AABB>(colliderB.shape);
+    const AABB &a = std::get<AABB>(colliderA.shape);
+    const AABB &b = std::get<AABB>(colliderB.shape);
     return testAABBAABB(a, transformA.position, b, transformB.position, info);
   }
 
   if (colliderA.type == ColliderType::Sphere &&
       colliderB.type == ColliderType::Sphere) {
-    const Sphere& a = std::get<Sphere>(colliderA.shape);
-    const Sphere& b = std::get<Sphere>(colliderB.shape);
+    const Sphere &a = std::get<Sphere>(colliderA.shape);
+    const Sphere &b = std::get<Sphere>(colliderB.shape);
     return testSphereSphere(a, transformA.position, b, transformB.position,
                             info);
   }
 
   if (colliderA.type == ColliderType::AABB &&
       colliderB.type == ColliderType::Sphere) {
-    const AABB& a = std::get<AABB>(colliderA.shape);
-    const Sphere& b = std::get<Sphere>(colliderB.shape);
+    const AABB &a = std::get<AABB>(colliderA.shape);
+    const Sphere &b = std::get<Sphere>(colliderB.shape);
     return testAABBSphere(a, transformA.position, b, transformB.position, info);
   }
   if (colliderA.type == ColliderType::Sphere &&
       colliderB.type == ColliderType::AABB) {
-    const Sphere& a = std::get<Sphere>(colliderA.shape);
-    const AABB& b = std::get<AABB>(colliderB.shape);
+    const Sphere &a = std::get<Sphere>(colliderA.shape);
+    const AABB &b = std::get<AABB>(colliderB.shape);
     return testSphereAABB(a, transformA.position, b, transformB.position, info);
   }
 
