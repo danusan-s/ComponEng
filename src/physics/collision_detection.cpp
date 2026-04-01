@@ -114,23 +114,22 @@ bool TestAABBSphere(const AABB &a, const Vec3 &posA, const Sphere &b,
 
     float minOverlap = std::min({dA.x, dB.x, dA.y, dB.y, dA.z, dB.z});
 
-    if (minOverlap == dA.x)
-      info.normal = Vec3(-1, 0, 0);
-    else if (minOverlap == dB.x)
-      info.normal = Vec3(1, 0, 0);
-    else if (minOverlap == dA.y)
-      info.normal = Vec3(0, -1, 0);
-    else if (minOverlap == dB.y)
-      info.normal = Vec3(0, 1, 0);
-    else if (minOverlap == dA.z)
-      info.normal = Vec3(0, 0, -1);
+    Vec3 floorToSphere = sphereCenter - centerA;
+    if (length(floorToSphere) > 1e-6f)
+      info.normal = normalize(floorToSphere);
     else
-      info.normal = Vec3(0, 0, 1);
-
+      info.normal = Vec3(0, -1, 0); // fallback: push up
     info.penetration = b.radius + minOverlap;
   }
 
   return true;
+}
+
+bool TestSphereAABB(const Sphere &a, const Vec3 &posA, const AABB &b,
+                    const Vec3 &posB, CollisionInfo &info) {
+  bool res = TestAABBSphere(b, posB, a, posA, info);
+  info.normal = -info.normal; // Flip normal for correct direction
+  return res;
 }
 
 bool TestCollision(const ColliderComponent &colliderA,
@@ -163,8 +162,7 @@ bool TestCollision(const ColliderComponent &colliderA,
       colliderB.type == ColliderType::AABB) {
     const Sphere &a = std::get<Sphere>(colliderA.shape);
     const AABB &b = std::get<AABB>(colliderB.shape);
-    // Note the order of parameters is reversed for AABBSphere test
-    return TestAABBSphere(b, transformB.position, a, transformA.position, info);
+    return TestSphereAABB(a, transformA.position, b, transformB.position, info);
   }
 
   // Unsupported collision pair
