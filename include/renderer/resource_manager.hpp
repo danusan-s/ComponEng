@@ -1,7 +1,7 @@
 #pragma once
 
-#include <map>
 #include <string>
+#include <unordered_map>
 
 #include "renderer/mesh.hpp"
 #include "renderer/shader.hpp"
@@ -14,9 +14,9 @@
 // public constructor is defined.
 class ResourceManager {
 public:
-  static std::map<std::string, Shader> s_shaders;
-  static std::map<std::string, Texture2D> s_textures;
-  static std::map<std::string, Mesh> s_meshes;
+  static std::unordered_map<std::string, Shader> s_shaders;
+  static std::unordered_map<std::string, Texture2D> s_textures;
+  static std::unordered_map<std::string, Mesh> s_meshes;
 
   static void loadShader(const char* vShaderFile, const char* fShaderFile,
                          const char* gShaderFile, std::string name);

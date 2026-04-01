@@ -22,26 +22,12 @@ private:
 public:
   double time = 0.0f;
 
-  void init() {
-    m_componentRegistry = std::make_unique<ComponentRegistry>();
-    m_entityManager = std::make_unique<EntityManager>();
-    m_systemManager = std::make_unique<SystemManager>();
-    m_archetypeManager = std::make_unique<ArchetypeManager>();
-    time = 0.0f;
-  }
-
-  EntityID createEntity() {
-    return m_entityManager->createEntity();
-  }
-
-  void destroyEntity(EntityID entity) {
-    Archetype* currArchetype = m_archetypeManager->getBySignature(
-        m_entityManager->getRecord(entity).signature);
-    if (currArchetype) {
-      currArchetype->removeEntity(entity);
-    }
-    m_entityManager->destroyEntity(entity);
-  }
+  void init();
+  EntityID createEntity();
+  void destroyEntity(EntityID entity);
+  void createSystems();
+  void updateSystems(float deltaTime);
+  void destroySystems();
 
   template <typename T> void registerComponent() {
     m_componentRegistry->registerComponent<T>();
@@ -194,17 +180,5 @@ public:
   std::shared_ptr<T>
   registerSystem(SystemGroup group = SystemGroup::Simulation) {
     return m_systemManager->registerSystem<T>(group);
-  }
-
-  void createSystems() {
-    m_systemManager->createAll(this);
-  }
-
-  void updateSystems(float deltaTime) {
-    m_systemManager->updateAll(this, deltaTime);
-  }
-
-  void destroySystems() {
-    m_systemManager->destroyAll(this);
   }
 };

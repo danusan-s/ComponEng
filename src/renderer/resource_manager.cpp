@@ -7,9 +7,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-std::map<std::string, Texture2D> ResourceManager::s_textures;
-std::map<std::string, Shader> ResourceManager::s_shaders;
-std::map<std::string, Mesh> ResourceManager::s_meshes;
+std::unordered_map<std::string, Texture2D> ResourceManager::s_textures;
+std::unordered_map<std::string, Shader> ResourceManager::s_shaders;
+std::unordered_map<std::string, Mesh> ResourceManager::s_meshes;
 
 void ResourceManager::loadShader(const char* vShaderFile,
                                  const char* fShaderFile,

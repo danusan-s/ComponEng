@@ -26,7 +26,7 @@ public:
            (archetype.m_signature & desc.excluded).none();
   }
 
-  template <typename... Excl> Query<Req...> exclude() {
+  template <typename... Excl> Query<Req...>& exclude() {
     desc.excluded = registry.makeSignature<Excl...>();
     return *this;
   }
