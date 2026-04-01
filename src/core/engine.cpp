@@ -76,11 +76,11 @@ void Engine::Run(IGame &game) {
   game.Init(world);
   world.CreateSystems();
 
-  float deltaTime = 0.0f;
-  float lastFrame = 0.0f;
+  double deltaTime = 0.0f;
+  double lastFrame = 0.0f;
 
   while (!window.ShouldClose()) {
-    float currentFrame = glfwGetTime();
+    double currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
     world.time += deltaTime;

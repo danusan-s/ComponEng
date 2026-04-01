@@ -10,7 +10,7 @@ constexpr auto RIGHT_KEY = GLFW_KEY_D;
 constexpr auto JUMP_KEY = GLFW_KEY_SPACE;
 constexpr auto CROUCH_KEY = GLFW_KEY_LEFT_SHIFT;
 
-void InputSystem::onUpdate(const SystemState& state) {
+void InputSystem::onUpdate(const SystemState &state) {
   auto &inputState = Engine::Get().window.inputState;
 
   state.world->query<InputComponent, MouseInputComponent>().each(
@@ -22,12 +22,13 @@ void InputSystem::onUpdate(const SystemState& state) {
         input.jump = inputState.keys[JUMP_KEY];
         input.crouch = inputState.keys[CROUCH_KEY];
 
-        mouseInput.deltaX = inputState.mouseDeltaX;
-        mouseInput.deltaY = inputState.mouseDeltaY;
+        mouseInput.deltaX = inputState.mouseX - inputState.lastMouseX;
+        mouseInput.deltaY = inputState.mouseY - inputState.lastMouseY;
         mouseInput.leftButton = inputState.mouseButtons[GLFW_MOUSE_BUTTON_LEFT];
-        mouseInput.rightButton = inputState.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT];
+        mouseInput.rightButton =
+            inputState.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT];
       });
 
-  inputState.mouseDeltaX = 0.0f;
-  inputState.mouseDeltaY = 0.0f;
+  inputState.lastMouseX = inputState.mouseX;
+  inputState.lastMouseY = inputState.mouseY;
 }

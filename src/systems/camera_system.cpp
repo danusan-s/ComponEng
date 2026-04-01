@@ -9,7 +9,7 @@
 #include <cmath>
 
 static constexpr float DEFAULT_MOVE_SPEED = 100.0f;
-static constexpr float MOUSE_SENSITIVITY = 0.5f;
+static constexpr float MOUSE_SENSITIVITY = 200.0f;
 static constexpr float PITCH_LIMIT = 89.0f;
 
 static void UpdateCameraVectors(const TransformComponent &transform,
@@ -52,8 +52,8 @@ static void ProcessKeyboardInput(TransformComponent &transform,
 static void ProcessMouseInput(TransformComponent &transform,
                               const MouseInputComponent &mouseInput,
                               float sensitivity) {
-  transform.rotation.y += mouseInput.deltaX * sensitivity;
-  transform.rotation.x += mouseInput.deltaY * sensitivity;
+  transform.rotation.y += mouseInput.deltaX * sensitivity; // Invert y
+  transform.rotation.x -= mouseInput.deltaY * sensitivity;
 
   if (transform.rotation.x > PITCH_LIMIT)
     transform.rotation.x = PITCH_LIMIT;
@@ -76,7 +76,7 @@ void CameraSystem::onUpdate(const SystemState &state) {
 
   ProcessKeyboardInput(transform, input, state.deltaTime, DEFAULT_MOVE_SPEED);
 
-  ProcessMouseInput(transform, mouseInput, MOUSE_SENSITIVITY);
+  ProcessMouseInput(transform, mouseInput, MOUSE_SENSITIVITY * state.deltaTime);
 
   Vec3 front, right, up;
   UpdateCameraVectors(transform, front, right, up);

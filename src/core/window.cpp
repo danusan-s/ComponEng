@@ -92,10 +92,10 @@ static void CursorPosCallback(GLFWwindow *window, double xposIn,
     inputState->firstMouse = false;
   }
 
-  inputState->mouseDeltaX = xpos - inputState->lastMouseX;
-  inputState->mouseDeltaY = inputState->lastMouseY - ypos; // inverted Y
-  inputState->lastMouseX = xpos;
-  inputState->lastMouseY = ypos;
+  inputState->lastMouseX = inputState->mouseX;
+  inputState->lastMouseY = inputState->mouseY;
+  inputState->mouseX = xpos;
+  inputState->mouseY = ypos;
 }
 
 void Window::Init(int width, int height, const char *title) {

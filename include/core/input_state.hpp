@@ -6,8 +6,6 @@ struct InputState {
   float mouseY = 0.0f;
   float lastMouseX = 0.0f;
   float lastMouseY = 0.0f;
-  float mouseDeltaX = 0.0f;
-  float mouseDeltaY = 0.0f;
   bool firstMouse = true;
   bool mouseButtons[8] = {false};
 };

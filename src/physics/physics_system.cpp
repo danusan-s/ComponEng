@@ -16,7 +16,7 @@ struct EntityPhysicsData {
   ColliderComponent *collider;
 };
 
-static float accumulatedTime = 0.0f;
+static double accumulatedTime = 0.0f;
 
 void PhysicsSystem::onUpdate(const SystemState &state) {
   accumulatedTime += state.deltaTime;

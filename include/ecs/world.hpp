@@ -19,7 +19,7 @@ private:
   std::unordered_map<ComponentID, std::vector<uint8_t>> singletons;
 
 public:
-  float time = 0.0f;
+  double time = 0.0f;
 
   void Init() {
     componentRegistry = std::make_unique<ComponentRegistry>();
