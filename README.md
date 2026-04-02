@@ -127,6 +127,13 @@ cd build
 ctest --output-on-failure
 ```
 
+For testing the graphical parts, run the example scene:
+
+```bash
+cd build
+./GameEngineTest
+```
+
 ### Test Coverage
 
 | Test Suite | What It Tests |
