@@ -111,6 +111,32 @@ You can run the executable from any directory. For example, from the project roo
 ./build/GameEngine
 ```
 
+## Running Tests
+
+The project includes unit tests for the ECS core and collision detection, built with Google Test.
+
+```bash
+cd build
+./EcsTests
+```
+
+Or via CMake's test runner:
+
+```bash
+cd build
+ctest --output-on-failure
+```
+
+### Test Coverage
+
+| Test Suite | What It Tests |
+|------------|--------------|
+| `EntityManagerTest` | Entity ID allocation, recycling, record management |
+| `ComponentRegistryTest` | Type-to-ID mapping, signature generation, destructor storage for non-trivial types |
+| `ArchetypeTest` | Component column storage, entity add/remove, swap-remove behavior, multi-component archetypes |
+| `QueryTest` | Required/excluded component matching, iteration over matching archetypes, `exclude()` returning reference |
+| `CollisionTest` | AABB-AABB, Sphere-Sphere, AABB-Sphere overlap detection, collision normals, edge cases |
+
 ## Controls
 
 | Input | Action |

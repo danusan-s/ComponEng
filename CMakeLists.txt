@@ -53,3 +53,28 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
     target_compile_options(GameEngine PRIVATE -fsanitize=address -fno-omit-frame-pointer)
     target_link_options(GameEngine PRIVATE -fsanitize=address)
 endif()
+
+# Google Test
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG v1.14.0
+)
+# Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+# Test executable
+add_executable(EcsTests
+    tests/test_entity_manager.cpp
+    tests/test_component_registry.cpp
+    tests/test_archetype.cpp
+    tests/test_query.cpp
+    tests/test_collision.cpp
+)
+target_link_libraries(EcsTests PRIVATE GameEngine gtest_main)
+target_compile_definitions(EcsTests PRIVATE GLM_ENABLE_EXPERIMENTAL)
+
+enable_testing()
+add_test(NAME EcsTests COMMAND EcsTests)
