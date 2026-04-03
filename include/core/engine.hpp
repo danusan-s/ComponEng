@@ -33,8 +33,12 @@ public:
     static Engine instance;
     return instance;
   }
+
+  // Load resources, run component registration and init world and window
   void init();
+  // Load game init, create systems and run main loop and also teardown game
   void run(IGame &game);
+  // Teardown world and window
   void shutdown();
 
   World m_world;
@@ -43,7 +47,9 @@ public:
 private:
   Engine() = default;
   ~Engine() = default;
-  void registerSystems();
+  // Helper to register engine components and systems
   void registerComponents();
+  void registerSystems();
+  // Create some default entities (camera) to populate the world with
   void initObjects();
 };

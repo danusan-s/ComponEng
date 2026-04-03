@@ -13,9 +13,12 @@
  */
 class Window {
 public:
+  // Initialize GLFW, create window and OpenGL context, set up input callbacks
   void init(int width, int height, const char *title);
+  // Clean up GLFW resources and destroy window
   void shutdown();
 
+  // Convenience methods that wrap GLFW calls for the main loop
   bool shouldClose() const;
   void swapBuffers();
   void pollEvents();

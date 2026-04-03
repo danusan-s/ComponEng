@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cstdarg>
 #include <cstring>
 #include <iostream>
