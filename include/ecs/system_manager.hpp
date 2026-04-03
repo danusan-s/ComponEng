@@ -32,7 +32,7 @@ class SystemManager {
 private:
   std::array<std::vector<SystemRecord>, NUM_GROUPS> m_systems;
 
-  bool hasSystem(const char *typeName) {
+  bool isRegistered(const char *typeName) {
     for (SystemGroup group : GROUP_ORDER) {
       auto &groupSystems = m_systems[group];
       for (size_t i = 0; i < groupSystems.size(); ++i) {
@@ -48,7 +48,7 @@ public:
   template <typename T> std::shared_ptr<T> registerSystem(SystemGroup group) {
     const char *typeName = typeid(T).name();
 
-    assert(!hasSystem(typeName) && "Registering system more than once.");
+    assert(!isRegistered(typeName) && "Registering system more than once.");
 
     auto system = std::make_shared<T>();
     m_systems[group].push_back({typeName, system});

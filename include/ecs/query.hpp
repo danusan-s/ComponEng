@@ -19,7 +19,7 @@ struct QueryDesc {
  * Iterates all archetypes whose Signature contains every requested component
  * and invokes a user-provided callback for each matching entity.
  * Also supports exclude() to filter out entities with specific components,
- * and parallel_for() to distribute work across the engine's ThreadPool.
+ * and eachParallel() to distribute work across the engine's ThreadPool.
  *
  * @tparam Req... Component types that an entity must have to match.
  */
@@ -46,8 +46,8 @@ public:
   }
 
   template <typename Fn, size_t... I>
-  void callEach(Fn &fn, ComponentColumn **reqCols, size_t i,
-                std::index_sequence<I...>) {
+  void invokeCallback(Fn &fn, ComponentColumn **reqCols, size_t i,
+                      std::index_sequence<I...>) {
     fn(reqCols[I]->template get<Req>(i)...);
   }
 
@@ -61,13 +61,14 @@ public:
 
       size_t n = archetype.getEntityCount();
       for (size_t i = 0; i < n; ++i)
-        callEach(fn, reqCols, i, std::index_sequence_for<Req...>{});
+        invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
     }
   }
 
   template <typename Fn, size_t... I>
-  void callEachWithEntity(Fn &fn, EntityID entity, ComponentColumn **reqCols,
-                          size_t i, std::index_sequence<I...>) {
+  void invokeCallbackWithEntity(Fn &fn, EntityID entity,
+                                ComponentColumn **reqCols, size_t i,
+                                std::index_sequence<I...>) {
     fn(entity, reqCols[I]->template get<Req>(i)...);
   }
 
@@ -81,12 +82,12 @@ public:
 
       size_t n = archetype.getEntityCount();
       for (size_t i = 0; i < n; ++i)
-        callEachWithEntity(fn, archetype.getEntityForRow(i), reqCols, i,
-                           std::index_sequence_for<Req...>{});
+        invokeCallbackWithEntity(fn, archetype.getEntityForRow(i), reqCols, i,
+                                 std::index_sequence_for<Req...>{});
     }
   }
 
-  template <typename Fn> void parallel_for(ThreadPool &pool, Fn fn) {
+  template <typename Fn> void eachParallel(ThreadPool &pool, Fn fn) {
     std::vector<std::future<void>> futures;
 
     for (size_t a = 0; a < archetypes.size(); ++a) {
@@ -98,41 +99,40 @@ public:
       if (n == 0)
         continue;
 
+      // If less than 50 running non parallel is faster as there is a overhead
+      // when we create task and then the pool unlocks and runs it. For small
+      // number of entities, that overhead is more than the time it takes to
+      // just run the loop in the current thread.
       if (n < 50) {
         ComponentColumn *reqCols[] = {
             &archetype.getColumn(registry.getComponentID<Req>())...};
         for (size_t i = 0; i < n; ++i) {
-          callEachThread(fn, reqCols, i, std::index_sequence_for<Req...>{});
+          invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
         }
-      } else {
-        size_t numChunks = std::min(n, pool.threadCount());
-        size_t chunkSize = std::max(size_t(1), n / numChunks);
+        continue;
+      }
 
-        for (size_t c = 0; c < numChunks; ++c) {
-          size_t start = c * chunkSize;
-          size_t end = (c == numChunks - 1) ? n : start + chunkSize;
+      size_t numChunks = std::min(n, pool.threadCount());
+      size_t chunkSize = std::max(size_t(1), n / numChunks);
 
-          futures.push_back(pool.submit([this, a, start, end, fn]() {
-            Archetype &archetype = archetypes[a];
-            ComponentColumn *reqCols[] = {
-                &archetype.getColumn(registry.getComponentID<Req>())...};
+      for (size_t c = 0; c < numChunks; ++c) {
+        size_t start = c * chunkSize;
+        size_t end = (c == numChunks - 1) ? n : start + chunkSize;
 
-            for (size_t i = start; i < end; ++i) {
-              callEachThread(fn, reqCols, i, std::index_sequence_for<Req...>{});
-            }
-          }));
-        }
+        futures.push_back(pool.submit([this, a, start, end, fn]() {
+          Archetype &archetype = archetypes[a];
+          ComponentColumn *reqCols[] = {
+              &archetype.getColumn(registry.getComponentID<Req>())...};
+
+          for (size_t i = start; i < end; ++i) {
+            invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
+          }
+        }));
       }
     }
 
     for (auto &f : futures)
       f.wait();
-  }
-
-  template <typename Fn, size_t... I>
-  void callEachThread(Fn &fn, ComponentColumn **reqCols, size_t i,
-                      std::index_sequence<I...>) {
-    fn(reqCols[I]->template get<Req>(i)...);
   }
 };
 

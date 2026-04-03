@@ -147,7 +147,7 @@ public:
     return *reinterpret_cast<T *>(at(row));
   }
 
-  void addEmpty() {
+  void pushBackEmpty() {
     if (m_count >= m_buffer.capacity() / m_stride) {
       size_t newCapacity =
           m_buffer.capacity() == 0 ? 8 : m_buffer.capacity() * 2;
@@ -194,6 +194,7 @@ public:
   void init(Signature signature, ComponentRegistry *registry) {
     this->m_signature = signature;
 
+    // build columns for each component in signature
     for (size_t i = 0; i < MAX_COMPONENTS; ++i) {
       if (signature.test(i)) {
         ComponentInfo &info = registry->getComponentInfo(i);
@@ -206,26 +207,43 @@ public:
   void addEntity(EntityID entity) {
     size_t row = m_columns.empty() ? 0 : m_columns[0].m_count;
     for (auto &col : m_columns) {
-      col.addEmpty();
+      col.pushBackEmpty();
     }
     m_entityToRow[entity] = row;
     m_rowToEntity[row] = entity;
   }
 
+  /**
+   * Swap and remove to last row for each component column, then erase the
+   * entity from mappings.
+   * @return the EntityID of the entity that was swapped into the removed
+   * entity's row, or INVALID_ENTITY if no swap occurred.
+   */
   EntityID removeEntity(EntityID entity) {
     auto it = m_entityToRow.find(entity);
-    EntityID lastRowEntity = m_rowToEntity[m_columns[0].m_count - 1];
-    m_rowToEntity.erase(m_columns[0].m_count - 1);
-
     if (it == m_entityToRow.end()) {
       throw std::runtime_error("Archetype: Entity not found in archetype");
     }
     size_t row = it->second;
+    size_t lastRow = m_columns[0].m_count - 1;
+
+    if (row == lastRow) {
+      for (auto &col : m_columns) {
+        col.remove(row);
+      }
+      m_rowToEntity.erase(lastRow);
+      m_entityToRow.erase(it);
+      return INVALID_ENTITY;
+    }
+
+    EntityID lastRowEntity = m_rowToEntity[lastRow];
     for (auto &col : m_columns) {
       col.remove(row);
     }
-    m_entityToRow.erase(it);
+    m_entityToRow[lastRowEntity] = row;
+    m_rowToEntity.erase(lastRow);
     m_rowToEntity[row] = lastRowEntity;
+    m_entityToRow.erase(it);
     return lastRowEntity;
   }
 

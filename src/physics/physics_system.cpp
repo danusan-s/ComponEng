@@ -96,7 +96,7 @@ void PhysicsSystem::onUpdate(const SystemState &state) {
     g_accumulatedTime -= fixedTimeStep;
 
     ThreadPool &pool = state.world->threadPool();
-    state.world->query<TransformComponent, RigidBodyComponent>().parallel_for(
+    state.world->query<TransformComponent, RigidBodyComponent>().eachParallel(
         pool,
         [&](TransformComponent &transform, RigidBodyComponent &rigidbody) {
           if (rigidbody.type == RigidBodyComponent::Static)
@@ -106,7 +106,7 @@ void PhysicsSystem::onUpdate(const SystemState &state) {
           }
         });
 
-    state.world->query<TransformComponent, RigidBodyComponent>().parallel_for(
+    state.world->query<TransformComponent, RigidBodyComponent>().eachParallel(
         pool,
         [&](TransformComponent &transform, RigidBodyComponent &rigidbody) {
           if (rigidbody.type == RigidBodyComponent::Static)
