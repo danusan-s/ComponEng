@@ -5,6 +5,7 @@
 #include "ecs/entity.hpp"
 #include "ecs/world.hpp"
 #include "physics/collision_detection.hpp"
+#include <algorithm>
 #include <vector>
 
 constexpr Vec3 g_gravity = Vec3(0.0f, -9.81f, 0.0f);
@@ -16,7 +17,74 @@ struct EntityPhysicsData {
   ColliderComponent *collider;
 };
 
+struct CollisionPair {
+  size_t indexA;
+  size_t indexB;
+  CollisionInfo info;
+};
+
 static double g_accumulatedTime = 0.0f;
+
+static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
+                             const CollisionInfo &info) {
+  float inverseMassA = 0.0f;
+  float inverseMassB = 0.0f;
+  float restitutionA = 0.0f;
+  float restitutionB = 0.0f;
+
+  if (a.rigidbody && a.rigidbody->type != RigidBodyComponent::Static) {
+    if (a.rigidbody->type == RigidBodyComponent::Dynamic) {
+      inverseMassA =
+          a.rigidbody->mass != 0.0f ? 1.0f / a.rigidbody->mass : 0.0f;
+    }
+    restitutionA = a.rigidbody->restitution;
+  }
+
+  if (b.rigidbody && b.rigidbody->type != RigidBodyComponent::Static) {
+    if (b.rigidbody->type == RigidBodyComponent::Dynamic) {
+      inverseMassB =
+          b.rigidbody->mass != 0.0f ? 1.0f / b.rigidbody->mass : 0.0f;
+    }
+    restitutionB = b.rigidbody->restitution;
+  }
+
+  if (inverseMassA == 0.0f && inverseMassB == 0.0f)
+    return;
+
+  Vec3 velocityA = a.rigidbody ? a.rigidbody->velocity : Vec3(0.0f);
+  Vec3 velocityB = b.rigidbody ? b.rigidbody->velocity : Vec3(0.0f);
+  Vec3 relativeVelocity = velocityB - velocityA;
+  float velocityAlongNormal = dot(relativeVelocity, info.normal);
+
+  if (velocityAlongNormal > 0.0f)
+    return;
+
+  float e = std::max(restitutionA, restitutionB);
+
+  float j = -(1.0f + e) * velocityAlongNormal / (inverseMassA + inverseMassB);
+
+  Vec3 impulse = j * info.normal;
+
+  if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Dynamic) {
+    a.rigidbody->velocity -= impulse * inverseMassA;
+  }
+  if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Dynamic) {
+    b.rigidbody->velocity += impulse * inverseMassB;
+  }
+
+  constexpr float percent = 0.2f;
+  constexpr float slop = 0.01f;
+  float correctionMagnitude = std::max(info.penetration - slop, 0.0f) *
+                              percent / (inverseMassA + inverseMassB);
+  Vec3 correction = correctionMagnitude * info.normal;
+
+  if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Dynamic) {
+    a.transform->position -= correction * inverseMassA;
+  }
+  if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Dynamic) {
+    b.transform->position += correction * inverseMassB;
+  }
+}
 
 void PhysicsSystem::onUpdate(const SystemState &state) {
   g_accumulatedTime += state.deltaTime;
@@ -60,74 +128,46 @@ void PhysicsSystem::onUpdate(const SystemState &state) {
           colliders.push_back({entity, &transform, nullptr, &collider});
         });
 
-    for (size_t i = 0; i < colliders.size(); ++i) {
-      for (size_t k = i + 1; k < colliders.size(); ++k) {
-        EntityPhysicsData &a = colliders[i];
-        EntityPhysicsData &b = colliders[k];
+    size_t n = colliders.size();
+    if (n < 2)
+      continue;
 
-        CollisionInfo info;
-        if (!testCollision(*a.collider, *a.transform, *b.collider, *b.transform,
-                           info))
-          continue;
+    size_t numThreads = state.world->threadPool().threadCount();
+    size_t chunkSize = std::max(size_t(1), n / numThreads);
 
-        float inverseMassA = 0.0f;
-        float inverseMassB = 0.0f;
-        float restitutionA = 0.0f;
-        float restitutionB = 0.0f;
+    std::vector<std::vector<CollisionPair>> threadCollisions(numThreads);
 
-        if (a.rigidbody && a.rigidbody->type != RigidBodyComponent::Static) {
-          if (a.rigidbody->type == RigidBodyComponent::Dynamic) {
-            inverseMassA =
-                a.rigidbody->mass != 0.0f ? 1.0f / a.rigidbody->mass : 0.0f;
+    std::vector<std::future<void>> futures;
+    for (size_t t = 0; t < numThreads; ++t) {
+      size_t iStart = t * chunkSize;
+      size_t iEnd = (t == numThreads - 1) ? n : iStart + chunkSize;
+
+      if (iStart >= n - 1)
+        break;
+
+      futures.push_back(state.world->threadPool().submit([&, t, iStart,
+                                                          iEnd]() {
+        for (size_t i = iStart; i < iEnd; ++i) {
+          for (size_t k = i + 1; k < n; ++k) {
+            CollisionInfo info;
+            if (!testCollision(*colliders[i].collider, *colliders[i].transform,
+                               *colliders[k].collider, *colliders[k].transform,
+                               info))
+              continue;
+
+            threadCollisions[t].push_back({i, k, info});
           }
-          restitutionA = a.rigidbody->restitution;
         }
+      }));
+    }
 
-        if (b.rigidbody && b.rigidbody->type != RigidBodyComponent::Static) {
-          if (b.rigidbody->type == RigidBodyComponent::Dynamic) {
-            inverseMassB =
-                b.rigidbody->mass != 0.0f ? 1.0f / b.rigidbody->mass : 0.0f;
-          }
-          restitutionB = b.rigidbody->restitution;
-        }
+    for (auto &f : futures)
+      f.wait();
 
-        if (inverseMassA == 0.0f && inverseMassB == 0.0f)
-          continue;
-
-        Vec3 velocityA = a.rigidbody ? a.rigidbody->velocity : Vec3(0.0f);
-        Vec3 velocityB = b.rigidbody ? b.rigidbody->velocity : Vec3(0.0f);
-        Vec3 relativeVelocity = velocityB - velocityA;
-        float velocityAlongNormal = dot(relativeVelocity, info.normal);
-
-        if (velocityAlongNormal > 0.0f)
-          continue;
-
-        float e = std::max(restitutionA, restitutionB);
-
-        float j =
-            -(1.0f + e) * velocityAlongNormal / (inverseMassA + inverseMassB);
-
-        Vec3 impulse = j * info.normal;
-
-        if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Dynamic) {
-          a.rigidbody->velocity -= impulse * inverseMassA;
-        }
-        if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Dynamic) {
-          b.rigidbody->velocity += impulse * inverseMassB;
-        }
-
-        constexpr float percent = 0.2f;
-        constexpr float slop = 0.01f;
-        float correctionMagnitude = std::max(info.penetration - slop, 0.0f) *
-                                    percent / (inverseMassA + inverseMassB);
-        Vec3 correction = correctionMagnitude * info.normal;
-
-        if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Dynamic) {
-          a.transform->position -= correction * inverseMassA;
-        }
-        if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Dynamic) {
-          b.transform->position += correction * inverseMassB;
-        }
+    for (size_t t = 0; t < threadCollisions.size(); ++t) {
+      for (auto &pair : threadCollisions[t]) {
+        resolveCollision(colliders[pair.indexA], colliders[pair.indexB],
+                         pair.info);
       }
     }
   }

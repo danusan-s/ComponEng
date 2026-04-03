@@ -8,6 +8,7 @@
 #include "ecs/entity_manager.hpp"
 #include "ecs/query.hpp"
 #include "ecs/system_manager.hpp"
+#include "ecs/thread_pool.hpp"
 #include <memory>
 
 class World {
@@ -16,6 +17,7 @@ private:
   std::unique_ptr<EntityManager> m_entityManager;
   std::unique_ptr<SystemManager> m_systemManager;
   std::unique_ptr<ArchetypeManager> m_archetypeManager;
+  std::unique_ptr<ThreadPool> m_threadPool;
 
   std::unordered_map<ComponentID, std::vector<uint8_t>> m_singletons;
 
@@ -181,4 +183,6 @@ public:
   registerSystem(SystemGroup group = SystemGroup::Simulation) {
     return m_systemManager->registerSystem<T>(group);
   }
+
+  ThreadPool& threadPool() { return *m_threadPool; }
 };

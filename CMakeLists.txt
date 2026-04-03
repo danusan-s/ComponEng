@@ -52,7 +52,10 @@ target_link_libraries(GameEngineTest
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
     target_compile_options(GameEngine PRIVATE -fsanitize=address -fno-omit-frame-pointer)
     target_link_options(GameEngine PRIVATE -fsanitize=address)
+else()
+    target_compile_options(GameEngine PRIVATE -O3)
 endif()
+
 
 # Google Test
 include(FetchContent)

@@ -3,6 +3,10 @@
 #include "ecs/archetype.hpp"
 #include "ecs/component_registry.hpp"
 #include "ecs/entity.hpp"
+#include "ecs/thread_pool.hpp"
+#include <algorithm>
+#include <future>
+#include <vector>
 
 struct QueryDesc {
   Signature required;
@@ -70,6 +74,59 @@ public:
         callEachWithEntity(fn, archetype.getEntityForRow(i), reqCols, i,
                            std::index_sequence_for<Req...>{});
     }
+  }
+
+  template <typename Fn> void parallel_for(ThreadPool &pool, Fn fn) {
+    size_t totalEntities = 0;
+    for (Archetype &archetype : archetypes) {
+      if (!matches(archetype))
+        continue;
+      totalEntities += archetype.getEntityCount();
+    }
+
+    if (totalEntities < 50) {
+      each(fn);
+      return;
+    }
+
+    std::vector<std::future<void>> futures;
+
+    for (size_t a = 0; a < archetypes.size(); ++a) {
+      Archetype &archetype = archetypes[a];
+      if (!matches(archetype))
+        continue;
+
+      size_t n = archetype.getEntityCount();
+      if (n == 0)
+        continue;
+
+      size_t numChunks = std::min(n, pool.threadCount());
+      size_t chunkSize = std::max(size_t(1), n / numChunks);
+
+      for (size_t c = 0; c < numChunks; ++c) {
+        size_t start = c * chunkSize;
+        size_t end = (c == numChunks - 1) ? n : start + chunkSize;
+
+        futures.push_back(pool.submit([this, a, start, end, fn]() {
+          Archetype &archetype = archetypes[a];
+          ComponentColumn *reqCols[] = {
+              &archetype.getColumn(registry.getComponentID<Req>())...};
+
+          for (size_t i = start; i < end; ++i) {
+            callEachThread(fn, reqCols, i, std::index_sequence_for<Req...>{});
+          }
+        }));
+      }
+    }
+
+    for (auto &f : futures)
+      f.wait();
+  }
+
+  template <typename Fn, size_t... I>
+  void callEachThread(Fn &fn, ComponentColumn **reqCols, size_t i,
+                      std::index_sequence<I...>) {
+    fn(reqCols[I]->template get<Req>(i)...);
   }
 };
 

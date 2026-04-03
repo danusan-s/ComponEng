@@ -5,6 +5,7 @@ void World::init() {
   m_entityManager = std::make_unique<EntityManager>();
   m_systemManager = std::make_unique<SystemManager>();
   m_archetypeManager = std::make_unique<ArchetypeManager>();
+  m_threadPool = std::make_unique<ThreadPool>();
   time = 0.0f;
 }
 
