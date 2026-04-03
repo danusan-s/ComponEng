@@ -1,55 +1,21 @@
-#include "renderer/mesh.hpp"
 #include "core/logger.hpp"
+#include "renderer/mesh.hpp"
+#include "renderer/opengl/gl_render_device.hpp"
 #include <array>
 #include <sstream>
 
-Mesh::Mesh() : m_vao(0), m_vbo(0), m_ebo(0) {
+Mesh::Mesh() {
 }
 
-void Mesh::initializeBuffers() {
-  if (m_vao != 0) {
-    glDeleteVertexArrays(1, &m_vao);
-    m_vao = 0;
-  }
-  if (m_vbo != 0) {
-    glDeleteBuffers(1, &m_vbo);
-    m_vbo = 0;
-  }
-  if (m_ebo != 0) {
-    glDeleteBuffers(1, &m_ebo);
-    m_ebo = 0;
-  }
+void Mesh::uploadToGPU() {
   if (m_vertices.empty() || m_indices.empty()) {
     LOG_ERROR("Cannot initialize buffers for an empty mesh.");
     return;
   }
 
-  glGenVertexArrays(1, &m_vao);
-  glGenBuffers(1, &m_vbo);
-  glGenBuffers(1, &m_ebo);
-
-  glBindVertexArray(m_vao);
-
-  glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-  glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(float),
-               m_vertices.data(), GL_STATIC_DRAW);
-
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebo);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indices.size() * sizeof(unsigned int),
-               m_indices.data(), GL_STATIC_DRAW);
-
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-  glEnableVertexAttribArray(0);
-
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
-                        (void*)(3 * sizeof(float)));
-  glEnableVertexAttribArray(1);
-
-  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
-                        (void*)(6 * sizeof(float)));
-  glEnableVertexAttribArray(2);
-
-  glBindVertexArray(0);
+  m_impl = std::make_unique<GLMesh>();
+  m_impl->upload(m_vertices.data(), m_vertices.size() / 8, m_indices.data(),
+                 m_indices.size(), defaultMeshLayout());
 }
 
 void Mesh::generateFromWavefrontObj(const std::string& data) {
@@ -146,4 +112,13 @@ void Mesh::generateFromWavefrontObj(const std::string& data) {
       }
     }
   }
+}
+
+const void* Mesh::getHandle() const {
+  return reinterpret_cast<const void*>(
+      static_cast<GLMesh&>(*m_impl).vao());
+}
+
+size_t Mesh::indexCount() const {
+  return m_impl->indexCount();
 }

@@ -5,12 +5,12 @@
 #include "ecs/entity.hpp"
 #include "renderer/resource_manager.hpp"
 
-#include "core/logger.hpp"
 #include "renderer/render_system.hpp"
 
 void Engine::init() {
   m_window.init(1280, 720, "ECS Game");
   m_world.init();
+  m_world.setWindowHandle(m_window.getHandle());
   DebugUI::init();
 
   ResourceManager::loadShader(
@@ -44,7 +44,7 @@ void Engine::registerSystems() {
   m_world.registerSystem<InputSystem>(SystemGroup::Initialization);
   m_world.registerSystem<CameraSystem>(SystemGroup::Simulation);
   m_world.registerSystem<PhysicsSystem>(SystemGroup::Simulation);
-  m_world.registerSystem<OpenGLRenderSystem>(SystemGroup::Presentation);
+  m_world.registerSystem<RenderSystem>(SystemGroup::Presentation);
 }
 
 void Engine::initObjects() {

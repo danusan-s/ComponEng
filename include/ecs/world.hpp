@@ -195,4 +195,10 @@ public:
   ThreadPool &threadPool() {
     return *m_threadPool;
   }
+
+  void setWindowHandle(void* handle) { m_windowHandle = handle; }
+  void* getWindowHandle() const { return m_windowHandle; }
+
+private:
+  void* m_windowHandle = nullptr;
 };

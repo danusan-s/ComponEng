@@ -1,29 +1,40 @@
 #pragma once
 
-#include "glad/glad.h"
+#include "core/types.hpp"
+#include "renderer/api/irender_device.hpp"
+#include <memory>
 #include <string>
 #include <vector>
 
 /**
- * @brief OpenGL mesh resource with vertex/index buffers.
+ * @brief Mesh resource with vertex/index buffers.
  *
- * Parses Wavefront OBJ data, generates VAO/VBO/EBO, and stores
- * raw vertex and index arrays for GPU rendering.
+ * Parses Wavefront OBJ data and uploads to the GPU via the IMesh interface.
+ * The underlying GPU resource is owned by this class.
  */
 class Mesh {
 public:
-  GLuint m_vao;
-  GLuint m_vbo;
-  GLuint m_ebo;
+  Mesh();
 
-  // Expected vertex: position (3 floats), normal (3 floats), uv (2 floats)
+  void uploadToGPU();
+
+  // Helper to parse OBJ data and populate m_vertices and m_indices
+  void generateFromWavefrontObj(const std::string& data);
+
+  // Access to the underlying IMesh for render device operations
+  IMesh& getImpl() { return *m_impl; }
+  const IMesh& getImpl() const { return *m_impl; }
+
+  // Convenience handle for VAO-based operations (GL-specific, but needed for
+  // instance attribute setup). Returns an opaque pointer the device can use.
+  const void* getHandle() const;
+
+  size_t indexCount() const;
+
+  // Raw vertex/index data (used during parsing before GPU upload)
   std::vector<float> m_vertices;
   std::vector<unsigned int> m_indices;
 
-  Mesh();
-
-  void initializeBuffers();
-
-  // Helper to parse OBJ data and populate m_vertices and m_indices
-  void generateFromWavefrontObj(const std::string &data);
+private:
+  std::unique_ptr<IMesh> m_impl;
 };

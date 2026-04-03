@@ -1,50 +1,33 @@
 #pragma once
 
-#include <string>
-
 #include "core/types.hpp"
-#include "glad/glad.h"
+#include "renderer/api/irender_device.hpp"
+#include <memory>
 
 /**
- * @brief OpenGL shader program wrapper.
+ * @brief Shader program wrapper.
  *
- * Compiles vertex/fragment/geometry shaders from source strings, reports
- * compile/link errors, and provides type-safe uniform setters for floats,
- * vectors, and matrices.
+ * Compiles vertex/fragment/geometry shaders from source strings and provides
+ * typed uniform setters. Backed by the IShader interface.
  */
 class Shader {
 public:
-  // state
-  GLuint m_id;
+  Shader();
 
-  Shader() : m_id(0) {
-  }
-
-  // sets the current shader as active
   void use() const;
+  void compile(const char* vertexSource, const char* fragmentSource,
+               const char* geometrySource = nullptr);
 
-  // compiles the shader from given source code
-  void compile(const char *vertexSource, const char *fragmentSource,
-               const char *geometrySource = nullptr);
-
-  // utility functions
-  void setFloat(const char *name, float value, bool useShader = false) const;
-  void setInteger(const char *name, int value, bool useShader = false) const;
-  void setVector2f(const char *name, float x, float y,
-                   bool useShader = false) const;
-  void setVector2f(const char *name, const Vec2 &value,
-                   bool useShader = false) const;
-  void setVector3f(const char *name, float x, float y, float z,
-                   bool useShader = false) const;
-  void setVector3f(const char *name, const Vec3 &value,
-                   bool useShader = false) const;
-  void setVector4f(const char *name, float x, float y, float z, float w,
-                   bool useShader = false) const;
-  void setVector4f(const char *name, const Vec4 &value,
-                   bool useShader = false) const;
-  void setMatrix4(const char *name, const Mat4 &matrix,
-                  bool useShader = false) const;
+  void setFloat(const char* name, float value) const;
+  void setInteger(const char* name, int value) const;
+  void setVector2f(const char* name, float x, float y) const;
+  void setVector2f(const char* name, const Vec2& value) const;
+  void setVector3f(const char* name, float x, float y, float z) const;
+  void setVector3f(const char* name, const Vec3& value) const;
+  void setVector4f(const char* name, float x, float y, float z, float w) const;
+  void setVector4f(const char* name, const Vec4& value) const;
+  void setMatrix4(const char* name, const Mat4& matrix) const;
 
 private:
-  void checkCompileErrors(GLuint object, std::string type);
+  std::unique_ptr<IShader> m_impl;
 };

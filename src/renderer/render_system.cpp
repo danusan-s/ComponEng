@@ -3,6 +3,7 @@
 #include "core/debug_ui.hpp"
 #include "core/logger.hpp"
 #include "core/types.hpp"
+#include "core/window.hpp"
 #include "ecs/entity.hpp"
 #include "ecs/world.hpp"
 #include "renderer/resource_manager.hpp"
@@ -10,6 +11,7 @@
 #include "components/material_component.hpp"
 #include "components/mesh_component.hpp"
 #include "components/transform_component.hpp"
+#include "renderer/opengl/gl_render_device.hpp"
 #include "renderer/render_system.hpp"
 
 static constexpr Vec3 DEFAULT_LIGHT_POS = Vec3(1000.0f, 1000.0f, 1000.0f);
@@ -49,7 +51,7 @@ struct InstanceData {
 };
 
 struct BatchData {
-  GLuint instanceVBO = 0;
+  std::unique_ptr<IBuffer> instanceBuffer;
   std::vector<InstanceData> instanceDatas;
 };
 
@@ -124,41 +126,30 @@ static Frustum generateFrustum(const Mat4& m) {
 }
 
 static void populateBatch(const TransformComponent& t, const MeshComponent& m,
-                          const MaterialComponent& mat) {
+                          const MaterialComponent& mat, IRenderDevice& device) {
   DrawKey key{m.meshName, mat.textureName, mat.shaderName};
   if (g_batches.find(key) == g_batches.end()) {
-    g_batches[key] = BatchData();
+    BatchData& batch = g_batches[key];
+    batch.instanceBuffer = device.createBuffer();
+    batch.instanceBuffer->setData(nullptr, MAX_ENTITIES * sizeof(InstanceData));
+
     const Mesh& mesh = ResourceManager::getMesh(key.meshName);
-    glGenBuffers(1, &g_batches[key].instanceVBO);
-    glBindVertexArray(mesh.m_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, g_batches[key].instanceVBO);
-    glBufferData(GL_ARRAY_BUFFER, MAX_ENTITIES * sizeof(InstanceData), nullptr,
-                 GL_DYNAMIC_DRAW);
+    device.setupInstanceAttributes(mesh.getHandle(), *batch.instanceBuffer);
 
-    for (int i = 0; i < 4; ++i) {
-      glVertexAttribPointer(
-          3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-          (void*)(offsetof(InstanceData, modelMatrix) + sizeof(Vec4) * i));
-      glEnableVertexAttribArray(3 + i);
-      glVertexAttribDivisor(3 + i, 1);
-    }
-    glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-                          (void*)offsetof(InstanceData, color));
-    glEnableVertexAttribArray(7);
-    glVertexAttribDivisor(7, 1);
-    glBindVertexArray(0);
-
-    LOG_INFO("Created batch for mesh %s, material %s, shader %s "
-             "with VBO %u",
+    LOG_INFO("Created batch for mesh %s, material %s, shader %s",
              key.meshName.c_str(), key.textureName.c_str(),
-             key.shaderName.c_str(), g_batches[key].instanceVBO);
+             key.shaderName.c_str());
   }
   g_batches[key].instanceDatas.push_back({getModelMatrix(t), mat.color});
 }
 
-void OpenGLRenderSystem::onUpdate(const SystemState& state) {
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+void RenderSystem::onCreate(const SystemState& state) {
+  m_device = std::make_unique<GLRenderDevice>();
+  m_device->init(state.world->getWindowHandle());
+}
+
+void RenderSystem::onUpdate(const SystemState& state) {
+  m_device->clear(0.0f, 0.0f, 0.0f, 1.0f);
 
   EntityID mainCameraID =
       state.world->getSingleton<MainCameraSingleton>().entity;
@@ -198,13 +189,13 @@ void OpenGLRenderSystem::onUpdate(const SystemState& state) {
         }
         if (!isBoxInFrustum(frustum, worldMin, worldMax))
           return;
-        populateBatch(t, m, mat);
+        populateBatch(t, m, mat, *m_device);
       });
 
   state.world->query<TransformComponent, MeshComponent, MaterialComponent>()
       .exclude<ColliderComponent>()
       .each([&](TransformComponent& t, MeshComponent& m,
-                MaterialComponent& mat) { populateBatch(t, m, mat); });
+                MaterialComponent& mat) { populateBatch(t, m, mat, *m_device); });
 
   for (const auto& pair : g_batches) {
     const DrawKey& key = pair.first;
@@ -216,25 +207,23 @@ void OpenGLRenderSystem::onUpdate(const SystemState& state) {
 
     shader.use();
     shader.setMatrix4("viewProj", viewProj);
-    shader.setVector3f("lightPos", DEFAULT_LIGHT_POS);
-    shader.setVector3f("lightColor", DEFAULT_LIGHT_COLOR);
-    shader.setVector3f("cameraPos", cameraPos);
+    shader.setVector3f("lightPos", DEFAULT_LIGHT_POS.x, DEFAULT_LIGHT_POS.y,
+                       DEFAULT_LIGHT_POS.z);
+    shader.setVector3f("lightColor", DEFAULT_LIGHT_COLOR.x, DEFAULT_LIGHT_COLOR.y,
+                       DEFAULT_LIGHT_COLOR.z);
+    shader.setVector3f("cameraPos", cameraPos.x, cameraPos.y, cameraPos.z);
     shader.setFloat("time", state.world->time);
 
     texture.bind();
-    glBindVertexArray(model.m_vao);
+    model.getImpl().bind();
 
-    glBindBuffer(GL_ARRAY_BUFFER, data.instanceVBO);
+    data.instanceBuffer->setSubData(
+        0, data.instanceDatas.data(),
+        data.instanceDatas.size() * sizeof(InstanceData));
 
-    glBindBuffer(GL_ARRAY_BUFFER, data.instanceVBO);
-    glBufferSubData(GL_ARRAY_BUFFER, 0,
-                    data.instanceDatas.size() * sizeof(InstanceData),
-                    data.instanceDatas.data());
+    m_device->drawIndexedInstanced(model.indexCount(),
+                                   data.instanceDatas.size());
 
-    glDrawElementsInstanced(GL_TRIANGLES, model.m_indices.size(), GL_UNSIGNED_INT,
-                            0, data.instanceDatas.size());
-
-    glBindVertexArray(0);
     ++drawCalls;
   }
 
@@ -246,11 +235,10 @@ void OpenGLRenderSystem::onUpdate(const SystemState& state) {
   DebugUI::addValue("Draw Calls", drawCalls);
 }
 
-void OpenGLRenderSystem::onDestroy(const SystemState& state) {
+void RenderSystem::onDestroy(const SystemState& state) {
   for (auto& pair : g_batches) {
-    if (pair.second.instanceVBO != 0) {
-      glDeleteBuffers(1, &pair.second.instanceVBO);
-      pair.second.instanceVBO = 0;
-    }
+    pair.second.instanceBuffer.reset();
   }
+  g_batches.clear();
+  m_device.reset();
 }

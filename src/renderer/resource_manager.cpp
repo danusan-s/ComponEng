@@ -7,9 +7,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-std::unordered_map<std::string, Texture2D> ResourceManager::s_textures;
-std::unordered_map<std::string, Shader> ResourceManager::s_shaders;
-std::unordered_map<std::string, Mesh> ResourceManager::s_meshes;
+std::unordered_map<std::string, std::unique_ptr<Shader>> ResourceManager::s_shaders;
+std::unordered_map<std::string, std::unique_ptr<Texture2D>> ResourceManager::s_textures;
+std::unordered_map<std::string, std::unique_ptr<Mesh>> ResourceManager::s_meshes;
 
 void ResourceManager::loadShader(const char* vShaderFile,
                                  const char* fShaderFile,
@@ -19,7 +19,7 @@ void ResourceManager::loadShader(const char* vShaderFile,
 }
 
 const Shader& ResourceManager::getShader(std::string name) {
-  return s_shaders.at(name);
+  return *s_shaders.at(name);
 }
 
 void ResourceManager::loadTexture(const char* file, bool alpha,
@@ -29,55 +29,38 @@ void ResourceManager::loadTexture(const char* file, bool alpha,
 }
 
 const Texture2D& ResourceManager::getTexture(std::string name) {
-  return s_textures.at(name);
+  return *s_textures.at(name);
 }
 
 bool ResourceManager::textureExists(std::string name) {
   return s_textures.find(name) != s_textures.end();
 }
 
-void ResourceManager::addMesh(std::string name, Mesh& mesh) {
+void ResourceManager::addMesh(std::string name, std::unique_ptr<Mesh> mesh) {
   LOG_INFO("Adding Mesh: %s", name.c_str());
-  mesh.initializeBuffers();
-  s_meshes[name] = mesh;
+  mesh->uploadToGPU();
+  s_meshes[name] = std::move(mesh);
 }
 
 void ResourceManager::loadMesh(const char* file, std::string name) {
   LOG_INFO("Loading Model: %s", name.c_str());
-  Mesh mesh = loadMeshFromFile(file);
-  addMesh(name, mesh);
+  s_meshes[name] = loadMeshFromFile(file);
 }
 
 const Mesh& ResourceManager::getMesh(std::string name) {
-  return s_meshes.at(name);
+  return *s_meshes.at(name);
 }
 
 void ResourceManager::clear() {
   LOG_INFO("Deleting loaded resources");
-
-  LOG_INFO("Attempting to delete shaders");
-  for (auto& iter : s_shaders)
-    glDeleteProgram(iter.second.m_id);
-  LOG_INFO("Shaders deleted successfully");
-
-  LOG_INFO("Attempting to delete textures");
-  for (auto& iter : s_textures)
-    glDeleteTextures(1, &iter.second.m_id);
-
-  LOG_INFO("Textures deleted successfully");
-
-  LOG_INFO("Attempting to delete models");
-  for (auto& iter : s_meshes) {
-    glDeleteVertexArrays(1, &iter.second.m_vao);
-    glDeleteBuffers(1, &iter.second.m_vbo);
-    glDeleteBuffers(1, &iter.second.m_ebo);
-  }
-  LOG_INFO("Models deleted successfully");
+  s_shaders.clear();
+  s_textures.clear();
+  s_meshes.clear();
 }
 
-Shader ResourceManager::loadShaderFromFile(const char* vShaderFile,
-                                           const char* fShaderFile,
-                                           const char* gShaderFile) {
+std::unique_ptr<Shader> ResourceManager::loadShaderFromFile(const char* vShaderFile,
+                                                            const char* fShaderFile,
+                                                            const char* gShaderFile) {
   std::string vertexCode;
   std::string fragmentCode;
   std::string geometryCode;
@@ -101,31 +84,24 @@ Shader ResourceManager::loadShaderFromFile(const char* vShaderFile,
   } catch (const std::exception& e) {
     LOG_ERROR("ERROR::SHADER: Failed to read shader files");
   }
-  const char* vShaderCode = vertexCode.c_str();
-  const char* fShaderCode = fragmentCode.c_str();
-  const char* gShaderCode = geometryCode.c_str();
-  Shader shader;
-  shader.compile(vShaderCode, fShaderCode,
-                 gShaderFile != nullptr ? gShaderCode : nullptr);
+  auto shader = std::make_unique<Shader>();
+  shader->compile(vertexCode.c_str(), fragmentCode.c_str(),
+                  gShaderFile != nullptr ? geometryCode.c_str() : nullptr);
   return shader;
 }
 
-Texture2D ResourceManager::loadTextureFromFile(const char* file, bool alpha) {
-  Texture2D texture;
-  if (alpha) {
-    texture.m_internalFormat = GL_RGBA;
-    texture.m_imageFormat = GL_RGBA;
-  }
+std::unique_ptr<Texture2D> ResourceManager::loadTextureFromFile(const char* file, bool alpha) {
   LOG_INFO("Loading texture file: %s", file);
   int width, height, nrChannels;
   unsigned char* data =
       stbi_load(file, &width, &height, &nrChannels, alpha ? 4 : 3);
-  texture.generate(width, height, data);
+  auto texture = std::make_unique<Texture2D>();
+  texture->generate(width, height, data);
   stbi_image_free(data);
   return texture;
 }
 
-Mesh ResourceManager::loadMeshFromFile(const char* file) {
+std::unique_ptr<Mesh> ResourceManager::loadMeshFromFile(const char* file) {
   std::string modelData;
   try {
     std::ifstream modelWavefrontObjFile(file);
@@ -134,10 +110,11 @@ Mesh ResourceManager::loadMeshFromFile(const char* file) {
     modelWavefrontObjFile.close();
     modelData = wavefrontObjStream.str();
   } catch (const std::exception& e) {
-    LOG_ERROR("ERROR::MODEL: Failed to read model files");
+    LOG_ERROR("ERROR::MODEL: Failed to read model file");
   }
 
-  Mesh model;
-  model.generateFromWavefrontObj(modelData);
-  return model;
+  auto mesh = std::make_unique<Mesh>();
+  mesh->generateFromWavefrontObj(modelData);
+  mesh->uploadToGPU();
+  return mesh;
 }

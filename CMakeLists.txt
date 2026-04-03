@@ -12,6 +12,7 @@ file(GLOB ENGINE_SOURCES
     "src/*.c"
     "src/core/*.cpp"
     "src/renderer/*.cpp"
+    "src/renderer/opengl/*.cpp"
     "src/systems/*.cpp"
     "src/physics/*.cpp"
     "src/ecs/*.cpp"
