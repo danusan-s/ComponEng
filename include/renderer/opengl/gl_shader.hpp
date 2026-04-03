@@ -8,8 +8,10 @@ public:
   GLShader();
   ~GLShader() override;
 
-  void compile(const char* vertexSource, const char* fragmentSource,
-               const char* geometrySource = nullptr) override;
+  void loadGLSL(const char* vertexSource, const char* fragmentSource,
+                const char* geometrySource = nullptr) override;
+  void loadSPIRV(const char* vertexPath, const char* fragmentPath,
+                 const char* geometryPath = nullptr) override;
   void use() const override;
   void release() override;
 

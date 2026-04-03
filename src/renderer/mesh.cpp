@@ -114,11 +114,6 @@ void Mesh::generateFromWavefrontObj(const std::string& data) {
   }
 }
 
-const void* Mesh::getHandle() const {
-  return reinterpret_cast<const void*>(
-      static_cast<GLMesh&>(*m_impl).vao());
-}
-
 size_t Mesh::indexCount() const {
   return m_impl->indexCount();
 }

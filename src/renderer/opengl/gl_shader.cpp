@@ -1,5 +1,7 @@
 #include "core/logger.hpp"
 #include "renderer/opengl/gl_shader.hpp"
+#include <fstream>
+#include <sstream>
 
 GLShader::GLShader() : m_id(0) {
 }
@@ -8,8 +10,8 @@ GLShader::~GLShader() {
   release();
 }
 
-void GLShader::compile(const char* vertexSource, const char* fragmentSource,
-                       const char* geometrySource) {
+void GLShader::loadGLSL(const char* vertexSource, const char* fragmentSource,
+                        const char* geometrySource) {
   if (m_id != 0) {
     glDeleteProgram(m_id);
     m_id = 0;
@@ -45,6 +47,53 @@ void GLShader::compile(const char* vertexSource, const char* fragmentSource,
   glDeleteShader(sFragment);
   if (geometrySource != nullptr)
     glDeleteShader(gShader);
+}
+
+void GLShader::loadSPIRV(const char* vertexPath, const char* fragmentPath,
+                         const char* geometryPath) {
+  // OpenGL doesn't natively support SPIR-V without GL_ARB_gl_spirv extension.
+  // Fall back to loading GLSL source by changing .spv extension to .vert/.frag
+  auto stripExt = [](const char* path) -> std::string {
+    std::string s(path);
+    auto dot = s.find_last_of('.');
+    if (dot != std::string::npos) {
+      // Remove .spv suffix
+      if (s.size() >= 4 && s.substr(dot) == ".spv") {
+        s.erase(dot);
+      }
+    }
+    return s;
+  };
+
+  std::string vertPath = stripExt(vertexPath);
+  std::string fragPath = stripExt(fragmentPath);
+  std::string geomPath;
+  if (geometryPath != nullptr) {
+    geomPath = stripExt(geometryPath);
+  }
+
+  auto readFile = [](const std::string& path) -> std::string {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+      LOG_ERROR("Failed to open shader file: %s", path.c_str());
+      return "";
+    }
+    std::stringstream ss;
+    ss << file.rdbuf();
+    return ss.str();
+  };
+
+  std::string vertSrc = readFile(vertPath);
+  std::string fragSrc = readFile(fragPath);
+  std::string geomSrc;
+  if (geometryPath != nullptr && !geomPath.empty()) {
+    geomSrc = readFile(geomPath);
+  }
+
+  if (!vertSrc.empty() && !fragSrc.empty()) {
+    loadGLSL(vertSrc.c_str(), fragSrc.c_str(),
+             geometryPath != nullptr && !geomSrc.empty() ? geomSrc.c_str() : nullptr);
+  }
 }
 
 void GLShader::use() const {

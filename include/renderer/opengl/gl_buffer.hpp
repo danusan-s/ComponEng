@@ -8,10 +8,8 @@ public:
   GLBuffer();
   ~GLBuffer() override;
 
-  void setData(const void* data, size_t sizeBytes) override;
+  void setData(const void* data, size_t sizeBytes, IBuffer::Usage usage = IBuffer::Usage::Dynamic) override;
   void setSubData(size_t offset, const void* data, size_t sizeBytes) override;
-  void bind() override;
-  void unbind() override;
   void release() override;
 
   GLuint handle() const { return m_id; }

@@ -133,8 +133,7 @@ static void populateBatch(const TransformComponent& t, const MeshComponent& m,
     batch.instanceBuffer = device.createBuffer();
     batch.instanceBuffer->setData(nullptr, MAX_ENTITIES * sizeof(InstanceData));
 
-    const Mesh& mesh = ResourceManager::getMesh(key.meshName);
-    device.setupInstanceAttributes(mesh.getHandle(), *batch.instanceBuffer);
+    device.setupInstanceAttributes(*batch.instanceBuffer);
 
     LOG_INFO("Created batch for mesh %s, material %s, shader %s",
              key.meshName.c_str(), key.textureName.c_str(),
@@ -217,12 +216,16 @@ void RenderSystem::onUpdate(const SystemState& state) {
     texture.bind();
     model.getImpl().bind();
 
+    m_device->setupInstanceAttributes(*data.instanceBuffer);
+
     data.instanceBuffer->setSubData(
         0, data.instanceDatas.data(),
         data.instanceDatas.size() * sizeof(InstanceData));
 
     m_device->drawIndexedInstanced(model.indexCount(),
                                    data.instanceDatas.size());
+
+    m_device->unbindInstanceAttributes();
 
     ++drawCalls;
   }

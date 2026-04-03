@@ -25,10 +25,6 @@ public:
   IMesh& getImpl() { return *m_impl; }
   const IMesh& getImpl() const { return *m_impl; }
 
-  // Convenience handle for VAO-based operations (GL-specific, but needed for
-  // instance attribute setup). Returns an opaque pointer the device can use.
-  const void* getHandle() const;
-
   size_t indexCount() const;
 
   // Raw vertex/index data (used during parsing before GPU upload)

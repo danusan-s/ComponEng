@@ -30,9 +30,8 @@ public:
   std::unique_ptr<IMesh> createMesh() override;
   std::unique_ptr<IBuffer> createBuffer() override;
 
-  void setupInstanceAttributes(const void* meshHandle,
-                               IBuffer& instanceBuffer) override;
-  void unbindInstanceAttributes(const void* meshHandle) override;
+  void setupInstanceAttributes(IBuffer& instanceBuffer) override;
+  void unbindInstanceAttributes() override;
 
   void drawIndexedInstanced(size_t indexCount, uint32_t instanceCount) override;
 };

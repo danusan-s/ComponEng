@@ -6,23 +6,17 @@
 #include <vector>
 
 /**
- * @brief Describes the layout of a single vertex attribute (e.g. position, normal, UV).
- *
- * Each attribute has a semantic name, a byte offset into the vertex, a component count,
- * and whether the data should be normalized when consumed by the shader.
+ * @brief Describes the layout of a single vertex attribute.
  */
 struct VertexAttribute {
   std::string name;
   uint32_t offset;
-  uint32_t componentCount; // 1, 2, 3, or 4
+  uint32_t componentCount;
   bool normalized;
 };
 
 /**
- * @brief Describes the full vertex layout: a list of attributes and the total stride.
- *
- * The stride is the byte offset between consecutive vertices. Each attribute's
- * offset is relative to the start of a vertex.
+ * @brief Describes the full vertex layout: attributes list + stride in bytes.
  */
 struct VertexLayout {
   std::vector<VertexAttribute> attributes;
@@ -30,9 +24,8 @@ struct VertexLayout {
 };
 
 /**
- * @brief Convenience factory for the default mesh vertex layout:
- *        position (3 floats), normal (3 floats), uv (2 floats).
- *        Stride = 32 bytes, 8 floats per vertex.
+ * @brief Default mesh vertex layout: position (3), normal (3), uv (2).
+ *        Stride = 32 bytes.
  */
 inline VertexLayout defaultMeshLayout() {
   return VertexLayout{
@@ -52,19 +45,15 @@ inline VertexLayout defaultMeshLayout() {
  */
 class IBuffer {
 public:
+  enum class Usage { Static, Dynamic };
+
   virtual ~IBuffer() = default;
 
-  /** Upload data to the buffer. Resizes if needed. */
-  virtual void setData(const void* data, size_t sizeBytes) = 0;
+  /** Upload data to the buffer. */
+  virtual void setData(const void* data, size_t sizeBytes, Usage usage = Usage::Dynamic) = 0;
 
   /** Upload a sub-region of the buffer (for dynamic updates). */
   virtual void setSubData(size_t offset, const void* data, size_t sizeBytes) = 0;
-
-  /** Bind the buffer for use. */
-  virtual void bind() = 0;
-
-  /** Unbind the buffer. */
-  virtual void unbind() = 0;
 
   /** Release GPU resources. */
   virtual void release() = 0;
@@ -74,14 +63,19 @@ public:
  * @brief API-agnostic shader interface.
  *
  * Wraps a compiled shader program with typed uniform setters.
+ * Backends may load GLSL source (OpenGL) or SPIR-V binaries (Vulkan).
  */
 class IShader {
 public:
   virtual ~IShader() = default;
 
-  /** Compile from source strings. */
-  virtual void compile(const char* vertexSource, const char* fragmentSource,
-                       const char* geometrySource = nullptr) = 0;
+  /** Load shader from GLSL source strings (OpenGL path). */
+  virtual void loadGLSL(const char* vertexSource, const char* fragmentSource,
+                        const char* geometrySource = nullptr) = 0;
+
+  /** Load shader from SPIR-V binary files (Vulkan path). */
+  virtual void loadSPIRV(const char* vertexPath, const char* fragmentPath,
+                         const char* geometryPath = nullptr) = 0;
 
   /** Activate this shader for subsequent uniform/draw calls. */
   virtual void use() const = 0;
@@ -104,19 +98,13 @@ public:
  */
 class ITexture {
 public:
-  struct Config {
-    uint32_t width;
-    uint32_t height;
-    bool alpha;
-  };
-
   virtual ~ITexture() = default;
 
   /** Create the GPU texture from pixel data (RGBA or RGB, 8-bit). */
   virtual void generate(uint32_t width, uint32_t height,
                         const unsigned char* data, bool alpha) = 0;
 
-  /** Bind this texture to the active texture unit. */
+  /** Bind this texture to the active texture unit / descriptor set. */
   virtual void bind() const = 0;
 
   /** Release GPU resources. */
@@ -134,7 +122,6 @@ protected:
  * @brief API-agnostic mesh interface.
  *
  * Holds vertex and index data along with a vertex layout descriptor.
- * The backend implementation uploads to GPU and manages the VAO equivalent.
  */
 class IMesh {
 public:
@@ -145,7 +132,7 @@ public:
                       const uint32_t* indices, size_t indexCount,
                       const VertexLayout& layout) = 0;
 
-  /** Bind the mesh for rendering. */
+  /** Bind the mesh for rendering (binds VAO / vertex buffers). */
   virtual void bind() const = 0;
 
   /** Release GPU resources. */
@@ -158,15 +145,14 @@ public:
 /**
  * @brief API-agnostic render device interface.
  *
- * Manages the lifecycle of the rendering API: initialization, state,
- * clear, and presentation. Also acts as a factory for buffers, shaders,
- * textures, and meshes.
+ * Manages the rendering API lifecycle: initialization, state, clear,
+ * presentation, and resource creation.
  */
 class IRenderDevice {
 public:
   virtual ~IRenderDevice() = default;
 
-  /** Initialize the rendering API (e.g. glad, GL state). */
+  /** Initialize the rendering API. windowHandle is a GLFWwindow*. */
   virtual void init(void* windowHandle) = 0;
 
   /** Set the viewport rectangle. */
@@ -178,7 +164,7 @@ public:
   /** Clear color and depth buffers. */
   virtual void clear(float r, float g, float b, float a) = 0;
 
-  /** Swap front/back buffers (presentation). */
+  /** Present the rendered frame. */
   virtual void present(void* windowHandle) = 0;
 
   /** Check for API errors and log them. Returns error count. */
@@ -190,12 +176,17 @@ public:
   virtual std::unique_ptr<IMesh> createMesh() = 0;
   virtual std::unique_ptr<IBuffer> createBuffer() = 0;
 
-  // Instance attribute setup (called once per batch to configure VAO attributes)
-  virtual void setupInstanceAttributes(const void* meshHandle,
-                                       IBuffer& instanceBuffer) = 0;
-  virtual void unbindInstanceAttributes(const void* meshHandle) = 0;
+  /** Configure instance vertex attributes on the currently bound mesh.
+   *  The instanceBuffer holds per-instance model matrices + color data.
+   *  This is an OpenGL-specific concept; Vulkan implementations should be
+   *  no-ops since instance attributes are configured at pipeline creation.
+   */
+  virtual void setupInstanceAttributes(IBuffer& instanceBuffer) = 0;
 
-  // Draw call
+  /** Unbind instance vertex attributes. No-op for Vulkan. */
+  virtual void unbindInstanceAttributes() = 0;
+
+  /** Issue a draw call: indexed instanced rendering. */
   virtual void drawIndexedInstanced(size_t indexCount,
                                     uint32_t instanceCount) = 0;
 };

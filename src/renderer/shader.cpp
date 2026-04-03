@@ -13,7 +13,7 @@ void Shader::use() const {
 
 void Shader::compile(const char* vertexSource, const char* fragmentSource,
                      const char* geometrySource) {
-  m_impl->compile(vertexSource, fragmentSource, geometrySource);
+  m_impl->loadGLSL(vertexSource, fragmentSource, geometrySource);
 }
 
 void Shader::setFloat(const char* name, float value) const {

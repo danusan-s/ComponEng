@@ -70,12 +70,9 @@ std::unique_ptr<IBuffer> GLRenderDevice::createBuffer() {
   return std::make_unique<GLBuffer>();
 }
 
-void GLRenderDevice::setupInstanceAttributes(const void* meshHandle,
-                                              IBuffer& instanceBuffer) {
-  GLuint vao = static_cast<GLuint>(reinterpret_cast<uintptr_t>(meshHandle));
+void GLRenderDevice::setupInstanceAttributes(IBuffer& instanceBuffer) {
   GLuint instanceVBO = static_cast<GLBuffer&>(instanceBuffer).handle();
 
-  glBindVertexArray(vao);
   glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
 
   struct InstanceData {
@@ -94,16 +91,13 @@ void GLRenderDevice::setupInstanceAttributes(const void* meshHandle,
   glEnableVertexAttribArray(7);
   glVertexAttribDivisor(7, 1);
 
-  glBindVertexArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void GLRenderDevice::unbindInstanceAttributes(const void* meshHandle) {
-  GLuint vao = static_cast<GLuint>(reinterpret_cast<uintptr_t>(meshHandle));
-  glBindVertexArray(vao);
+void GLRenderDevice::unbindInstanceAttributes() {
   for (int i = 3; i <= 7; ++i) {
     glDisableVertexAttribArray(i);
   }
-  glBindVertexArray(0);
 }
 
 void GLRenderDevice::drawIndexedInstanced(size_t indexCount,
