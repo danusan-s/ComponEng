@@ -77,18 +77,6 @@ public:
   }
 
   template <typename Fn> void parallel_for(ThreadPool &pool, Fn fn) {
-    size_t totalEntities = 0;
-    for (Archetype &archetype : archetypes) {
-      if (!matches(archetype))
-        continue;
-      totalEntities += archetype.getEntityCount();
-    }
-
-    if (totalEntities < 50) {
-      each(fn);
-      return;
-    }
-
     std::vector<std::future<void>> futures;
 
     for (size_t a = 0; a < archetypes.size(); ++a) {
@@ -100,22 +88,30 @@ public:
       if (n == 0)
         continue;
 
-      size_t numChunks = std::min(n, pool.threadCount());
-      size_t chunkSize = std::max(size_t(1), n / numChunks);
+      if (n < 50) {
+        ComponentColumn *reqCols[] = {
+            &archetype.getColumn(registry.getComponentID<Req>())...};
+        for (size_t i = 0; i < n; ++i) {
+          callEachThread(fn, reqCols, i, std::index_sequence_for<Req...>{});
+        }
+      } else {
+        size_t numChunks = std::min(n, pool.threadCount());
+        size_t chunkSize = std::max(size_t(1), n / numChunks);
 
-      for (size_t c = 0; c < numChunks; ++c) {
-        size_t start = c * chunkSize;
-        size_t end = (c == numChunks - 1) ? n : start + chunkSize;
+        for (size_t c = 0; c < numChunks; ++c) {
+          size_t start = c * chunkSize;
+          size_t end = (c == numChunks - 1) ? n : start + chunkSize;
 
-        futures.push_back(pool.submit([this, a, start, end, fn]() {
-          Archetype &archetype = archetypes[a];
-          ComponentColumn *reqCols[] = {
-              &archetype.getColumn(registry.getComponentID<Req>())...};
+          futures.push_back(pool.submit([this, a, start, end, fn]() {
+            Archetype &archetype = archetypes[a];
+            ComponentColumn *reqCols[] = {
+                &archetype.getColumn(registry.getComponentID<Req>())...};
 
-          for (size_t i = start; i < end; ++i) {
-            callEachThread(fn, reqCols, i, std::index_sequence_for<Req...>{});
-          }
-        }));
+            for (size_t i = start; i < end; ++i) {
+              callEachThread(fn, reqCols, i, std::index_sequence_for<Req...>{});
+            }
+          }));
+        }
       }
     }
 
