@@ -8,6 +8,15 @@
 #include <thread>
 #include <vector>
 
+/**
+ * @brief Fixed-size thread pool with a task queue for parallel work submission.
+ *
+ * Spawns a configurable number of worker threads on construction.
+ * Tasks are submitted via submit() and return a std::future for synchronization.
+ * The destructor cleanly shuts down all workers after processing remaining tasks.
+ *
+ * Typical usage: create one pool at engine init, reuse it across frames.
+ */
 class ThreadPool {
 public:
   explicit ThreadPool(size_t numThreads = 0) : m_stop(false) {

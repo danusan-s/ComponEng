@@ -5,11 +5,20 @@
 #include <assert.h>
 #include <queue>
 
+/**
+ * @brief Metadata stored per entity: its archetype row and component signature.
+ */
 struct EntityRecord {
   std::size_t row;
   Signature signature;
 };
 
+/**
+ * @brief Manages entity creation, destruction, and ID recycling.
+ *
+ * Maintains a pool of free entity IDs and a fixed-size array of EntityRecords.
+ * When an entity is destroyed its ID is returned to the free pool for reuse.
+ */
 class EntityManager {
 private:
   std::queue<EntityID> m_freeIDs;
@@ -37,14 +46,14 @@ public:
   void destroyEntity(EntityID id) {
     assert(id < MAX_ENTITIES && "Entity out of range.");
 
-    EntityRecord& record = m_entityRecords[id];
+    EntityRecord &record = m_entityRecords[id];
     record.row = 0;
     record.signature.reset();
     m_freeIDs.push(id);
     --m_livingEntityCount;
   }
 
-  EntityRecord& getRecord(EntityID id) {
+  EntityRecord &getRecord(EntityID id) {
     assert(id < MAX_ENTITIES && "Entity out of range.");
 
     return m_entityRecords[id];

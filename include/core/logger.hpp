@@ -8,6 +8,14 @@
 #define LOG_ERROR(fmt, ...)                                                    \
   Logger::Log(__FILE__, __FUNCTION__, "ERROR", fmt, ##__VA_ARGS__)
 
+/**
+ * @brief Minimal printf-style logger that prints timestamped messages to
+ * stdout.
+ *
+ * Used via LOG_INFO and LOG_ERROR macros which automatically inject
+ * the source file and function name.
+ * Thread-unsafe (intended for single-threaded debug output).
+ */
 class Logger {
 public:
   static void Log(const char *file, const char *func, const char *prefix,

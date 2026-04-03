@@ -5,39 +5,44 @@
 #include "core/types.hpp"
 #include "glad/glad.h"
 
-// General purpose shader object. Compiles from file, generates
-// compile/link-time error messages and hosts several utility
-// functions for easy management.
+/**
+ * @brief OpenGL shader program wrapper.
+ *
+ * Compiles vertex/fragment/geometry shaders from source strings, reports
+ * compile/link errors, and provides type-safe uniform setters for floats,
+ * vectors, and matrices.
+ */
 class Shader {
 public:
   // state
   GLuint m_id;
 
-  Shader() : m_id(0) {}
+  Shader() : m_id(0) {
+  }
 
   // sets the current shader as active
   void use() const;
 
   // compiles the shader from given source code
-  void compile(const char* vertexSource, const char* fragmentSource,
-               const char* geometrySource = nullptr);
+  void compile(const char *vertexSource, const char *fragmentSource,
+               const char *geometrySource = nullptr);
 
   // utility functions
-  void setFloat(const char* name, float value, bool useShader = false) const;
-  void setInteger(const char* name, int value, bool useShader = false) const;
-  void setVector2f(const char* name, float x, float y,
+  void setFloat(const char *name, float value, bool useShader = false) const;
+  void setInteger(const char *name, int value, bool useShader = false) const;
+  void setVector2f(const char *name, float x, float y,
                    bool useShader = false) const;
-  void setVector2f(const char* name, const Vec2& value,
+  void setVector2f(const char *name, const Vec2 &value,
                    bool useShader = false) const;
-  void setVector3f(const char* name, float x, float y, float z,
+  void setVector3f(const char *name, float x, float y, float z,
                    bool useShader = false) const;
-  void setVector3f(const char* name, const Vec3& value,
+  void setVector3f(const char *name, const Vec3 &value,
                    bool useShader = false) const;
-  void setVector4f(const char* name, float x, float y, float z, float w,
+  void setVector4f(const char *name, float x, float y, float z, float w,
                    bool useShader = false) const;
-  void setVector4f(const char* name, const Vec4& value,
+  void setVector4f(const char *name, const Vec4 &value,
                    bool useShader = false) const;
-  void setMatrix4(const char* name, const Mat4& matrix,
+  void setMatrix4(const char *name, const Mat4 &matrix,
                   bool useShader = false) const;
 
 private:

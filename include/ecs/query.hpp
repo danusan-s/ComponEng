@@ -13,6 +13,16 @@ struct QueryDesc {
   Signature excluded;
 };
 
+/**
+ * @brief Typed query over entities matching a set of required component types.
+ *
+ * Iterates all archetypes whose Signature contains every requested component
+ * and invokes a user-provided callback for each matching entity.
+ * Also supports exclude() to filter out entities with specific components,
+ * and parallel_for() to distribute work across the engine's ThreadPool.
+ *
+ * @tparam Req... Component types that an entity must have to match.
+ */
 template <typename... Req> class Query {
 public:
   Query(std::array<Archetype, MAX_ARCHETYPES> &archetypes,

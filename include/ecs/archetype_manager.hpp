@@ -4,6 +4,13 @@
 #include "ecs/entity.hpp"
 #include <stdexcept>
 
+/**
+ * @brief Creates, stores, and looks up archetypes by their component Signature.
+ *
+ * Each unique Signature maps to exactly one Archetype. When a new signature
+ * is encountered a fresh archetype is created and cached. This manager is
+ * the sole owner of all archetypes in the World.
+ */
 class ArchetypeManager {
 private:
   std::array<Archetype, MAX_ARCHETYPES> m_archetypes;
@@ -11,8 +18,8 @@ private:
   size_t m_archetypeCount = 0;
 
 public:
-  Archetype& getOrCreate(const Signature& signature,
-                         ComponentRegistry* componentRegistry) {
+  Archetype &getOrCreate(const Signature &signature,
+                         ComponentRegistry *componentRegistry) {
     if (signature == Signature(0)) {
       throw std::runtime_error("ArchetypeManager: signature cannot be empty");
     }
@@ -32,7 +39,7 @@ public:
     return m_archetypes[newID];
   }
 
-  Archetype* getBySignature(const Signature& signature) {
+  Archetype *getBySignature(const Signature &signature) {
     auto it = m_signatureToArchetypeID.find(signature);
     if (it != m_signatureToArchetypeID.end()) {
       return &m_archetypes[it->second];
@@ -40,14 +47,14 @@ public:
     return nullptr;
   }
 
-  Archetype& getByID(ArchetypeID id) {
+  Archetype &getByID(ArchetypeID id) {
     if (id >= m_archetypeCount) {
       throw std::runtime_error("ArchetypeManager: Invalid ArchetypeID");
     }
     return m_archetypes[id];
   }
 
-  std::array<Archetype, MAX_ARCHETYPES>& getArchetypes() {
+  std::array<Archetype, MAX_ARCHETYPES> &getArchetypes() {
     return m_archetypes;
   }
 };

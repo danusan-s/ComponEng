@@ -2,8 +2,10 @@
 
 #include "glad/glad.h"
 
-// Texture2D is able to store and configure a texture in OpenGL.
-// It also hosts utility functions for easy management.
+/**
+ * @brief OpenGL 2D texture wrapper with generation, configuration, and binding
+ * helpers.
+ */
 class Texture2D {
 public:
   GLuint m_id;
@@ -18,6 +20,6 @@ public:
 
   Texture2D();
 
-  void generate(GLuint width, GLuint height, unsigned char* data);
+  void generate(GLuint width, GLuint height, unsigned char *data);
   void bind() const;
 };

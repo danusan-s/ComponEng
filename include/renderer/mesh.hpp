@@ -4,6 +4,12 @@
 #include <string>
 #include <vector>
 
+/**
+ * @brief OpenGL mesh resource with vertex/index buffers.
+ *
+ * Parses Wavefront OBJ data, generates VAO/VBO/EBO, and stores
+ * raw vertex and index arrays for GPU rendering.
+ */
 class Mesh {
 public:
   GLuint m_vao;

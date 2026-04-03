@@ -6,12 +6,26 @@
 #include <typeindex>
 #include <unordered_map>
 
+/**
+ * @brief Runtime metadata associated with a registered component type.
+ *
+ * Stores the type name, size in bytes, and an optional destructor
+ * callback for non-trivially-destructible types.
+ */
 struct ComponentInfo {
-  const char* name;
+  const char *name;
   size_t size;
-  void (*destructor)(void*) = nullptr;
+  size_t alignment;
+  void (*destructor)(void *) = nullptr;
 };
 
+/**
+ * @brief Maps types to compact ComponentIDs at runtime.
+ *
+ * Each distinct component type is assigned a unique ID the first time
+ * it is registered. These IDs are used as bit indices in Signatures
+ * and as column indices within archetypes.
+ */
 class ComponentRegistry {
 private:
   std::unordered_map<std::type_index, ComponentID> m_typeToID;
@@ -39,10 +53,11 @@ public:
     m_typeToID[key] = id;
     m_componentInfos[id].name = key.name();
     m_componentInfos[id].size = sizeof(T);
+    m_componentInfos[id].alignment = alignof(T);
     // Store destructor for non-trivial types so archetype moves can clean up.
     if constexpr (!std::is_trivially_destructible_v<T>) {
-      m_componentInfos[id].destructor = [](void* ptr) {
-        static_cast<T*>(ptr)->~T();
+      m_componentInfos[id].destructor = [](void *ptr) {
+        static_cast<T *>(ptr)->~T();
       };
     }
     return id;
@@ -60,7 +75,7 @@ public:
     return m_nextComponentID;
   }
 
-  ComponentInfo& getComponentInfo(ComponentID id) {
+  ComponentInfo &getComponentInfo(ComponentID id) {
     if (id >= m_nextComponentID)
       throw std::runtime_error("ComponentRegistry: invalid ComponentID");
     return m_componentInfos[id];

@@ -4,24 +4,62 @@
 #include "components/transform_component.hpp"
 #include "core/types.hpp"
 
+/**
+ * @brief Output of a collision test: contact normal and penetration depth.
+ *
+ * The normal points from collider A toward collider B.
+ */
 struct CollisionInfo {
   Vec3 normal;
   float penetration;
 };
 
-Vec3 getColliderWorldPosition(const TransformComponent& transform,
-                              const Vec3& localCenter);
+/**
+ * @brief Computes the world-space center of a collider given its local offset
+ * and entity transform.
+ */
+Vec3 getColliderWorldPosition(const TransformComponent &transform,
+                              const Vec3 &localCenter);
 
-bool testAABBAABB(const AABB& a, const Vec3& posA,
-                  const AABB& b, const Vec3& posB,
-                  CollisionInfo& info);
+/**
+ * @brief Tests two axis-aligned bounding boxes for overlap.
+ * @return true if overlapping, with contact info filled into @p info.
+ */
+bool testAABBAABB(const AABB &a, const Vec3 &posA, const AABB &b,
+                  const Vec3 &posB, CollisionInfo &info);
 
-bool testSphereSphere(const Sphere& a, const Vec3& posA,
-                      const Sphere& b, const Vec3& posB,
-                      CollisionInfo& info);
+/**
+ * @brief Tests two spheres for overlap.
+ * @return true if overlapping, with contact info filled into @p info.
+ */
+bool testSphereSphere(const Sphere &a, const Vec3 &posA, const Sphere &b,
+                      const Vec3 &posB, CollisionInfo &info);
 
-bool testCollision(const ColliderComponent& colliderA,
-                   const TransformComponent& transformA,
-                   const ColliderComponent& colliderB,
-                   const TransformComponent& transformB,
-                   CollisionInfo& info);
+/**
+ * @brief Tests an AABB and a sphere for overlap.
+ * @return true if overlapping, with contact info filled into @p info.
+ */
+bool testAABBSphere(const AABB &aabb, const Vec3 &posAABB, const Sphere &sphere,
+                    const Vec3 &posSphere, CollisionInfo &info);
+
+/**
+ * @brief Tests a sphere and an AABB for overlap (reverse of testAABBSphere).
+ *
+ * Swaps param and calls testAABBSphere. Reverses normal direction in @p info to
+ * maintain A->B convention.
+ *
+ * @return true if overlapping, with contact info filled into @p info.
+ */
+bool testSphereAABB(const Sphere &sphere, const Vec3 &posSphere,
+                    const AABB &aabb, const Vec3 &posAABB, CollisionInfo &info);
+
+/**
+ * @brief Dispatches to the appropriate shape-pair test based on collider types.
+ *
+ * Supports AABB-AABB, Sphere-Sphere, and AABB-Sphere pairs.
+ * Returns false for unsupported combinations.
+ */
+bool testCollision(const ColliderComponent &colliderA,
+                   const TransformComponent &transformA,
+                   const ColliderComponent &colliderB,
+                   const TransformComponent &transformB, CollisionInfo &info);
