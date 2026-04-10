@@ -27,6 +27,8 @@ Well the project initially started for a really silly reason. I was kinda tired 
 - **Diffuse Lighting** - Ambient + lambertian diffuse shading
 - **Debug UI** - ImGui overlay showing camera inspector and real-time FPS
 
+https://github.com/user-attachments/assets/9a45ef11-346c-4247-b8d2-d867f22ae4d3
+
 ## Architecture Highlights
 
 ### Entity-Component-System (ECS)
