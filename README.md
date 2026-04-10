@@ -27,6 +27,8 @@ Well the project initially started for a really silly reason. I was kinda tired 
 - **Diffuse Lighting** - Ambient + lambertian diffuse shading
 - **Debug UI** - ImGui overlay showing camera inspector and real-time FPS
 
+[Watch demo video](docs/comopneng.mp4)
+
 ## Architecture Highlights
 
 ### Entity-Component-System (ECS)

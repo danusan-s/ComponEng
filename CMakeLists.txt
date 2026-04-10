@@ -47,38 +47,39 @@ target_link_libraries(GameEngine
         OpenGL::GL
 )
 
-# Vulkan backend setup
-if(RENDERER_BACKEND STREQUAL "vulkan")
-    find_package(Vulkan REQUIRED)
-
-    find_program(GLSLC glslc)
-    if(NOT GLSLC)
-        message(FATAL_ERROR "glslc not found. Install shaderc or Vulkan SDK.")
-    endif()
-
-    file(GLOB GLSL_SOURCES "assets/shaders/*.vert" "assets/shaders/*.frag")
-    set(SPIRV_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/spirv")
-    file(MAKE_DIRECTORY ${SPIRV_OUTPUT_DIR})
-
-    set(SPIRV_FILES "")
-    foreach(glsl ${GLSL_SOURCES})
-        get_filename_component(filename ${glsl} NAME)
-        set(spirv "${SPIRV_OUTPUT_DIR}/${filename}.spv")
-        add_custom_command(
-            OUTPUT ${spirv}
-            COMMAND ${GLSLC} -o ${spirv} ${glsl}
-            DEPENDS ${glsl}
-            COMMENT "Compiling ${filename} → ${filename}.spv"
-        )
-        list(APPEND SPIRV_FILES ${spirv})
-    endforeach()
-
-    add_custom_target(CompileShaders DEPENDS ${SPIRV_FILES})
-    add_dependencies(GameEngine CompileShaders)
-
-    target_link_libraries(GameEngine PUBLIC Vulkan::Vulkan)
-    target_compile_definitions(GameEngine PUBLIC RENDERER_BACKEND_VULKAN)
-endif()
+# Vulkan backend setup - TEMPORARILY DISABLED as GLSL to SPIR-V conversion is buggy
+# and Vulkan support is not yet implemented
+# if(RENDERER_BACKEND STREQUAL "vulkan")
+#     find_package(Vulkan REQUIRED)
+#
+#     find_program(GLSLC glslc)
+#     if(NOT GLSLC)
+#         message(FATAL_ERROR "glslc not found. Install shaderc or Vulkan SDK.")
+#     endif()
+#
+#     file(GLOB GLSL_SOURCES "assets/shaders/*.vert" "assets/shaders/*.frag")
+#     set(SPIRV_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/spirv")
+#     file(MAKE_DIRECTORY ${SPIRV_OUTPUT_DIR})
+#
+#     set(SPIRV_FILES "")
+#     foreach(glsl ${GLSL_SOURCES})
+#         get_filename_component(filename ${glsl} NAME)
+#         set(spirv "${SPIRV_OUTPUT_DIR}/${filename}.spv")
+#         add_custom_command(
+#             OUTPUT ${spirv}
+#             COMMAND ${GLSLC} -o ${spirv} ${glsl}
+#             DEPENDS ${glsl}
+#             COMMENT "Compiling ${filename} → ${filename}.spv"
+#         )
+#         list(APPEND SPIRV_FILES ${spirv})
+#     endforeach()
+#
+#     add_custom_target(CompileShaders DEPENDS ${SPIRV_FILES})
+#     add_dependencies(GameEngine CompileShaders)
+#
+#     target_link_libraries(GameEngine PUBLIC Vulkan::Vulkan)
+#     target_compile_definitions(GameEngine PUBLIC RENDERER_BACKEND_VULKAN)
+# endif()
 
 add_executable(GameEngineTest src/main.cpp)
 

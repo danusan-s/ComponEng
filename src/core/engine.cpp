@@ -1,5 +1,5 @@
-#include "core/debug_ui.hpp"
 #include "core/engine.hpp"
+#include "core/debug_ui.hpp"
 #include "core/logger.hpp"
 #include "core/utils.hpp"
 #include "ecs/entity.hpp"
@@ -15,8 +15,7 @@ void Engine::init() {
 
   ResourceManager::loadShader(
       Utils::getAssetPath("assets/shaders/diffuse.vert").c_str(),
-      Utils::getAssetPath("assets/shaders/diffuse.frag").c_str(),
-      nullptr,
+      Utils::getAssetPath("assets/shaders/diffuse.frag").c_str(), nullptr,
       "default");
 
   ResourceManager::loadTexture(
@@ -33,10 +32,10 @@ void Engine::init() {
 }
 
 void Engine::registerComponents() {
-  m_world.registerComponents<TransformComponent, MeshComponent, MaterialComponent,
-                           CameraComponent, MouseInputComponent,
-                           RigidBodyComponent, InputComponent,
-                           ColliderComponent>();
+  m_world.registerComponents<TransformComponent, MeshComponent,
+                             MaterialComponent, CameraComponent,
+                             MouseInputComponent, RigidBodyComponent,
+                             InputComponent, ColliderComponent>();
   m_world.registerComponents<MainCameraSingleton>();
 }
 
@@ -50,43 +49,55 @@ void Engine::registerSystems() {
 void Engine::initObjects() {
   EntityID cameraEntity = m_world.createEntity();
   m_world.addComponents(cameraEntity,
-                      TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
-                                         .rotation = Vec3(0.0f, 0.0f, 0.0f),
-                                         .scale = Vec3(1.0f)},
-                      CameraComponent{.fov = 45.0f,
-                                      .aspectRatio = 16.0f / 9.0f,
-                                      .nearPlane = 0.1f,
-                                      .farPlane = 1000.0f},
-                      InputComponent{.forward = false,
-                                     .backward = false,
-                                     .left = false,
-                                     .right = false,
-                                     .jump = false,
-                                     .crouch = false},
-                      MouseInputComponent{.deltaX = 0.0f,
-                                          .deltaY = 0.0f,
-                                          .leftButton = false,
-                                          .rightButton = false});
+                        TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
+                                           .rotation = Vec3(0.0f, 0.0f, 0.0f),
+                                           .scale = Vec3(1.0f)},
+                        CameraComponent{.fov = 45.0f,
+                                        .aspectRatio = 16.0f / 9.0f,
+                                        .nearPlane = 0.1f,
+                                        .farPlane = 1000.0f},
+                        InputComponent{.forward = false,
+                                       .backward = false,
+                                       .left = false,
+                                       .right = false,
+                                       .jump = false,
+                                       .crouch = false},
+                        MouseInputComponent{.deltaX = 0.0f,
+                                            .deltaY = 0.0f,
+                                            .leftButton = false,
+                                            .rightButton = false});
   m_world.setSingleton<MainCameraSingleton>(
       MainCameraSingleton{.entity = cameraEntity});
 }
 
-void Engine::run(IGame& game) {
+void Engine::run(IGame &game) {
   game.init(m_world);
   m_world.createSystems();
 
   double deltaTime = 0.0f;
+  double accumulator = 0.0f;
   double lastFrame = 0.0f;
+  long long frameCount = 0;
+  double avgFPS = 0.0f;
 
   while (!m_window.shouldClose()) {
     double currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
+    accumulator += deltaTime;
     lastFrame = currentFrame;
+    frameCount++;
     m_world.time += deltaTime;
+
+    if (accumulator >= 1.0f) {
+      avgFPS = frameCount / accumulator;
+      frameCount = 0;
+      accumulator = 0.0f;
+    }
 
     DebugUI::beginFrame();
     m_world.updateSystems(deltaTime);
     DebugUI::addValue("FPS", 1.0f / deltaTime);
+    DebugUI::addValue("Avg FPS: %.2f", avgFPS);
     DebugUI::endFrame();
 
     m_window.swapBuffers();
