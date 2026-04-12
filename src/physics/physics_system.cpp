@@ -2,6 +2,7 @@
 #include "components/collider_component.hpp"
 #include "components/rigidbody_component.hpp"
 #include "components/transform_component.hpp"
+#include "core/debug_ui.hpp"
 #include "ecs/entity.hpp"
 #include "ecs/world.hpp"
 #include "physics/collision_detection.hpp"
@@ -24,6 +25,8 @@ struct CollisionPair {
 };
 
 static double g_accumulatedTime = 0.0f;
+static int g_collisionCount = 0;
+static int g_runCount = 0;
 
 static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
                              const CollisionInfo &info) {
@@ -89,8 +92,10 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
 void PhysicsSystem::onUpdate(const SystemState &state) {
   g_accumulatedTime += state.deltaTime;
   constexpr float fixedTimeStep = 1 / 60.0f;
-  if (g_accumulatedTime < fixedTimeStep)
+  if (g_accumulatedTime < fixedTimeStep) {
+    DebugUI::addValue("Collisions: ", float(g_collisionCount) / g_runCount);
     return;
+  }
 
   while (g_accumulatedTime >= fixedTimeStep) {
     g_accumulatedTime -= fixedTimeStep;
@@ -168,10 +173,18 @@ void PhysicsSystem::onUpdate(const SystemState &state) {
       f.wait();
 
     for (size_t t = 0; t < threadCollisions.size(); ++t) {
+      g_collisionCount += threadCollisions[t].size();
+    }
+    g_runCount++;
+
+    for (size_t t = 0; t < threadCollisions.size(); ++t) {
       for (auto &pair : threadCollisions[t]) {
         resolveCollision(colliders[pair.indexA], colliders[pair.indexB],
                          pair.info);
       }
     }
   }
+  DebugUI::addValue("Collisions: ", float(g_collisionCount) / g_runCount);
+  g_collisionCount = 0;
+  g_runCount = 0;
 }

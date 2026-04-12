@@ -1,5 +1,7 @@
 #pragma once
+#include "renderer/resource_manager.hpp"
 
 struct MeshComponent {
-  const char *meshName; // 32 bytes (pointer + size)
+  MeshID meshID;       // 4 bytes
+  bool visible = true; // 1 byte
 };

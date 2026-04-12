@@ -55,7 +55,7 @@ void Engine::initObjects() {
                         CameraComponent{.fov = 45.0f,
                                         .aspectRatio = 16.0f / 9.0f,
                                         .nearPlane = 0.1f,
-                                        .farPlane = 1000.0f},
+                                        .farPlane = 10000.0f},
                         InputComponent{.forward = false,
                                        .backward = false,
                                        .left = false,

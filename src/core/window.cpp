@@ -1,12 +1,12 @@
-#include "glad/glad.h"
+#include "core/window.hpp"
 #include "core/input_state.hpp"
 #include "core/logger.hpp"
-#include "core/window.hpp"
+#include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
 static bool g_mouseLocked = true;
 
-static void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
+static void framebufferSizeCallback(GLFWwindow *window, int width, int height) {
   float targetAspectRatio = 16.0f / 9.0f;
   float currentAspectRatio = static_cast<float>(width) / height;
 
@@ -24,10 +24,10 @@ static void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
   glViewport(0, yOffset, width, newHeight);
 }
 
-static void keyCallback(GLFWwindow* window, int key, int scancode, int action,
+static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
                         int mode) {
-  auto* inputState =
-      static_cast<InputState*>(glfwGetWindowUserPointer(window));
+  auto *inputState =
+      static_cast<InputState *>(glfwGetWindowUserPointer(window));
   if (!inputState)
     return;
 
@@ -55,10 +55,10 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action,
     glfwSetWindowShouldClose(window, true);
 }
 
-static void mouseButtonCallback(GLFWwindow* window, int button, int action,
+static void mouseButtonCallback(GLFWwindow *window, int button, int action,
                                 int mods) {
-  auto* inputState =
-      static_cast<InputState*>(glfwGetWindowUserPointer(window));
+  auto *inputState =
+      static_cast<InputState *>(glfwGetWindowUserPointer(window));
   if (!inputState)
     return;
 
@@ -70,10 +70,10 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action,
   }
 }
 
-static void cursorPosCallback(GLFWwindow* window, double xposIn,
+static void cursorPosCallback(GLFWwindow *window, double xposIn,
                               double yposIn) {
-  auto* inputState =
-      static_cast<InputState*>(glfwGetWindowUserPointer(window));
+  auto *inputState =
+      static_cast<InputState *>(glfwGetWindowUserPointer(window));
   if (!inputState)
     return;
 
@@ -97,7 +97,7 @@ static void cursorPosCallback(GLFWwindow* window, double xposIn,
   inputState->mouseY = ypos;
 }
 
-void Window::init(int width, int height, const char* title) {
+void Window::init(int width, int height, const char *title) {
   this->m_width = width;
   this->m_height = height;
 
@@ -121,7 +121,7 @@ void Window::init(int width, int height, const char* title) {
   }
 
   glfwMakeContextCurrent(m_handle);
-  glfwSwapInterval(0);
+  // glfwSwapInterval(0);
 
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     LOG_ERROR("Failed to initialize GLAD");

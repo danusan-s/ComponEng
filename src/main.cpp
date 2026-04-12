@@ -1,24 +1,27 @@
 #include "core/engine.hpp"
 #include "core/game.hpp"
+#include "renderer/resource_manager.hpp"
 #include <random>
 
 class Game : public IGame {
 public:
-  void init(World& world) override {
+  void init(World &world) override {
     std::default_random_engine generator;
-    std::uniform_real_distribution<float> randPosition(-100.0f, 100.0f);
+    std::uniform_real_distribution<float> randPosition(-500.0f, 500.0f);
     std::uniform_real_distribution<float> randScale(1.0f, 5.0f);
     std::uniform_real_distribution<float> randGravity(-10.0f, -1.0f);
     std::uniform_real_distribution<float> randColor(0.0f, 1.0f);
     std::uniform_real_distribution<float> randMass(0.5f, 5.0f);
     std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);
 
-    for (int i = 0; i < 100; ++i) {
+    const int count = 2000;
+
+    for (int i = 0; i < count; ++i) {
       EntityID entity = world.createEntity();
 
       float scale = randScale(generator);
       world.addComponents(
-          entity, MeshComponent{.meshName = "cube"},
+          entity, MeshComponent{.meshID = ResourceManager::getMeshID("cube")},
           TransformComponent{.position = Vec3(randPosition(generator),
                                               randPosition(generator),
                                               randPosition(generator)),
@@ -27,22 +30,22 @@ public:
           RigidBodyComponent{.type = RigidBodyComponent::Dynamic,
                              .mass = randMass(generator),
                              .restitution = 1.0f},
-          MaterialComponent{.color =
-                                Vec4(randColor(generator), randColor(generator),
-                                     randColor(generator), 1.0f),
-                            .textureName = "white",
-                            .shaderName = "default"},
+          MaterialComponent{
+              .color = Vec4(randColor(generator), randColor(generator),
+                            randColor(generator), 1.0f),
+              .textureID = ResourceManager::getTextureID("white"),
+              .shaderID = ResourceManager::getShaderID("default")},
           ColliderComponent{.type = ColliderType::AABB,
                             .shape = AABB{.localCenter = Vec3(0.0f),
                                           .halfExtents = Vec3(scale)}});
     }
 
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < count; ++i) {
       EntityID entity = world.createEntity();
 
       float scale = randScale(generator);
       world.addComponents(
-          entity, MeshComponent{.meshName = "sphere"},
+          entity, MeshComponent{.meshID = ResourceManager::getMeshID("sphere")},
           TransformComponent{.position = Vec3(randPosition(generator),
                                               randPosition(generator),
                                               randPosition(generator)),
@@ -53,11 +56,11 @@ public:
                                  Vec3(0.0f, randVelocity(generator), 0.0f),
                              .mass = randMass(generator),
                              .restitution = 1.0f},
-          MaterialComponent{.color =
-                                Vec4(randColor(generator), randColor(generator),
-                                     randColor(generator), 1.0f),
-                            .textureName = "white",
-                            .shaderName = "default"},
+          MaterialComponent{
+              .color = Vec4(randColor(generator), randColor(generator),
+                            randColor(generator), 1.0f),
+              .textureID = ResourceManager::getTextureID("white"),
+              .shaderID = ResourceManager::getShaderID("default")},
           ColliderComponent{
               .type = ColliderType::Sphere,
               .shape = Sphere{.localCenter = Vec3(0.0f), .radius = scale}});
@@ -66,27 +69,27 @@ public:
     EntityID ground = world.createEntity();
     world.addComponents(
         ground,
-        TransformComponent{.position = Vec3(0.0f, -100.0f, 0.0f),
+        TransformComponent{.position = Vec3(0.0f, -1000.0f, 0.0f),
                            .rotation = Vec3(0.0f),
-                           .scale = Vec3(100.0f, 1.0f, 100.0f)},
-        MeshComponent{.meshName = "cube"},
+                           .scale = Vec3(1000.0f, 1.0f, 1000.0f)},
+        MeshComponent{.meshID = ResourceManager::getMeshID("cube")},
         MaterialComponent{.color = Vec4(0.5f, 0.5f, 0.5f, 1.0f),
-                          .textureName = "white",
-                          .shaderName = "default"},
+                          .textureID = ResourceManager::getTextureID("white"),
+                          .shaderID = ResourceManager::getShaderID("default")},
         RigidBodyComponent{.type = RigidBodyComponent::Static,
                            .restitution = 1.0f},
-        ColliderComponent{.type = ColliderType::AABB,
-                          .shape =
-                              AABB{.localCenter = Vec3(0.0f),
-                                   .halfExtents = Vec3(100.0f, 1.0f, 100.0f)}});
+        ColliderComponent{
+            .type = ColliderType::AABB,
+            .shape = AABB{.localCenter = Vec3(0.0f),
+                          .halfExtents = Vec3(1000.0f, 1.0f, 1000.0f)}});
   }
 
-  void shutdown(World& world) override {
+  void shutdown(World &world) override {
   }
 };
 
 int main() {
-  Engine& engine = Engine::get();
+  Engine &engine = Engine::get();
   engine.init();
 
   Game testScene;

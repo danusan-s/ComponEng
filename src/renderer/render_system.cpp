@@ -1,9 +1,7 @@
 #include "components/camera_component.hpp"
 #include "components/collider_component.hpp"
 #include "core/debug_ui.hpp"
-#include "core/logger.hpp"
 #include "core/types.hpp"
-#include "core/window.hpp"
 #include "ecs/entity.hpp"
 #include "ecs/world.hpp"
 #include "renderer/resource_manager.hpp"
@@ -26,38 +24,7 @@ struct Frustum {
   Plane planes[6];
 };
 
-struct DrawKey {
-  std::string meshName;
-  std::string textureName;
-  std::string shaderName;
-
-  bool operator==(const DrawKey& other) const {
-    return meshName == other.meshName && textureName == other.textureName &&
-           shaderName == other.shaderName;
-  }
-};
-
-struct DrawKeyHash {
-  std::size_t operator()(const DrawKey& k) const {
-    return std::hash<std::string>()(k.meshName) ^
-           (std::hash<std::string>()(k.textureName) << 1) ^
-           (std::hash<std::string>()(k.shaderName) << 2);
-  }
-};
-
-struct InstanceData {
-  Mat4 modelMatrix;
-  Vec3 color;
-};
-
-struct BatchData {
-  std::unique_ptr<IBuffer> instanceBuffer;
-  std::vector<InstanceData> instanceDatas;
-};
-
-static std::unordered_map<DrawKey, BatchData, DrawKeyHash> g_batches;
-
-static Mat4 getModelMatrix(const TransformComponent& transform) {
+static Mat4 getModelMatrix(const TransformComponent &transform) {
   Mat4 model = Mat4(1.0f);
   model = translate(model, transform.position);
   model = rotate(model, transform.rotation.x, Vec3(1.0f, 0.0f, 0.0f));
@@ -67,10 +34,10 @@ static Mat4 getModelMatrix(const TransformComponent& transform) {
   return model;
 }
 
-static bool isBoxInFrustum(const Frustum& frustum, const Vec3& boxMin,
-                           const Vec3& boxMax) {
+static bool isBoxInFrustum(const Frustum &frustum, const Vec3 &boxMin,
+                           const Vec3 &boxMax) {
   for (int i = 0; i < 6; i++) {
-    const Plane& plane = frustum.planes[i];
+    const Plane &plane = frustum.planes[i];
     Vec3 positiveVertex;
     positiveVertex.x = (plane.normal.x >= 0) ? boxMax.x : boxMin.x;
     positiveVertex.y = (plane.normal.y >= 0) ? boxMax.y : boxMin.y;
@@ -83,7 +50,7 @@ static bool isBoxInFrustum(const Frustum& frustum, const Vec3& boxMin,
   return true;
 }
 
-static Frustum generateFrustum(const Mat4& m) {
+static Frustum generateFrustum(const Mat4 &m) {
   Frustum f;
 
   f.planes[0].normal.x = m[0][3] + m[0][0];
@@ -125,52 +92,40 @@ static Frustum generateFrustum(const Mat4& m) {
   return f;
 }
 
-static void populateBatch(const TransformComponent& t, const MeshComponent& m,
-                          const MaterialComponent& mat, IRenderDevice& device) {
-  DrawKey key{m.meshName, mat.textureName, mat.shaderName};
-  if (g_batches.find(key) == g_batches.end()) {
-    BatchData& batch = g_batches[key];
-    batch.instanceBuffer = device.createBuffer();
-    batch.instanceBuffer->setData(nullptr, MAX_ENTITIES * sizeof(InstanceData));
-
-    device.setupInstanceAttributes(*batch.instanceBuffer);
-
-    LOG_INFO("Created batch for mesh %s, material %s, shader %s",
-             key.meshName.c_str(), key.textureName.c_str(),
-             key.shaderName.c_str());
-  }
-  g_batches[key].instanceDatas.push_back({getModelMatrix(t), mat.color});
+static void populateBatch(const TransformComponent &t, const MeshComponent &m,
+                          const MaterialComponent &mat, BatchMap &batches) {
+  DrawKey key{m.meshID, mat.textureID, mat.shaderID};
+  batches.add(key, {getModelMatrix(t), mat.color});
 }
 
-void RenderSystem::onCreate(const SystemState& state) {
+void RenderSystem::onCreate(const SystemState &state) {
   m_device = std::make_unique<GLRenderDevice>();
   m_device->init(state.world->getWindowHandle());
+  m_batches = std::make_unique<BatchMap>(*m_device);
 }
 
-void RenderSystem::onUpdate(const SystemState& state) {
+void RenderSystem::onUpdate(const SystemState &state) {
   m_device->clear(0.0f, 0.0f, 0.0f, 1.0f);
 
   EntityID mainCameraID =
       state.world->getSingleton<MainCameraSingleton>().entity;
 
-  Vec3& cameraPos =
+  Vec3 &cameraPos =
       state.world->getComponent<TransformComponent>(mainCameraID).position;
-  Mat4& viewProj = state.world->getComponent<CameraComponent>(mainCameraID)
+  Mat4 &viewProj = state.world->getComponent<CameraComponent>(mainCameraID)
                        .viewProjectionMatrix;
 
   Frustum frustum = generateFrustum(viewProj);
 
   int drawCalls = 0;
 
-  for (auto& pair : g_batches) {
-    pair.second.instanceDatas.clear();
-  }
-
   state.world
       ->query<TransformComponent, MeshComponent, MaterialComponent,
               ColliderComponent>()
-      .each([&](TransformComponent& t, MeshComponent& m, MaterialComponent& mat,
-                ColliderComponent& col) {
+      .eachParallel(state.world->threadPool(), [&](TransformComponent &t,
+                                                   MeshComponent &m,
+                                                   MaterialComponent &mat,
+                                                   ColliderComponent &col) {
         Vec3 center, worldMin, worldMax;
         if (col.type == ColliderType::AABB) {
           center = t.position + std::get<AABB>(col.shape).localCenter;
@@ -186,30 +141,31 @@ void RenderSystem::onUpdate(const SystemState& state) {
           worldMin = center - t.scale;
           worldMax = center + t.scale;
         }
-        if (!isBoxInFrustum(frustum, worldMin, worldMax))
-          return;
-        populateBatch(t, m, mat, *m_device);
+        m.visible = isBoxInFrustum(frustum, worldMin, worldMax);
       });
 
   state.world->query<TransformComponent, MeshComponent, MaterialComponent>()
-      .exclude<ColliderComponent>()
-      .each([&](TransformComponent& t, MeshComponent& m,
-                MaterialComponent& mat) { populateBatch(t, m, mat, *m_device); });
+      .each(
+          [&](TransformComponent &t, MeshComponent &m, MaterialComponent &mat) {
+            if (m.visible)
+              populateBatch(t, m, mat, *m_batches.get());
+          });
 
-  for (const auto& pair : g_batches) {
-    const DrawKey& key = pair.first;
-    const BatchData& data = pair.second;
+  const auto &batches = m_batches->getMap();
+  for (const auto &pair : batches) {
+    const DrawKey &key = pair.first;
+    const BatchData &data = pair.second;
 
-    const Shader& shader = ResourceManager::getShader(key.shaderName);
-    const Texture2D& texture = ResourceManager::getTexture(key.textureName);
-    const Mesh& model = ResourceManager::getMesh(key.meshName);
+    const Shader &shader = ResourceManager::getShader(key.shaderID);
+    const Texture2D &texture = ResourceManager::getTexture(key.textureID);
+    const Mesh &model = ResourceManager::getMesh(key.meshID);
 
     shader.use();
     shader.setMatrix4("viewProj", viewProj);
     shader.setVector3f("lightPos", DEFAULT_LIGHT_POS.x, DEFAULT_LIGHT_POS.y,
                        DEFAULT_LIGHT_POS.z);
-    shader.setVector3f("lightColor", DEFAULT_LIGHT_COLOR.x, DEFAULT_LIGHT_COLOR.y,
-                       DEFAULT_LIGHT_COLOR.z);
+    shader.setVector3f("lightColor", DEFAULT_LIGHT_COLOR.x,
+                       DEFAULT_LIGHT_COLOR.y, DEFAULT_LIGHT_COLOR.z);
     shader.setVector3f("cameraPos", cameraPos.x, cameraPos.y, cameraPos.z);
     shader.setFloat("time", state.world->time);
 
@@ -218,9 +174,9 @@ void RenderSystem::onUpdate(const SystemState& state) {
 
     m_device->setupInstanceAttributes(*data.instanceBuffer);
 
-    data.instanceBuffer->setSubData(
-        0, data.instanceDatas.data(),
-        data.instanceDatas.size() * sizeof(InstanceData));
+    data.instanceBuffer->setSubData(0, data.instanceDatas.data(),
+                                    data.instanceDatas.size() *
+                                        sizeof(InstanceData));
 
     m_device->drawIndexedInstanced(model.indexCount(),
                                    data.instanceDatas.size());
@@ -231,17 +187,17 @@ void RenderSystem::onUpdate(const SystemState& state) {
   }
 
   int instancesRendered = 0;
-  for (const auto& pair : g_batches) {
+  for (const auto &pair : batches) {
     instancesRendered += pair.second.instanceDatas.size();
   }
+
+  m_batches->clear();
+
   DebugUI::addValue("Instances Rendered", instancesRendered);
   DebugUI::addValue("Draw Calls", drawCalls);
 }
 
-void RenderSystem::onDestroy(const SystemState& state) {
-  for (auto& pair : g_batches) {
-    pair.second.instanceBuffer.reset();
-  }
-  g_batches.clear();
+void RenderSystem::onDestroy(const SystemState &state) {
+  m_batches.reset();
   m_device.reset();
 }
