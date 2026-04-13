@@ -14,7 +14,7 @@ public:
     std::uniform_real_distribution<float> randMass(0.5f, 5.0f);
     std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);
 
-    const int count = 2000;
+    const int count = 100;
 
     for (int i = 0; i < count; ++i) {
       EntityID entity = world.createEntity();
@@ -35,9 +35,11 @@ public:
                             randColor(generator), 1.0f),
               .textureID = ResourceManager::getTextureID("white"),
               .shaderID = ResourceManager::getShaderID("default")},
-          ColliderComponent{.type = ColliderType::AABB,
-                            .shape = AABB{.localCenter = Vec3(0.0f),
-                                          .halfExtents = Vec3(scale)}});
+          ColliderComponent{.type = ColliderType::Box,
+                            .transform =
+                                TransformComponent{.position = Vec3(0.0f),
+                                                   .rotation = Vec3(0.0f),
+                                                   .scale = Vec3(1.0f)}});
     }
 
     for (int i = 0; i < count; ++i) {
@@ -61,9 +63,11 @@ public:
                             randColor(generator), 1.0f),
               .textureID = ResourceManager::getTextureID("white"),
               .shaderID = ResourceManager::getShaderID("default")},
-          ColliderComponent{
-              .type = ColliderType::Sphere,
-              .shape = Sphere{.localCenter = Vec3(0.0f), .radius = scale}});
+          ColliderComponent{.type = ColliderType::Sphere,
+                            .transform =
+                                TransformComponent{.position = Vec3(0.0f),
+                                                   .rotation = Vec3(0.0f),
+                                                   .scale = Vec3(1.0f)}});
     }
 
     EntityID ground = world.createEntity();
@@ -78,10 +82,11 @@ public:
                           .shaderID = ResourceManager::getShaderID("default")},
         RigidBodyComponent{.type = RigidBodyComponent::Static,
                            .restitution = 1.0f},
-        ColliderComponent{
-            .type = ColliderType::AABB,
-            .shape = AABB{.localCenter = Vec3(0.0f),
-                          .halfExtents = Vec3(1000.0f, 1.0f, 1000.0f)}});
+        ColliderComponent{.type = ColliderType::Box,
+                          .transform =
+                              TransformComponent{.position = Vec3(0.0f),
+                                                 .rotation = Vec3(0.0f),
+                                                 .scale = Vec3(1.0f)}});
   }
 
   void shutdown(World &world) override {

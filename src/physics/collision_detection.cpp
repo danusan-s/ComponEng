@@ -1,28 +1,33 @@
 #include "physics/collision_detection.hpp"
+#include "components/transform_component.hpp"
 #include <algorithm>
 #include <cmath>
 
-Vec3 getColliderWorldPosition(const TransformComponent &transform,
-                              const Vec3 &localCenter) {
-  return transform.position + localCenter;
+TransformComponent
+getWorldTransform(const TransformComponent &localTransform,
+                  const TransformComponent &parentTransform) {
+  TransformComponent worldTransform;
+  worldTransform.position = parentTransform.position + localTransform.position;
+  worldTransform.rotation = parentTransform.rotation + localTransform.rotation;
+  worldTransform.scale = parentTransform.scale * localTransform.scale;
+  return worldTransform;
 }
 
-bool testAABBAABB(const AABB &a, const Vec3 &posA, const AABB &b,
-                  const Vec3 &posB, CollisionInfo &info) {
-  Vec3 centerA = posA + a.localCenter;
-  Vec3 centerB = posB + b.localCenter;
+bool testBoxBox(const TransformComponent &a, const TransformComponent &b,
+                CollisionInfo &info) {
+  Vec3 diff = b.position - a.position;
+  Vec3 halfExtentsA = a.scale;
+  Vec3 halfExtentsB = b.scale;
 
-  Vec3 diff = centerB - centerA;
-
-  float overlapX = (a.halfExtents.x + b.halfExtents.x) - std::abs(diff.x);
+  float overlapX = (halfExtentsA.x + halfExtentsB.x) - std::abs(diff.x);
   if (overlapX <= 0)
     return false;
 
-  float overlapY = (a.halfExtents.y + b.halfExtents.y) - std::abs(diff.y);
+  float overlapY = (halfExtentsA.y + halfExtentsB.y) - std::abs(diff.y);
   if (overlapY <= 0)
     return false;
 
-  float overlapZ = (a.halfExtents.z + b.halfExtents.z) - std::abs(diff.z);
+  float overlapZ = (halfExtentsA.z + halfExtentsB.z) - std::abs(diff.z);
   if (overlapZ <= 0)
     return false;
 
@@ -40,14 +45,12 @@ bool testAABBAABB(const AABB &a, const Vec3 &posA, const AABB &b,
   return true;
 }
 
-bool testSphereSphere(const Sphere &a, const Vec3 &posA, const Sphere &b,
-                      const Vec3 &posB, CollisionInfo &info) {
-  Vec3 centerA = posA + a.localCenter;
-  Vec3 centerB = posB + b.localCenter;
-
-  Vec3 delta = centerB - centerA;
+bool testSphereSphere(const TransformComponent &a, const TransformComponent &b,
+                      CollisionInfo &info) {
+  Vec3 delta = b.position - a.position;
   float distance = length(delta);
-  float radiusSum = a.radius + b.radius;
+
+  float radiusSum = a.scale.x + b.scale.x; // Assuming scale.x is the radius
 
   if (distance >= radiusSum)
     return false;
@@ -63,13 +66,15 @@ bool testSphereSphere(const Sphere &a, const Vec3 &posA, const Sphere &b,
   return true;
 }
 
-bool testAABBSphere(const AABB &a, const Vec3 &posA, const Sphere &b,
-                    const Vec3 &posB, CollisionInfo &info) {
-  Vec3 centerA = posA + a.localCenter;
-  Vec3 sphereCenter = posB + b.localCenter;
+bool testAABBSphere(const TransformComponent &a, const TransformComponent &b,
+                    CollisionInfo &info) {
+  Vec3 centerA = a.position;
+  Vec3 sphereCenter = b.position;
 
-  Vec3 minA = centerA - a.halfExtents;
-  Vec3 maxA = centerA + a.halfExtents;
+  Vec3 minA = centerA - a.scale;
+  Vec3 maxA = centerA + a.scale;
+
+  float radius = b.scale.x; // Assuming scale.x is the radius
 
   Vec3 closestPoint;
   closestPoint.x = std::max(minA.x, std::min(sphereCenter.x, maxA.x));
@@ -79,7 +84,7 @@ bool testAABBSphere(const AABB &a, const Vec3 &posA, const Sphere &b,
   Vec3 delta = sphereCenter - closestPoint;
   float distanceSq = dot(delta, delta);
 
-  if (distanceSq > (b.radius * b.radius)) {
+  if (distanceSq > (radius * radius)) {
     return false;
   }
 
@@ -87,7 +92,7 @@ bool testAABBSphere(const AABB &a, const Vec3 &posA, const Sphere &b,
 
   if (distance > 1e-4f) {
     info.normal = delta / distance;
-    info.penetration = b.radius - distance;
+    info.penetration = radius - distance;
   } else {
     Vec3 dA = sphereCenter - minA;
     Vec3 dB = maxA - sphereCenter;
@@ -99,15 +104,15 @@ bool testAABBSphere(const AABB &a, const Vec3 &posA, const Sphere &b,
       info.normal = normalize(floorToSphere);
     else
       info.normal = Vec3(0, -1, 0);
-    info.penetration = b.radius + minOverlap;
+    info.penetration = radius + minOverlap;
   }
 
   return true;
 }
 
-bool testSphereAABB(const Sphere &a, const Vec3 &posA, const AABB &b,
-                    const Vec3 &posB, CollisionInfo &info) {
-  bool res = testAABBSphere(b, posB, a, posA, info);
+bool testSphereBox(const TransformComponent &a, const TransformComponent &b,
+                   CollisionInfo &info) {
+  bool res = testAABBSphere(b, a, info);
   info.normal = -info.normal;
   return res;
 }
@@ -116,32 +121,28 @@ bool testCollision(const ColliderComponent &colliderA,
                    const TransformComponent &transformA,
                    const ColliderComponent &colliderB,
                    const TransformComponent &transformB, CollisionInfo &info) {
-  if (colliderA.type == ColliderType::AABB &&
-      colliderB.type == ColliderType::AABB) {
-    const AABB &a = std::get<AABB>(colliderA.shape);
-    const AABB &b = std::get<AABB>(colliderB.shape);
-    return testAABBAABB(a, transformA.position, b, transformB.position, info);
+  const TransformComponent worldTransformA =
+      getWorldTransform(colliderA.transform, transformA);
+  const TransformComponent worldTransformB =
+      getWorldTransform(colliderB.transform, transformB);
+
+  if (colliderA.type == ColliderType::Box &&
+      colliderB.type == ColliderType::Box) {
+    return testBoxBox(worldTransformA, worldTransformB, info);
   }
 
   if (colliderA.type == ColliderType::Sphere &&
       colliderB.type == ColliderType::Sphere) {
-    const Sphere &a = std::get<Sphere>(colliderA.shape);
-    const Sphere &b = std::get<Sphere>(colliderB.shape);
-    return testSphereSphere(a, transformA.position, b, transformB.position,
-                            info);
+    return testSphereSphere(worldTransformA, worldTransformB, info);
   }
 
-  if (colliderA.type == ColliderType::AABB &&
+  if (colliderA.type == ColliderType::Box &&
       colliderB.type == ColliderType::Sphere) {
-    const AABB &a = std::get<AABB>(colliderA.shape);
-    const Sphere &b = std::get<Sphere>(colliderB.shape);
-    return testAABBSphere(a, transformA.position, b, transformB.position, info);
+    return testAABBSphere(worldTransformA, worldTransformB, info);
   }
   if (colliderA.type == ColliderType::Sphere &&
-      colliderB.type == ColliderType::AABB) {
-    const Sphere &a = std::get<Sphere>(colliderA.shape);
-    const AABB &b = std::get<AABB>(colliderB.shape);
-    return testSphereAABB(a, transformA.position, b, transformB.position, info);
+      colliderB.type == ColliderType::Box) {
+    return testSphereBox(worldTransformA, worldTransformB, info);
   }
 
   return false;

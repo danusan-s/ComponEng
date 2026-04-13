@@ -21,7 +21,7 @@ struct FrustumPlane {
 };
 
 struct Frustum {
-  Plane planes[6];
+  FrustumPlane planes[6];
 };
 
 static Mat4 getModelMatrix(const TransformComponent &transform) {
@@ -37,7 +37,7 @@ static Mat4 getModelMatrix(const TransformComponent &transform) {
 static bool isBoxInFrustum(const Frustum &frustum, const Vec3 &boxMin,
                            const Vec3 &boxMax) {
   for (int i = 0; i < 6; i++) {
-    const Plane &plane = frustum.planes[i];
+    const FrustumPlane &plane = frustum.planes[i];
     Vec3 positiveVertex;
     positiveVertex.x = (plane.normal.x >= 0) ? boxMax.x : boxMin.x;
     positiveVertex.y = (plane.normal.y >= 0) ? boxMax.y : boxMin.y;
@@ -122,27 +122,14 @@ void RenderSystem::onUpdate(const SystemState &state) {
   state.world
       ->query<TransformComponent, MeshComponent, MaterialComponent,
               ColliderComponent>()
-      .eachParallel(state.world->threadPool(), [&](TransformComponent &t,
-                                                   MeshComponent &m,
-                                                   MaterialComponent &mat,
-                                                   ColliderComponent &col) {
-        Vec3 center, worldMin, worldMax;
-        if (col.type == ColliderType::AABB) {
-          center = t.position + std::get<AABB>(col.shape).localCenter;
-          worldMin = center - std::get<AABB>(col.shape).halfExtents;
-          worldMax = center + std::get<AABB>(col.shape).halfExtents;
-        } else if (col.type == ColliderType::Sphere) {
-          center = t.position + std::get<Sphere>(col.shape).localCenter;
-          float radius = std::get<Sphere>(col.shape).radius;
-          worldMin = center - Vec3(radius);
-          worldMax = center + Vec3(radius);
-        } else {
-          center = t.position;
-          worldMin = center - t.scale;
-          worldMax = center + t.scale;
-        }
-        m.visible = isBoxInFrustum(frustum, worldMin, worldMax);
-      });
+      .eachParallel(state.world->threadPool(),
+                    [&](TransformComponent &t, MeshComponent &m,
+                        MaterialComponent &mat, ColliderComponent &col) {
+                      Vec3 center = col.transform.position + t.position;
+                      Vec3 worldMin = center - col.transform.scale * t.scale;
+                      Vec3 worldMax = center + col.transform.scale * t.scale;
+                      m.visible = isBoxInFrustum(frustum, worldMin, worldMax);
+                    });
 
   state.world->query<TransformComponent, MeshComponent, MaterialComponent>()
       .each(
