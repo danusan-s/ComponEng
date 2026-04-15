@@ -97,7 +97,8 @@ static void cursorPosCallback(GLFWwindow *window, double xposIn,
   inputState->mouseY = ypos;
 }
 
-void Window::init(int width, int height, const char *title) {
+void Window::init(int width, int height, const char *title,
+                  IRenderDevice *renderDevice) {
   this->m_width = width;
   this->m_height = height;
 
@@ -121,18 +122,9 @@ void Window::init(int width, int height, const char *title) {
   }
 
   glfwMakeContextCurrent(m_handle);
-  // glfwSwapInterval(0);
 
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-    LOG_ERROR("Failed to initialize GLAD");
-    return;
-  }
-
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_CULL_FACE);
-  glEnable(GL_SCISSOR_TEST);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  m_renderDevice = renderDevice;
+  m_renderDevice->init(m_handle);
 
   glfwSetWindowUserPointer(m_handle, &m_inputState);
   glfwSetKeyCallback(m_handle, keyCallback);
@@ -151,15 +143,15 @@ void Window::setViewport(int w, int h) {
   if (currentAspectRatio > targetAspectRatio) {
     int newWidth = static_cast<int>(h * targetAspectRatio);
     int xOffset = (w - newWidth) / 2;
-    glScissor(xOffset, 0, newWidth, h);
-    glViewport(xOffset, 0, newWidth, h);
+    m_renderDevice->setScissor(xOffset, 0, newWidth, h);
+    m_renderDevice->setViewport(xOffset, 0, newWidth, h);
     return;
   }
 
   int newHeight = static_cast<int>(w / targetAspectRatio);
   int yOffset = (h - newHeight) / 2;
-  glScissor(0, yOffset, w, newHeight);
-  glViewport(0, yOffset, w, newHeight);
+  m_renderDevice->setScissor(0, yOffset, w, newHeight);
+  m_renderDevice->setViewport(0, yOffset, w, newHeight);
 }
 
 void Window::shutdown() {

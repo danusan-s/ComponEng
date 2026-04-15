@@ -1,5 +1,5 @@
-#include "core/logger.hpp"
 #include "renderer/opengl/gl_render_device.hpp"
+#include "core/logger.hpp"
 #include <GLFW/glfw3.h>
 #include <cstdint>
 
@@ -9,9 +9,8 @@ GLRenderDevice::GLRenderDevice() {
 GLRenderDevice::~GLRenderDevice() {
 }
 
-void GLRenderDevice::init(void* windowHandle) {
-  GLFWwindow* window = static_cast<GLFWwindow*>(windowHandle);
-  glfwMakeContextCurrent(window);
+void GLRenderDevice::init(void *windowHandle) {
+  GLFWwindow *window = static_cast<GLFWwindow *>(windowHandle);
 
   if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     LOG_ERROR("Failed to initialize GLAD");
@@ -38,8 +37,8 @@ void GLRenderDevice::clear(float r, float g, float b, float a) {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void GLRenderDevice::present(void* windowHandle) {
-  GLFWwindow* window = static_cast<GLFWwindow*>(windowHandle);
+void GLRenderDevice::present(void *windowHandle) {
+  GLFWwindow *window = static_cast<GLFWwindow *>(windowHandle);
   glfwSwapBuffers(window);
 }
 
@@ -70,8 +69,8 @@ std::unique_ptr<IBuffer> GLRenderDevice::createBuffer() {
   return std::make_unique<GLBuffer>();
 }
 
-void GLRenderDevice::setupInstanceAttributes(IBuffer& instanceBuffer) {
-  GLuint instanceVBO = static_cast<GLBuffer&>(instanceBuffer).handle();
+void GLRenderDevice::setupInstanceAttributes(IBuffer &instanceBuffer) {
+  GLuint instanceVBO = static_cast<GLBuffer &>(instanceBuffer).handle();
 
   glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
 
@@ -82,12 +81,12 @@ void GLRenderDevice::setupInstanceAttributes(IBuffer& instanceBuffer) {
 
   for (int i = 0; i < 4; ++i) {
     glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-                          reinterpret_cast<void*>(sizeof(float) * 4 * i));
+                          reinterpret_cast<void *>(sizeof(float) * 4 * i));
     glEnableVertexAttribArray(3 + i);
     glVertexAttribDivisor(3 + i, 1);
   }
   glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-                        reinterpret_cast<void*>(sizeof(float) * 16));
+                        reinterpret_cast<void *>(sizeof(float) * 16));
   glEnableVertexAttribArray(7);
   glVertexAttribDivisor(7, 1);
 
@@ -101,7 +100,7 @@ void GLRenderDevice::unbindInstanceAttributes() {
 }
 
 void GLRenderDevice::drawIndexedInstanced(size_t indexCount,
-                                           uint32_t instanceCount) {
+                                          uint32_t instanceCount) {
   glDrawElementsInstanced(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr,
                           instanceCount);
 }

@@ -2,6 +2,7 @@
 
 #include "glad/glad.h"
 #include "input_state.hpp"
+#include "renderer/api/irender_device.hpp"
 #include <GLFW/glfw3.h>
 
 /**
@@ -14,7 +15,8 @@
 class Window {
 public:
   // Initialize GLFW, create window and OpenGL context, set up input callbacks
-  void init(int width, int height, const char *title);
+  void init(int width, int height, const char *title,
+            IRenderDevice *renderDevice);
   // Clean up GLFW resources and destroy window
   void shutdown();
 
@@ -31,9 +33,9 @@ public:
 
 private:
   GLFWwindow *m_handle = nullptr;
+  IRenderDevice *m_renderDevice = nullptr;
   int m_width = 0;
   int m_height = 0;
 
-  void initOpenGL();
   void setViewport(int w, int h);
 };

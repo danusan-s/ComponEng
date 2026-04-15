@@ -4,6 +4,7 @@
 #include "core/types.hpp"
 #include "ecs/entity.hpp"
 #include "ecs/world.hpp"
+#include "renderer/api/irender_device.hpp"
 #include "renderer/resource_manager.hpp"
 
 #include "components/material_component.hpp"
@@ -99,13 +100,13 @@ static void populateBatch(const TransformComponent &t, const MeshComponent &m,
 }
 
 void RenderSystem::onCreate(const SystemState &state) {
-  m_device = std::make_unique<GLRenderDevice>();
-  m_device->init(state.world->getWindowHandle());
-  m_batches = std::make_unique<BatchMap>(*m_device);
+  IRenderDevice *renderDevice = state.world->getRenderDevice();
+  m_batches = std::make_unique<BatchMap>(*renderDevice);
 }
 
 void RenderSystem::onUpdate(const SystemState &state) {
-  m_device->clear(0.0f, 0.0f, 0.0f, 1.0f);
+  IRenderDevice *renderDevice = state.world->getRenderDevice();
+  renderDevice->clear(0.0f, 0.0f, 0.0f, 1.0f);
 
   EntityID mainCameraID =
       state.world->getSingleton<MainCameraSingleton>().entity;
@@ -159,16 +160,16 @@ void RenderSystem::onUpdate(const SystemState &state) {
     texture.bind();
     model.getImpl().bind();
 
-    m_device->setupInstanceAttributes(*data.instanceBuffer);
+    renderDevice->setupInstanceAttributes(*data.instanceBuffer);
 
     data.instanceBuffer->setSubData(0, data.instanceDatas.data(),
                                     data.instanceDatas.size() *
                                         sizeof(InstanceData));
 
-    m_device->drawIndexedInstanced(model.indexCount(),
-                                   data.instanceDatas.size());
+    renderDevice->drawIndexedInstanced(model.indexCount(),
+                                       data.instanceDatas.size());
 
-    m_device->unbindInstanceAttributes();
+    renderDevice->unbindInstanceAttributes();
 
     ++drawCalls;
   }
@@ -186,5 +187,4 @@ void RenderSystem::onUpdate(const SystemState &state) {
 
 void RenderSystem::onDestroy(const SystemState &state) {
   m_batches.reset();
-  m_device.reset();
 }

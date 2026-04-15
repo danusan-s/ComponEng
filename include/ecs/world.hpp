@@ -9,6 +9,7 @@
 #include "ecs/query.hpp"
 #include "ecs/system_manager.hpp"
 #include "ecs/thread_pool.hpp"
+#include "renderer/api/irender_device.hpp"
 #include <memory>
 
 /**
@@ -196,9 +197,21 @@ public:
     return *m_threadPool;
   }
 
-  void setWindowHandle(void* handle) { m_windowHandle = handle; }
-  void* getWindowHandle() const { return m_windowHandle; }
+  void setWindowHandle(void *handle) {
+    m_windowHandle = handle;
+  }
+  void *getWindowHandle() const {
+    return m_windowHandle;
+  }
+
+  void setRenderDevice(IRenderDevice *device) {
+    m_renderDevice = device;
+  }
+  IRenderDevice *getRenderDevice() const {
+    return m_renderDevice;
+  }
 
 private:
-  void* m_windowHandle = nullptr;
+  void *m_windowHandle = nullptr;
+  IRenderDevice *m_renderDevice = nullptr;
 };

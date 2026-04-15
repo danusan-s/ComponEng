@@ -34,4 +34,7 @@ public:
   void unbindInstanceAttributes() override;
 
   void drawIndexedInstanced(size_t indexCount, uint32_t instanceCount) override;
+
+private:
+  void* m_windowHandle{nullptr};
 };

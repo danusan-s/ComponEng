@@ -3,14 +3,18 @@
 #include "core/logger.hpp"
 #include "core/utils.hpp"
 #include "ecs/entity.hpp"
+#include "renderer/opengl/gl_render_device.hpp"
 #include "renderer/resource_manager.hpp"
 
 #include "renderer/render_system.hpp"
 
 void Engine::init() {
-  m_window.init(1280, 720, "ECS Game");
+  GLRenderDevice *renderDevice = new GLRenderDevice;
+  m_render_device = renderDevice;
+  m_window.init(1280, 720, "ECS Game", renderDevice);
   m_world.init();
   m_world.setWindowHandle(m_window.getHandle());
+  m_world.setRenderDevice(m_render_device);
   DebugUI::init();
 
   ResourceManager::loadShader(
@@ -116,4 +120,5 @@ void Engine::shutdown() {
   DebugUI::shutdown();
   ResourceManager::clear();
   m_window.shutdown();
+  delete m_render_device;
 }

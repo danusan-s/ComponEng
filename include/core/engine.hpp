@@ -14,6 +14,7 @@
 #include "core/window.hpp"
 #include "ecs/world.hpp"
 #include "physics/physics_system.hpp"
+#include "renderer/api/irender_device.hpp"
 #include "renderer/render_system.hpp"
 #include "systems/camera_system.hpp"
 #include "systems/input_system.hpp"
@@ -43,6 +44,7 @@ public:
 
   World m_world;
   Window m_window;
+  IRenderDevice *m_render_device;
 
 private:
   Engine() = default;
