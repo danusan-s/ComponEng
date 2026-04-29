@@ -60,8 +60,8 @@ public:
     return archetype->get<T>(componentID, record.row);
   }
 
-  template <typename T> void addComponent(EntityID entity, T &&component) {
-    addComponents(entity, std::forward<T>(component));
+  template <typename T> void addComponent(EntityID entity, T component) {
+    addComponents(entity, std::move(component));
   }
 
   template <typename... Ts>
