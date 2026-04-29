@@ -27,7 +27,7 @@ private:
 
 public:
   EntityManager() : m_livingEntityCount(0) {
-    for (EntityID id = 0; id < MAX_ENTITIES; ++id) {
+    for (EntityID id = 1; id < MAX_ENTITIES; ++id) {
       m_freeIDs.push(id);
     }
   }

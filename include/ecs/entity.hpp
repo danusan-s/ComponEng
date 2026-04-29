@@ -4,7 +4,7 @@
 
 using EntityID = std::uint32_t;
 
-constexpr EntityID INVALID_ENTITY = 0xFFFFFFFFu;
+constexpr EntityID INVALID_ENTITY = 0;
 
 constexpr EntityID MAX_ENTITIES = 10000;
 
