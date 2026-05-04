@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "ecs/component_registry.hpp"
+#include "componeng/ecs/component_registry.hpp"
 
 struct TestCompA { int value; };
 struct TestCompB { float x, y; };

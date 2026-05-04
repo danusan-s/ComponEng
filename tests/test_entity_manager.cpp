@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "ecs/entity_manager.hpp"
+#include "componeng/ecs/entity_manager.hpp"
 
 TEST(EntityManagerTest, CreatesSequentialIDs) {
   EntityManager em;

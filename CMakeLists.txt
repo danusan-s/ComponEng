@@ -12,14 +12,14 @@ find_package(glfw3 3.3 REQUIRED)
 find_package(OpenGL REQUIRED)
 
 file(GLOB ENGINE_SOURCES
-    "src/*.cpp"
-    "src/*.c"
-    "src/core/*.cpp"
-    "src/renderer/*.cpp"
-    "src/renderer/opengl/*.cpp"
-    "src/systems/*.cpp"
-    "src/physics/*.cpp"
-    "src/ecs/*.cpp"
+    "src/componeng/*.cpp"
+    "src/componeng/*.c"
+    "src/componeng/core/*.cpp"
+    "src/componeng/renderer/*.cpp"
+    "src/componeng/renderer/opengl/*.cpp"
+    "src/componeng/systems/*.cpp"
+    "src/componeng/physics/*.cpp"
+    "src/componeng/ecs/*.cpp"
     "src/glad/*.c"
     "src/imgui/*.cpp"
 )
@@ -98,16 +98,21 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-# Test executable
-add_executable(EcsTests
+# Test executables - one per test file
+enable_testing()
+
+set(TEST_SOURCES
     tests/test_entity_manager.cpp
     tests/test_component_registry.cpp
     tests/test_archetype.cpp
     tests/test_query.cpp
     tests/test_collision.cpp
 )
-target_link_libraries(EcsTests PRIVATE GameEngine gtest_main)
-target_compile_definitions(EcsTests PRIVATE GLM_ENABLE_EXPERIMENTAL)
 
-enable_testing()
-add_test(NAME EcsTests COMMAND EcsTests)
+foreach(TEST_SRC ${TEST_SOURCES})
+    get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
+    add_executable(${TEST_NAME} ${TEST_SRC})
+    target_link_libraries(${TEST_NAME} PRIVATE GameEngine gtest_main)
+    target_compile_definitions(${TEST_NAME} PRIVATE GLM_ENABLE_EXPERIMENTAL)
+    add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+endforeach()

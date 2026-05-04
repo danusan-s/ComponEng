@@ -1,6 +1,6 @@
-#include "core/engine.hpp"
-#include "core/game.hpp"
-#include "renderer/resource_manager.hpp"
+#include "componeng/core/engine.hpp"
+#include "componeng/core/game.hpp"
+#include "componeng/renderer/resource_manager.hpp"
 #include <random>
 
 class Game : public IGame {

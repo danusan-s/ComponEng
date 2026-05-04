@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "ecs/archetype.hpp"
+#include "componeng/ecs/archetype.hpp"
 
 struct Pos { float x, y, z; };
 struct Vel { float vx, vy, vz; };

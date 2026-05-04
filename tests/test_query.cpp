@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include "ecs/archetype.hpp"
-#include "ecs/query.hpp"
+#include "componeng/ecs/archetype.hpp"
+#include "componeng/ecs/query.hpp"
 
 struct Pos { float x, y, z; };
 struct Vel { float vx, vy, vz; };

@@ -1,6 +1,6 @@
-// #include "components/collider_component.hpp"
-// #include "components/transform_component.hpp"
-// #include "physics/collision_detection.hpp"
+// #include "componeng/components/collider_component.hpp"
+// #include "componeng/components/transform_component.hpp"
+// #include "componeng/physics/collision_detection.hpp"
 // #include <gtest/gtest.h>
 //
 // static ColliderComponent makeAABB(Vec3 localCenter, Vec3 halfExtents) {
