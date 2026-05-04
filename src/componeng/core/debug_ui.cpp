@@ -5,6 +5,8 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
 
+namespace componeng::core {
+
 void DebugUI::init() {
   LOG_INFO("Initializing UI System...");
 
@@ -50,3 +52,5 @@ void DebugUI::addValue(const std::string& label, float v) {
 void DebugUI::addVec3(const std::string& label, Vec3 v) {
   ImGui::Text("%s: (%.2f, %.2f, %.2f)", label.c_str(), v.x, v.y, v.z);
 }
+
+} // namespace componeng::core

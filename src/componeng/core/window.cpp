@@ -4,6 +4,8 @@
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
+namespace componeng::core {
+
 static bool g_mouseLocked = true;
 
 static void framebufferSizeCallback(GLFWwindow *window, int width, int height) {
@@ -174,3 +176,5 @@ void Window::swapBuffers() {
 void Window::pollEvents() {
   glfwPollEvents();
 }
+
+} // namespace componeng::core

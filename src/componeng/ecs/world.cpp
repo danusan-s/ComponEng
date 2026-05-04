@@ -1,5 +1,7 @@
 #include "componeng/ecs/world.hpp"
 
+namespace componeng::ecs {
+
 void World::init() {
   m_componentRegistry = std::make_unique<ComponentRegistry>();
   m_entityManager = std::make_unique<EntityManager>();
@@ -33,3 +35,5 @@ void World::updateSystems(float deltaTime) {
 void World::destroySystems() {
   m_systemManager->destroyAll(this);
 }
+
+} // namespace componeng::ecs

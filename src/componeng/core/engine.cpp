@@ -8,6 +8,8 @@
 
 #include "componeng/renderer/render_system.hpp"
 
+namespace componeng::core {
+
 void Engine::init() {
   GLRenderDevice *renderDevice = new GLRenderDevice;
   m_render_device = renderDevice;
@@ -122,3 +124,5 @@ void Engine::shutdown() {
   m_window.shutdown();
   delete m_render_device;
 }
+
+} // namespace componeng::core

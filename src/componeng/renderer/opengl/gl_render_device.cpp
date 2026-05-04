@@ -3,6 +3,8 @@
 #include <GLFW/glfw3.h>
 #include <cstdint>
 
+namespace componeng::renderer::opengl {
+
 GLRenderDevice::GLRenderDevice() {
 }
 
@@ -100,7 +102,9 @@ void GLRenderDevice::unbindInstanceAttributes() {
 }
 
 void GLRenderDevice::drawIndexedInstanced(size_t indexCount,
-                                          uint32_t instanceCount) {
+                                            uint32_t instanceCount) {
   glDrawElementsInstanced(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr,
                           instanceCount);
 }
+
+} // namespace componeng::renderer::opengl

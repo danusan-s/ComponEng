@@ -2,6 +2,8 @@
 #include "componeng/renderer/opengl/gl_render_device.hpp"
 #include "componeng/renderer/shader.hpp"
 
+namespace componeng::renderer {
+
 Shader::Shader() {
   GLRenderDevice tempDevice;
   m_impl = tempDevice.createShader();
@@ -12,7 +14,7 @@ void Shader::use() const {
 }
 
 void Shader::compile(const char* vertexSource, const char* fragmentSource,
-                     const char* geometrySource) {
+                       const char* geometrySource) {
   m_impl->loadGLSL(vertexSource, fragmentSource, geometrySource);
 }
 
@@ -41,7 +43,7 @@ void Shader::setVector3f(const char* name, const Vec3& value) const {
 }
 
 void Shader::setVector4f(const char* name, float x, float y, float z,
-                         float w) const {
+                           float w) const {
   m_impl->setVector4f(name, x, y, z, w);
 }
 
@@ -52,3 +54,5 @@ void Shader::setVector4f(const char* name, const Vec4& value) const {
 void Shader::setMatrix4(const char* name, const Mat4& matrix) const {
   m_impl->setMatrix4(name, &matrix[0][0]);
 }
+
+} // namespace componeng::renderer

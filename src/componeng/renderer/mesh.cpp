@@ -4,6 +4,8 @@
 #include <array>
 #include <sstream>
 
+namespace componeng::renderer {
+
 Mesh::Mesh() {
 }
 
@@ -117,3 +119,5 @@ void Mesh::generateFromWavefrontObj(const std::string& data) {
 size_t Mesh::indexCount() const {
   return m_impl->indexCount();
 }
+
+} // namespace componeng::renderer

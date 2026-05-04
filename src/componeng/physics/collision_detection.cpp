@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+namespace componeng::physics {
+
 TransformComponent
 getWorldTransform(const TransformComponent &localTransform,
                   const TransformComponent &parentTransform) {
@@ -138,7 +140,7 @@ bool testCollision(const ColliderComponent &colliderA,
 
   if (colliderA.type == ColliderType::Box &&
       colliderB.type == ColliderType::Sphere) {
-    return testAABBSphere(worldTransformA, worldTransformB, info);
+    return testBoxSphere(worldTransformA, worldTransformB, info);
   }
   if (colliderA.type == ColliderType::Sphere &&
       colliderB.type == ColliderType::Box) {
@@ -147,3 +149,5 @@ bool testCollision(const ColliderComponent &colliderA,
 
   return false;
 }
+
+} // namespace componeng::physics

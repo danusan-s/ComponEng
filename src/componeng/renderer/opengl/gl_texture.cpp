@@ -1,5 +1,7 @@
 #include "componeng/renderer/opengl/gl_texture.hpp"
 
+namespace componeng::renderer::opengl {
+
 GLTexture::GLTexture() : m_id(0) {
 }
 
@@ -8,7 +10,7 @@ GLTexture::~GLTexture() {
 }
 
 void GLTexture::generate(uint32_t width, uint32_t height,
-                         const unsigned char* data, bool alpha) {
+                             const unsigned char* data, bool alpha) {
   m_width = width;
   m_height = height;
 
@@ -41,3 +43,5 @@ void GLTexture::release() {
     m_id = 0;
   }
 }
+
+} // namespace componeng::renderer::opengl

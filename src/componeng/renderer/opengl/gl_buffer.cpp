@@ -1,6 +1,8 @@
 #include "componeng/core/logger.hpp"
 #include "componeng/renderer/opengl/gl_buffer.hpp"
 
+namespace componeng::renderer::opengl {
+
 GLBuffer::GLBuffer() {
   glGenBuffers(1, &m_id);
 }
@@ -27,3 +29,5 @@ void GLBuffer::release() {
     m_id = 0;
   }
 }
+
+} // namespace componeng::renderer::opengl

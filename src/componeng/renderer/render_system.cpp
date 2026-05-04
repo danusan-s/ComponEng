@@ -13,6 +13,8 @@
 #include "componeng/renderer/opengl/gl_render_device.hpp"
 #include "componeng/renderer/render_system.hpp"
 
+namespace componeng::renderer {
+
 static constexpr Vec3 DEFAULT_LIGHT_POS = Vec3(1000.0f, 1000.0f, 1000.0f);
 static constexpr Vec3 DEFAULT_LIGHT_COLOR = Vec3(1.0f, 1.0f, 1.0f);
 
@@ -94,7 +96,7 @@ static Frustum generateFrustum(const Mat4 &m) {
 }
 
 static void populateBatch(const TransformComponent &t, const MeshComponent &m,
-                          const MaterialComponent &mat, BatchMap &batches) {
+                        const MaterialComponent &mat, BatchMap &batches) {
   DrawKey key{m.meshID, mat.textureID, mat.shaderID};
   batches.add(key, {getModelMatrix(t), mat.color});
 }
@@ -125,7 +127,7 @@ void RenderSystem::onUpdate(const SystemState &state) {
               ColliderComponent>()
       .eachParallel(state.world->threadPool(),
                     [&](TransformComponent &t, MeshComponent &m,
-                        MaterialComponent &mat, ColliderComponent &col) {
+                          MaterialComponent &mat, ColliderComponent &col) {
                       Vec3 center = col.transform.position + t.position;
                       Vec3 worldMin = center - col.transform.scale * t.scale;
                       Vec3 worldMax = center + col.transform.scale * t.scale;
@@ -188,3 +190,5 @@ void RenderSystem::onUpdate(const SystemState &state) {
 void RenderSystem::onDestroy(const SystemState &state) {
   m_batches.reset();
 }
+
+} // namespace componeng::renderer

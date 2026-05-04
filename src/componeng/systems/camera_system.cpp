@@ -8,6 +8,8 @@
 #include <GLFW/glfw3.h>
 #include <cmath>
 
+namespace componeng::systems {
+
 static constexpr float DEFAULT_MOVE_SPEED = 100.0f;
 static constexpr float MOUSE_SENSITIVITY = 1.0f;
 static constexpr float PITCH_LIMIT = 89.0f;
@@ -29,8 +31,8 @@ static void updateCameraVectors(const TransformComponent &transform,
 }
 
 static void processKeyboardInput(TransformComponent &transform,
-                                 const InputComponent &input, float deltaTime,
-                                 float speed) {
+                                   const InputComponent &input, float deltaTime,
+                                   float speed) {
   float velocity = speed * deltaTime;
   Vec3 front, right, up;
   updateCameraVectors(transform, front, right, up);
@@ -50,8 +52,8 @@ static void processKeyboardInput(TransformComponent &transform,
 }
 
 static void processMouseInput(TransformComponent &transform,
-                              const MouseInputComponent &mouseInput,
-                              float sensitivity) {
+                                const MouseInputComponent &mouseInput,
+                                float sensitivity) {
   transform.rotation.y += mouseInput.deltaX * sensitivity;
   transform.rotation.x -= mouseInput.deltaY * sensitivity;
 
@@ -84,9 +86,11 @@ void CameraSystem::onUpdate(const SystemState &state) {
   Mat4 viewMatrix = lookAt(transform.position, transform.position + front, up);
 
   Mat4 projectionMatrix = perspective(radians(camera.fov), camera.aspectRatio,
-                                      camera.nearPlane, camera.farPlane);
+                                        camera.nearPlane, camera.farPlane);
 
   camera.viewProjectionMatrix = projectionMatrix * viewMatrix;
 
   DebugUI::addVec3("Camera Position", transform.position);
 }
+
+} // namespace componeng::systems

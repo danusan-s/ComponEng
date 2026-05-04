@@ -3,6 +3,8 @@
 #include "componeng/core/engine.hpp"
 #include "componeng/ecs/world.hpp"
 
+namespace componeng::systems {
+
 constexpr auto FORWARD_KEY = GLFW_KEY_W;
 constexpr auto BACKWARD_KEY = GLFW_KEY_S;
 constexpr auto LEFT_KEY = GLFW_KEY_A;
@@ -32,3 +34,5 @@ void InputSystem::onUpdate(const SystemState& state) {
   inputState.lastMouseX = inputState.mouseX;
   inputState.lastMouseY = inputState.mouseY;
 }
+
+} // namespace componeng::systems

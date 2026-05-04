@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 
+namespace componeng::renderer::opengl {
+
 GLShader::GLShader() : m_id(0) {
 }
 
@@ -11,7 +13,7 @@ GLShader::~GLShader() {
 }
 
 void GLShader::loadGLSL(const char* vertexSource, const char* fragmentSource,
-                        const char* geometrySource) {
+                          const char* geometrySource) {
   if (m_id != 0) {
     glDeleteProgram(m_id);
     m_id = 0;
@@ -30,9 +32,9 @@ void GLShader::loadGLSL(const char* vertexSource, const char* fragmentSource,
   GLuint gShader = 0;
   if (geometrySource != nullptr) {
     gShader = glCreateShader(GL_GEOMETRY_SHADER);
-    glShaderSource(gShader, 1, &geometrySource, nullptr);
-    glCompileShader(gShader);
-    checkCompileErrors(gShader, "GEOMETRY");
+      glShaderSource(gShader, 1, &geometrySource, nullptr);
+      glCompileShader(gShader);
+      checkCompileErrors(gShader, "GEOMETRY");
   }
 
   m_id = glCreateProgram();
@@ -50,7 +52,7 @@ void GLShader::loadGLSL(const char* vertexSource, const char* fragmentSource,
 }
 
 void GLShader::loadSPIRV(const char* vertexPath, const char* fragmentPath,
-                         const char* geometryPath) {
+                           const char* geometryPath) {
   // OpenGL doesn't natively support SPIR-V without GL_ARB_gl_spirv extension.
   // Fall back to loading GLSL source by changing .spv extension to .vert/.frag
   auto stripExt = [](const char* path) -> std::string {
@@ -124,7 +126,7 @@ void GLShader::setVector3f(const char* name, float x, float y, float z) const {
 }
 
 void GLShader::setVector4f(const char* name, float x, float y, float z,
-                           float w) const {
+                             float w) const {
   glUniform4f(glGetUniformLocation(m_id, name), x, y, z, w);
 }
 
@@ -137,17 +139,19 @@ void GLShader::checkCompileErrors(GLuint object, const std::string& type) {
   char infoLog[1024];
   if (type != "PROGRAM") {
     glGetShaderiv(object, GL_COMPILE_STATUS, &success);
-    if (!success) {
-      glGetShaderInfoLog(object, 1024, nullptr, infoLog);
-      LOG_ERROR("ERROR::SHADER: Compile-time error: Type: %s\n%s", type.c_str(),
-                infoLog);
-    }
+      if (!success) {
+        glGetShaderInfoLog(object, 1024, nullptr, infoLog);
+        LOG_ERROR("ERROR::SHADER: Compile-time error: Type: %s\n%s", type.c_str(),
+                  infoLog);
+      }
   } else {
     glGetProgramiv(object, GL_LINK_STATUS, &success);
-    if (!success) {
-      glGetProgramInfoLog(object, 1024, nullptr, infoLog);
-      LOG_ERROR("ERROR::Shader: Link-time error: Type: %s\n%s", type.c_str(),
-                infoLog);
-    }
+      if (!success) {
+        glGetProgramInfoLog(object, 1024, nullptr, infoLog);
+        LOG_ERROR("ERROR::Shader: Link-time error: Type: %s\n%s", type.c_str(),
+                  infoLog);
+      }
   }
 }
+
+} // namespace componeng::renderer::opengl

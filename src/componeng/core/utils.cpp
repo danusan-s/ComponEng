@@ -10,6 +10,8 @@
 #include <unistd.h>
 #endif
 
+namespace componeng::core {
+
 std::string Utils::getExecutablePath() {
 #if defined(_WIN32)
   char buffer[MAX_PATH];
@@ -52,3 +54,5 @@ std::string Utils::getAssetPath(const std::string &relativePath) {
 
   return std::filesystem::weakly_canonical(assetPath).string();
 }
+
+} // namespace componeng::core

@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <vector>
 
+namespace componeng::physics {
+
 constexpr Vec3 g_gravity = Vec3(0.0f, -9.81f, 0.0f);
 
 struct EntityPhysicsData {
@@ -57,6 +59,7 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
   Vec3 velocityA = a.rigidbody ? a.rigidbody->velocity : Vec3(0.0f);
   Vec3 velocityB = b.rigidbody ? b.rigidbody->velocity : Vec3(0.0f);
   Vec3 relativeVelocity = velocityB - velocityA;
+
   float velocityAlongNormal = dot(relativeVelocity, info.normal);
 
   if (velocityAlongNormal > 0.0f)
@@ -188,3 +191,5 @@ void PhysicsSystem::onUpdate(const SystemState &state) {
   g_collisionCount = 0;
   g_runCount = 0;
 }
+
+} // namespace componeng::physics

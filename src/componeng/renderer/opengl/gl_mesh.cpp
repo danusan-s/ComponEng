@@ -1,6 +1,8 @@
 #include "componeng/core/logger.hpp"
 #include "componeng/renderer/opengl/gl_mesh.hpp"
 
+namespace componeng::renderer::opengl {
+
 GLMesh::GLMesh() : m_vao(0), m_vbo(0), m_ebo(0), m_indexCount(0) {
 }
 
@@ -9,8 +11,8 @@ GLMesh::~GLMesh() {
 }
 
 void GLMesh::upload(const float* vertices, size_t vertexCount,
-                    const uint32_t* indices, size_t indexCount,
-                    const VertexLayout& layout) {
+                      const uint32_t* indices, size_t indexCount,
+                      const VertexLayout& layout) {
   if (m_vao != 0) {
     glDeleteVertexArrays(1, &m_vao);
     m_vao = 0;
@@ -74,3 +76,5 @@ void GLMesh::release() {
 size_t GLMesh::indexCount() const {
   return m_indexCount;
 }
+
+} // namespace componeng::renderer::opengl
