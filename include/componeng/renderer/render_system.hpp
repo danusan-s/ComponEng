@@ -12,11 +12,11 @@ namespace componeng::renderer {
  * Performs frustum culling, builds draw batches, and issues draw calls
  * using instanced rendering through the render device abstraction.
  */
-class RenderSystem : public ISystem {
+class RenderSystem : public ecs::ISystem {
 public:
-  void onCreate(const SystemState &state) override;
-  void onUpdate(const SystemState &state) override;
-  void onDestroy(const SystemState &state) override;
+  void onCreate(const ecs::SystemState &state) override;
+  void onUpdate(const ecs::SystemState &state) override;
+  void onDestroy(const ecs::SystemState &state) override;
 
 private:
   std::unique_ptr<BatchMap> m_batches;

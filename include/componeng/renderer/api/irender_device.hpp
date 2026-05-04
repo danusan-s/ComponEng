@@ -30,15 +30,14 @@ struct VertexLayout {
  *        Stride = 32 bytes.
  */
 inline VertexLayout defaultMeshLayout() {
-  return VertexLayout{
-      .attributes =
-          {
-              {"position", 0, 3, false},
-              {"normal", 12, 3, false},
-              {"uv", 24, 2, false},
-          },
-      .stride = 32,
+  VertexLayout layout;
+  layout.attributes = {
+      {"position", 0, 3, false},
+      {"normal", 12, 3, false},
+      {"uv", 24, 2, false},
   };
+  layout.stride = 32;
+  return layout;
 }
 
 /**

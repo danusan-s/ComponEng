@@ -14,8 +14,8 @@ namespace componeng::core {
 class IGame {
 public:
   virtual ~IGame() = default;
-  virtual void init(World &world) = 0;
-  virtual void shutdown(World &world) = 0;
+  virtual void init(ecs::World &world) = 0;
+  virtual void shutdown(ecs::World &world) = 0;
 };
 
 } // namespace componeng::core

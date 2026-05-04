@@ -87,12 +87,13 @@ public:
     std::size_t newRow = newArchetype.getRowForEntity(entity);
 
     if (oldArchetype == nullptr) {
-      LOG_INFO("Adding first component to entity %llu",
-               (unsigned long long)entity);
+      core::LOG_INFO("Adding first component to entity %llu",
+                     (unsigned long long)entity);
     } else {
-      LOG_INFO("Moving entity %llu to new archetype %s from old archetype %s",
-               (unsigned long long)entity, newSig.to_string().c_str(),
-               oldSig.to_string().c_str());
+      core::LOG_INFO(
+          "Moving entity %llu to new archetype %s from old archetype %s",
+          (unsigned long long)entity, newSig.to_string().c_str(),
+          oldSig.to_string().c_str());
     }
 
     if (oldArchetype) {

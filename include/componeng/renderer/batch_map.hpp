@@ -32,22 +32,22 @@ struct DrawKeyHash {
 };
 
 struct InstanceData {
-  Mat4 modelMatrix;
-  Vec3 color;
+  core::Mat4 modelMatrix;
+  core::Vec3 color;
 };
 
 struct BatchData {
-  std::unique_ptr<IBuffer> instanceBuffer;
+  std::unique_ptr<api::IBuffer> instanceBuffer;
   std::vector<InstanceData> instanceDatas;
 };
 
 class BatchMap {
 
   std::unordered_map<DrawKey, BatchData, DrawKeyHash> map_;
-  IRenderDevice &device;
+  api::IRenderDevice &device;
 
 public:
-  BatchMap(IRenderDevice &device) : device(device) {
+  BatchMap(api::IRenderDevice &device) : device(device) {
   }
   void add(const DrawKey &key, InstanceData value) {
     auto it = map_.find(key);
@@ -57,7 +57,7 @@ public:
       BatchData &batch = it->second;
       batch.instanceBuffer = device.createBuffer();
       batch.instanceBuffer->setData(nullptr,
-                                    MAX_ENTITIES * sizeof(InstanceData));
+                                    ecs::MAX_ENTITIES * sizeof(InstanceData));
       device.setupInstanceAttributes(*batch.instanceBuffer);
     };
 

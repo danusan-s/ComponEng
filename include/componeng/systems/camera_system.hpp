@@ -10,9 +10,9 @@ namespace componeng::systems {
  * TransformComponent and computes the view/projection matrix in
  * CameraComponent.
  */
-class CameraSystem : public ISystem {
+class CameraSystem : public ecs::ISystem {
 public:
-  void onUpdate(const SystemState &state) override;
+  void onUpdate(const ecs::SystemState &state) override;
 };
 
 } // namespace componeng::systems

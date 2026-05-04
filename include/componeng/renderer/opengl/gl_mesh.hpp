@@ -1,23 +1,25 @@
 #pragma once
 
-#include "glad/glad.h"
 #include "componeng/renderer/api/irender_device.hpp"
+#include "glad/glad.h"
 
 namespace componeng::renderer::opengl {
 
-class GLMesh : public IMesh {
+class GLMesh : public api::IMesh {
 public:
   GLMesh();
   ~GLMesh() override;
 
-  void upload(const float* vertices, size_t vertexCount,
-              const uint32_t* indices, size_t indexCount,
-              const VertexLayout& layout) override;
+  void upload(const float *vertices, size_t vertexCount,
+              const uint32_t *indices, size_t indexCount,
+              const api::VertexLayout &layout) override;
   void bind() const override;
   void release() override;
   size_t indexCount() const override;
 
-  GLuint vao() const { return m_vao; }
+  GLuint vao() const {
+    return m_vao;
+  }
 
 private:
   GLuint m_vao = 0;

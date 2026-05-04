@@ -11,9 +11,9 @@ namespace componeng::physics {
  * ThreadPool to parallelize gravity integration and broad-phase collision
  * detection.
  */
-class PhysicsSystem : public ISystem {
+class PhysicsSystem : public ecs::ISystem {
 public:
-  void onUpdate(const SystemState &state) override;
+  void onUpdate(const ecs::SystemState &state) override;
 };
 
 } // namespace componeng::physics

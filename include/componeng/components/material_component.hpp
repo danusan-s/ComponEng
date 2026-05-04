@@ -5,9 +5,9 @@
 namespace componeng::components {
 
 struct MaterialComponent {
-  Vec3 color;          // 12 bytes
-  TextureID textureID; // 4 bytes
-  ShaderID shaderID;   // 4 bytes
+  core::Vec3 color;              // 12 bytes
+  renderer::TextureID textureID; // 4 bytes
+  renderer::ShaderID shaderID;   // 4 bytes
 };
 
 } // namespace componeng::components

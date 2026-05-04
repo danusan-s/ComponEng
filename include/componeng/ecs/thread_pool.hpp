@@ -14,8 +14,9 @@ namespace componeng::ecs {
  * @brief Fixed-size thread pool with a task queue for parallel work submission.
  *
  * Spawns a configurable number of worker threads on construction.
- * Tasks are submitted via submit() and return a std::future for synchronization.
- * The destructor cleanly shuts down all workers after processing remaining tasks.
+ * Tasks are submitted via submit() and return a std::future for
+ * synchronization. The destructor cleanly shuts down all workers after
+ * processing remaining tasks.
  *
  * Typical usage: create one pool at engine init, reuse it across frames.
  */
@@ -44,8 +45,8 @@ public:
   }
 
   template <typename F> std::future<void> submit(F &&task) {
-    auto wrapped = std::make_shared<std::packaged_task<void()>>(
-        std::forward<F>(task));
+    auto wrapped =
+        std::make_shared<std::packaged_task<void()>>(std::forward<F>(task));
     std::future<void> future = wrapped->get_future();
     {
       std::unique_lock<std::mutex> lock(m_mutex);
@@ -55,7 +56,9 @@ public:
     return future;
   }
 
-  size_t threadCount() const { return m_workers.size(); }
+  size_t threadCount() const {
+    return m_workers.size();
+  }
 
 private:
   void workerLoop() {

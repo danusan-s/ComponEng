@@ -44,9 +44,9 @@ public:
   // Teardown world and window
   void shutdown();
 
-  World m_world;
+  ecs::World m_world;
   Window m_window;
-  IRenderDevice *m_render_device;
+  renderer::api::IRenderDevice *m_render_device;
 
 private:
   Engine() = default;

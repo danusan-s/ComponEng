@@ -21,8 +21,12 @@ public:
   void uploadToGPU();
 
   // Access to the underlying IMesh for render device operations
-  IMesh& getImpl() { return *m_impl; }
-  const IMesh& getImpl() const { return *m_impl; }
+  api::IMesh &getImpl() {
+    return *m_impl;
+  }
+  const api::IMesh &getImpl() const {
+    return *m_impl;
+  }
 
   size_t indexCount() const;
 
@@ -31,7 +35,7 @@ public:
   std::vector<unsigned int> m_indices;
 
 private:
-  std::unique_ptr<IMesh> m_impl;
+  std::unique_ptr<api::IMesh> m_impl;
 };
 
 } // namespace componeng::renderer

@@ -14,9 +14,9 @@ namespace componeng::systems {
  * the current input state without depending on GLFW directly.
  * This decoupling allows for input remapping easily.
  */
-class InputSystem : public ISystem {
+class InputSystem : public ecs::ISystem {
 public:
-  void onUpdate(const SystemState &state) override;
+  void onUpdate(const ecs::SystemState &state) override;
 };
 
 } // namespace componeng::systems
