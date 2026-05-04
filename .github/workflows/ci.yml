@@ -23,6 +23,7 @@ jobs:
             libglfw3-dev \
             libgl1-mesa-dev \
             libglew-dev \
+            libglm-dev \
             xvfb
 
       - name: Configure CMake
