@@ -3,6 +3,8 @@
 #include "glad/glad.h"
 #include "componeng/renderer/api/irender_device.hpp"
 
+namespace componeng::renderer::opengl {
+
 class GLShader : public IShader {
 public:
   GLShader();
@@ -19,8 +21,8 @@ public:
   void setInteger(const char* name, int value) const override;
   void setVector2f(const char* name, float x, float y) const override;
   void setVector3f(const char* name, float x, float y, float z) const override;
-  void setVector4f(const char* name, float x, float y, float z,
-                   float w) const override;
+  void setVector4f(const char* name, float x, float y,
+                   float z, float w) const override;
   void setMatrix4(const char* name, const float* matrix) const override;
 
   GLuint handle() const { return m_id; }
@@ -30,3 +32,5 @@ private:
 
   GLuint m_id = 0;
 };
+
+} // namespace componeng::renderer::opengl

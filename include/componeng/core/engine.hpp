@@ -19,6 +19,8 @@
 #include "componeng/systems/camera_system.hpp"
 #include "componeng/systems/input_system.hpp"
 
+namespace componeng::core {
+
 /**
  * @brief Singleton entry point for the game engine.
  *
@@ -55,3 +57,5 @@ private:
   // Create some default entities (camera) to populate the world with
   void initObjects();
 };
+
+} // namespace componeng::core

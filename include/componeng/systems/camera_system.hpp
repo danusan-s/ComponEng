@@ -1,6 +1,8 @@
 #pragma once
 #include "componeng/ecs/system.hpp"
 
+namespace componeng::systems {
+
 /**
  * @brief Simulation-phase system that processes camera movement and mouse look.
  *
@@ -12,3 +14,5 @@ class CameraSystem : public ISystem {
 public:
   void onUpdate(const SystemState &state) override;
 };
+
+} // namespace componeng::systems

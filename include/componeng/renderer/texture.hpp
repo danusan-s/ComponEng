@@ -3,6 +3,8 @@
 #include "componeng/renderer/api/irender_device.hpp"
 #include <memory>
 
+namespace componeng::renderer {
+
 /**
  * @brief 2D texture wrapper with generation, configuration, and binding.
  *
@@ -18,3 +20,5 @@ public:
 private:
   std::unique_ptr<ITexture> m_impl;
 };
+
+} // namespace componeng::renderer

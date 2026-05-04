@@ -1,6 +1,8 @@
 #pragma once
 #include "componeng/core/types.hpp"
 
+namespace componeng::components {
+
 struct RigidBodyComponent {
   enum Type {
     Static,   // Immovable object, not affected by forces
@@ -13,3 +15,5 @@ struct RigidBodyComponent {
   float mass;
   float restitution;
 };
+
+} // namespace componeng::components

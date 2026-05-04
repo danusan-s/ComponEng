@@ -4,6 +4,8 @@
 #include "componeng/ecs/entity.hpp"
 #include <stdexcept>
 
+namespace componeng::ecs {
+
 /**
  * @brief Creates, stores, and looks up archetypes by their component Signature.
  *
@@ -58,3 +60,5 @@ public:
     return m_archetypes;
   }
 };
+
+} // namespace componeng::ecs

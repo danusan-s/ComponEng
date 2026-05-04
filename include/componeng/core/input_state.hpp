@@ -1,5 +1,7 @@
 #pragma once
 
+namespace componeng::core {
+
 /**
  * @brief Snapshot of current input state (keyboard and mouse).
  *
@@ -15,3 +17,5 @@ struct InputState {
   bool firstMouse = true;
   bool mouseButtons[8] = {false};
 };
+
+} // namespace componeng::core

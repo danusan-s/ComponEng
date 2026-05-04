@@ -4,6 +4,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+namespace componeng::core {
+
 // Type aliases for cleaner code
 using Vec2 = glm::vec2;
 using Vec3 = glm::vec3;
@@ -24,3 +26,5 @@ using glm::rotate;
 using glm::scale;
 using glm::translate;
 using glm::value_ptr;
+
+} // namespace componeng::core

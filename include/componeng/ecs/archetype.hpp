@@ -6,6 +6,8 @@
 #include <cstring>
 #include <vector>
 
+namespace componeng::ecs {
+
 /**
  * @brief A growable, aligned block of raw bytes.
  *
@@ -276,3 +278,5 @@ public:
     return m_columns.empty() ? 0 : m_columns[0].m_count;
   }
 };
+
+} // namespace componeng::ecs

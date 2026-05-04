@@ -6,6 +6,8 @@
 #include <memory>
 #include <vector>
 
+namespace componeng::ecs {
+
 enum SystemGroup { Initialization, Simulation, Presentation };
 
 constexpr SystemGroup GROUP_ORDER[] = {Initialization, Simulation,
@@ -88,3 +90,5 @@ public:
     }
   }
 };
+
+} // namespace componeng::ecs

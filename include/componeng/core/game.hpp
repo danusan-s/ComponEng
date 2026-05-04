@@ -2,6 +2,8 @@
 
 #include "componeng/ecs/world.hpp"
 
+namespace componeng::core {
+
 /**
  * @brief User-defined game logic interface.
  *
@@ -15,3 +17,5 @@ public:
   virtual void init(World &world) = 0;
   virtual void shutdown(World &world) = 0;
 };
+
+} // namespace componeng::core

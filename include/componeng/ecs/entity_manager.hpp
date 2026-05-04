@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <queue>
 
+namespace componeng::ecs {
+
 /**
  * @brief Metadata stored per entity: its archetype row and component signature.
  */
@@ -59,3 +61,5 @@ public:
     return m_entityRecords[id];
   }
 };
+
+} // namespace componeng::ecs

@@ -3,6 +3,8 @@
 #include "glad/glad.h"
 #include "componeng/renderer/api/irender_device.hpp"
 
+namespace componeng::renderer::opengl {
+
 class GLMesh : public IMesh {
 public:
   GLMesh();
@@ -23,3 +25,5 @@ private:
   GLuint m_ebo = 0;
   size_t m_indexCount = 0;
 };
+
+} // namespace componeng::renderer::opengl

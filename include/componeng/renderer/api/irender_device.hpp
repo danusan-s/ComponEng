@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+namespace componeng::renderer::api {
+
 /**
  * @brief Describes the layout of a single vertex attribute.
  */
@@ -29,11 +31,12 @@ struct VertexLayout {
  */
 inline VertexLayout defaultMeshLayout() {
   return VertexLayout{
-      .attributes = {
-          {"position", 0, 3, false},
-          {"normal", 12, 3, false},
-          {"uv", 24, 2, false},
-      },
+      .attributes =
+          {
+              {"position", 0, 3, false},
+              {"normal", 12, 3, false},
+              {"uv", 24, 2, false},
+          },
       .stride = 32,
   };
 }
@@ -50,10 +53,12 @@ public:
   virtual ~IBuffer() = default;
 
   /** Upload data to the buffer. */
-  virtual void setData(const void* data, size_t sizeBytes, Usage usage = Usage::Dynamic) = 0;
+  virtual void setData(const void *data, size_t sizeBytes,
+                       Usage usage = Usage::Dynamic) = 0;
 
   /** Upload a sub-region of the buffer (for dynamic updates). */
-  virtual void setSubData(size_t offset, const void* data, size_t sizeBytes) = 0;
+  virtual void setSubData(size_t offset, const void *data,
+                          size_t sizeBytes) = 0;
 
   /** Release GPU resources. */
   virtual void release() = 0;
@@ -63,19 +68,19 @@ public:
  * @brief API-agnostic shader interface.
  *
  * Wraps a compiled shader program with typed uniform setters.
- * Backends may load GLSL source (OpenGL) or SPIR-V binaries (Vulkan).
+ * Backends may load GLSL source (OpenGL) or SPIRV binaries (Vulkan).
  */
 class IShader {
 public:
   virtual ~IShader() = default;
 
   /** Load shader from GLSL source strings (OpenGL path). */
-  virtual void loadGLSL(const char* vertexSource, const char* fragmentSource,
-                        const char* geometrySource = nullptr) = 0;
+  virtual void loadGLSL(const char *vertexSource, const char *fragmentSource,
+                        const char *geometrySource = nullptr) = 0;
 
-  /** Load shader from SPIR-V binary files (Vulkan path). */
-  virtual void loadSPIRV(const char* vertexPath, const char* fragmentPath,
-                         const char* geometryPath = nullptr) = 0;
+  /** Load shader from SPIRV binary files (Vulkan path). */
+  virtual void loadSPIRV(const char *vertexPath, const char *fragmentPath,
+                         const char *geometryPath = nullptr) = 0;
 
   /** Activate this shader for subsequent uniform/draw calls. */
   virtual void use() const = 0;
@@ -84,13 +89,14 @@ public:
   virtual void release() = 0;
 
   // Uniform setters
-  virtual void setFloat(const char* name, float value) const = 0;
-  virtual void setInteger(const char* name, int value) const = 0;
-  virtual void setVector2f(const char* name, float x, float y) const = 0;
-  virtual void setVector3f(const char* name, float x, float y, float z) const = 0;
-  virtual void setVector4f(const char* name, float x, float y, float z,
+  virtual void setFloat(const char *name, float value) const = 0;
+  virtual void setInteger(const char *name, int value) const = 0;
+  virtual void setVector2f(const char *name, float x, float y) const = 0;
+  virtual void setVector3f(const char *name, float x, float y,
+                           float z) const = 0;
+  virtual void setVector4f(const char *name, float x, float y, float z,
                            float w) const = 0;
-  virtual void setMatrix4(const char* name, const float* matrix) const = 0;
+  virtual void setMatrix4(const char *name, const float *matrix) const = 0;
 };
 
 /**
@@ -102,7 +108,7 @@ public:
 
   /** Create the GPU texture from pixel data (RGBA or RGB, 8-bit). */
   virtual void generate(uint32_t width, uint32_t height,
-                        const unsigned char* data, bool alpha) = 0;
+                        const unsigned char *data, bool alpha) = 0;
 
   /** Bind this texture to the active texture unit / descriptor set. */
   virtual void bind() const = 0;
@@ -110,8 +116,12 @@ public:
   /** Release GPU resources. */
   virtual void release() = 0;
 
-  uint32_t width() const { return m_width; }
-  uint32_t height() const { return m_height; }
+  uint32_t width() const {
+    return m_width;
+  }
+  uint32_t height() const {
+    return m_height;
+  }
 
 protected:
   uint32_t m_width = 0;
@@ -128,9 +138,9 @@ public:
   virtual ~IMesh() = default;
 
   /** Upload vertex and index data to the GPU using the given layout. */
-  virtual void upload(const float* vertices, size_t vertexCount,
-                      const uint32_t* indices, size_t indexCount,
-                      const VertexLayout& layout) = 0;
+  virtual void upload(const float *vertices, size_t vertexCount,
+                      const uint32_t *indices, size_t indexCount,
+                      const VertexLayout &layout) = 0;
 
   /** Bind the mesh for rendering (binds VAO / vertex buffers). */
   virtual void bind() const = 0;
@@ -153,7 +163,7 @@ public:
   virtual ~IRenderDevice() = default;
 
   /** Initialize the rendering API. windowHandle is a GLFWwindow*. */
-  virtual void init(void* windowHandle) = 0;
+  virtual void init(void *windowHandle) = 0;
 
   /** Set the viewport rectangle. */
   virtual void setViewport(int x, int y, int w, int h) = 0;
@@ -165,7 +175,7 @@ public:
   virtual void clear(float r, float g, float b, float a) = 0;
 
   /** Present the rendered frame. */
-  virtual void present(void* windowHandle) = 0;
+  virtual void present(void *windowHandle) = 0;
 
   /** Check for API errors and log them. Returns error count. */
   virtual int checkErrors() const = 0;
@@ -176,12 +186,13 @@ public:
   virtual std::unique_ptr<IMesh> createMesh() = 0;
   virtual std::unique_ptr<IBuffer> createBuffer() = 0;
 
-  /** Configure instance vertex attributes on the currently bound mesh.
+  /**
+   * Configure instance vertex attributes on the currently bound mesh.
    *  The instanceBuffer holds per-instance model matrices + color data.
    *  This is an OpenGL-specific concept; Vulkan implementations should be
    *  no-ops since instance attributes are configured at pipeline creation.
    */
-  virtual void setupInstanceAttributes(IBuffer& instanceBuffer) = 0;
+  virtual void setupInstanceAttributes(IBuffer &instanceBuffer) = 0;
 
   /** Unbind instance vertex attributes. No-op for Vulkan. */
   virtual void unbindInstanceAttributes() = 0;
@@ -190,3 +201,5 @@ public:
   virtual void drawIndexedInstanced(size_t indexCount,
                                     uint32_t instanceCount) = 0;
 };
+
+} // namespace componeng::renderer::api

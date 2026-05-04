@@ -3,6 +3,8 @@
 #include "componeng/core/types.hpp"
 #include <string>
 
+namespace componeng::core {
+
 /**
  * @brief Wrapper around ImGui to provide a simple interface for displaying
  * debug information
@@ -26,3 +28,5 @@ public:
   static void beginFrame();
   static void endFrame();
 };
+
+} // namespace componeng::core

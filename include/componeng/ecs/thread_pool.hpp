@@ -8,6 +8,8 @@
 #include <thread>
 #include <vector>
 
+namespace componeng::ecs {
+
 /**
  * @brief Fixed-size thread pool with a task queue for parallel work submission.
  *
@@ -77,3 +79,5 @@ private:
   std::condition_variable m_cv;
   bool m_stop;
 };
+
+} // namespace componeng::ecs

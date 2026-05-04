@@ -1,7 +1,11 @@
 #pragma once
 
 // Forward declaration to avoid circular dependencies
+namespace componeng::ecs {
 class World;
+} // namespace componeng::ecs
+
+namespace componeng::ecs {
 
 /**
  * @brief Per-frame state passed to every system during its lifecycle callbacks.
@@ -30,3 +34,5 @@ public:
   virtual void onDestroy(const SystemState &state) {
   }
 };
+
+} // namespace componeng::ecs

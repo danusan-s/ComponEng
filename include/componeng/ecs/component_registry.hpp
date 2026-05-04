@@ -6,6 +6,8 @@
 #include <typeindex>
 #include <unordered_map>
 
+namespace componeng::ecs {
+
 /**
  * @brief Runtime metadata associated with a registered component type.
  *
@@ -87,3 +89,5 @@ public:
     return sig;
   }
 };
+
+} // namespace componeng::ecs

@@ -8,6 +8,8 @@
 #include <future>
 #include <vector>
 
+namespace componeng::ecs {
+
 struct QueryDesc {
   Signature required;
   Signature excluded;
@@ -135,6 +137,8 @@ public:
       f.wait();
   }
 };
+
+} // namespace componeng::ecs
 
 // Optional components make it so system implementation has to check if
 // component is nullptr or not which means per entity branching. This is a

@@ -9,6 +9,8 @@
 #include "componeng/renderer/shader.hpp"
 #include "componeng/renderer/texture.hpp"
 
+namespace componeng::renderer {
+
 using ShaderID = uint32_t;
 using TextureID = uint32_t;
 using MeshID = uint32_t;
@@ -61,3 +63,5 @@ private:
   static uint32_t nextTextureID;
   static uint32_t nextMeshID;
 };
+
+} // namespace componeng::renderer

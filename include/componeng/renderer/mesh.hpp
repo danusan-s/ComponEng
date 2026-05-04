@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+namespace componeng::renderer {
+
 /**
  * @brief Mesh resource with vertex/index buffers.
  *
@@ -17,9 +19,6 @@ public:
   Mesh();
 
   void uploadToGPU();
-
-  // Helper to parse OBJ data and populate m_vertices and m_indices
-  void generateFromWavefrontObj(const std::string& data);
 
   // Access to the underlying IMesh for render device operations
   IMesh& getImpl() { return *m_impl; }
@@ -34,3 +33,5 @@ public:
 private:
   std::unique_ptr<IMesh> m_impl;
 };
+
+} // namespace componeng::renderer

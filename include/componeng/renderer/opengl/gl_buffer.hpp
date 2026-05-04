@@ -3,6 +3,8 @@
 #include "glad/glad.h"
 #include "componeng/renderer/api/irender_device.hpp"
 
+namespace componeng::renderer::opengl {
+
 class GLBuffer : public IBuffer {
 public:
   GLBuffer();
@@ -18,3 +20,5 @@ private:
   GLuint m_id = 0;
   size_t m_size = 0;
 };
+
+} // namespace componeng::renderer::opengl

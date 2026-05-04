@@ -2,8 +2,12 @@
 #include "componeng/core/types.hpp"
 #include "componeng/renderer/resource_manager.hpp"
 
+namespace componeng::components {
+
 struct MaterialComponent {
   Vec3 color;          // 12 bytes
   TextureID textureID; // 4 bytes
   ShaderID shaderID;   // 4 bytes
 };
+
+} // namespace componeng::components

@@ -12,6 +12,8 @@
 #include "componeng/renderer/api/irender_device.hpp"
 #include <memory>
 
+namespace componeng::ecs {
+
 /**
  * @brief Central ECS world that ties together all subsystems.
  *
@@ -215,3 +217,5 @@ private:
   void *m_windowHandle = nullptr;
   IRenderDevice *m_renderDevice = nullptr;
 };
+
+} // namespace componeng::ecs

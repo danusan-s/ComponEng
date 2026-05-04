@@ -4,6 +4,8 @@
 #include <cstring>
 #include <iostream>
 
+namespace componeng::core {
+
 #define LOG_INFO(fmt, ...)                                                     \
   Logger::Log(__FILE__, __FUNCTION__, "INFO", fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...)                                                    \
@@ -42,3 +44,5 @@ public:
     std::cout << finalMsg << std::endl;
   }
 };
+
+} // namespace componeng::core

@@ -7,6 +7,8 @@
 #include "componeng/renderer/opengl/gl_shader.hpp"
 #include "componeng/renderer/opengl/gl_texture.hpp"
 
+namespace componeng::renderer::opengl {
+
 /**
  * @brief OpenGL implementation of IRenderDevice.
  *
@@ -38,3 +40,5 @@ public:
 private:
   void* m_windowHandle{nullptr};
 };
+
+} // namespace componeng::renderer::opengl

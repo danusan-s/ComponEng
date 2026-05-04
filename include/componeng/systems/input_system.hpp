@@ -4,6 +4,8 @@
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
+namespace componeng::systems {
+
 /**
  * @brief Initialization-phase system that polls raw GLFW input and writes it
  * into InputComponent and MouseInputComponent.
@@ -16,3 +18,5 @@ class InputSystem : public ISystem {
 public:
   void onUpdate(const SystemState &state) override;
 };
+
+} // namespace componeng::systems

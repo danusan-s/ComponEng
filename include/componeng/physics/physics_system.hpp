@@ -1,6 +1,8 @@
 #pragma once
 #include "componeng/ecs/system.hpp"
 
+namespace componeng::physics {
+
 /**
  * @brief Simulation-phase system that handles gravity, integration, and
  * collision response.
@@ -13,3 +15,5 @@ class PhysicsSystem : public ISystem {
 public:
   void onUpdate(const SystemState &state) override;
 };
+
+} // namespace componeng::physics

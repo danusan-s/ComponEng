@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <vector>
 
+namespace componeng::renderer {
+
 struct DrawKey {
   MeshID meshID;
   TextureID textureID;
@@ -72,3 +74,5 @@ public:
     return map_;
   }
 };
+
+} // namespace componeng::renderer

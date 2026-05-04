@@ -2,6 +2,8 @@
 
 #include <string>
 
+namespace componeng::core {
+
 /**
  * @brief Static utility functions for filesystem path resolution.
  *
@@ -14,3 +16,5 @@ public:
   static std::string getExecutableDir();
   static std::string getAssetPath(const std::string &relativePath);
 };
+
+} // namespace componeng::core

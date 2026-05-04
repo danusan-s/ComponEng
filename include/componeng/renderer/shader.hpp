@@ -4,6 +4,8 @@
 #include "componeng/renderer/api/irender_device.hpp"
 #include <memory>
 
+namespace componeng::renderer {
+
 /**
  * @brief Shader program wrapper.
  *
@@ -31,3 +33,5 @@ public:
 private:
   std::unique_ptr<IShader> m_impl;
 };
+
+} // namespace componeng::renderer

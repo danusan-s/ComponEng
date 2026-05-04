@@ -3,6 +3,8 @@
 #include "glad/glad.h"
 #include "componeng/renderer/api/irender_device.hpp"
 
+namespace componeng::renderer::opengl {
+
 class GLTexture : public ITexture {
 public:
   GLTexture();
@@ -18,3 +20,5 @@ public:
 private:
   GLuint m_id = 0;
 };
+
+} // namespace componeng::renderer::opengl

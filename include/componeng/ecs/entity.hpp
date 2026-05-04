@@ -2,6 +2,8 @@
 #include <bitset>
 #include <cstdint>
 
+namespace componeng::ecs {
+
 using EntityID = std::uint32_t;
 
 constexpr EntityID INVALID_ENTITY = 0;
@@ -17,3 +19,5 @@ constexpr ComponentID MAX_COMPONENTS = 32;
 constexpr ArchetypeID MAX_ARCHETYPES = 64;
 
 using Signature = std::bitset<MAX_COMPONENTS>;
+
+} // namespace componeng::ecs

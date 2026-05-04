@@ -5,6 +5,8 @@
 #include "componeng/renderer/api/irender_device.hpp"
 #include <GLFW/glfw3.h>
 
+namespace componeng::core {
+
 /**
  * @brief Abstraction over GLFW window management and OpenGL context setup.
  *
@@ -39,3 +41,5 @@ private:
 
   void setViewport(int w, int h);
 };
+
+} // namespace componeng::core

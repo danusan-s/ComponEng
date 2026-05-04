@@ -3,6 +3,8 @@
 #include "componeng/renderer/batch_map.hpp"
 #include <memory>
 
+namespace componeng::renderer {
+
 /**
  * @brief Presentation-phase system that renders all entities with MeshComponent
  * and MaterialComponent.
@@ -19,3 +21,5 @@ public:
 private:
   std::unique_ptr<BatchMap> m_batches;
 };
+
+} // namespace componeng::renderer

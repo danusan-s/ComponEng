@@ -4,6 +4,8 @@
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/types.hpp"
 
+namespace componeng::physics {
+
 /**
  * @brief Output of a collision test: contact normal and penetration depth.
  *
@@ -26,14 +28,14 @@ TransformComponent getWorldTransform(const TransformComponent &localTransform,
  * @return true if overlapping, with contact info filled into @p info.
  */
 bool testBoxBox(const TransformComponent &a, const TransformComponent &b,
-              CollisionInfo &info);
+                CollisionInfo &info);
 
 /**
  * @brief Tests two spheres for overlap.
  * @return true if overlapping, with contact info filled into @p info.
  */
 bool testSphereSphere(const TransformComponent &a, const TransformComponent &b,
-                     CollisionInfo &info);
+                       CollisionInfo &info);
 
 /**
  * @brief Tests a Box and a sphere for overlap.
@@ -63,3 +65,5 @@ bool testCollision(const ColliderComponent &colliderA,
                    const TransformComponent &transformA,
                    const ColliderComponent &colliderB,
                    const TransformComponent &transformB, CollisionInfo &info);
+
+} // namespace componeng::physics
