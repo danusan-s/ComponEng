@@ -3,6 +3,11 @@
 #include "componeng/renderer/resource_manager.hpp"
 #include <random>
 
+using namespace componeng::core;
+using namespace componeng::components;
+using namespace componeng::ecs;
+using namespace componeng::renderer;
+
 class Game : public IGame {
 public:
   void init(World &world) override {

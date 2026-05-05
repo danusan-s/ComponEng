@@ -69,7 +69,7 @@ bool testSphereSphere(const components::TransformComponent &a,
   return true;
 }
 
-bool testAABBSphere(const components::TransformComponent &a,
+bool testBoxSphere(const components::TransformComponent &a,
                     const components::TransformComponent &b,
                     CollisionInfo &info) {
   core::Vec3 centerA = a.position;
@@ -117,7 +117,7 @@ bool testAABBSphere(const components::TransformComponent &a,
 bool testSphereBox(const components::TransformComponent &a,
                    const components::TransformComponent &b,
                    CollisionInfo &info) {
-  bool res = testAABBSphere(b, a, info);
+  bool res = testBoxSphere(b, a, info);
   info.normal = -info.normal;
   return res;
 }
