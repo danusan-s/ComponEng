@@ -20,6 +20,10 @@ public:
 
   void uploadToGPU();
 
+  // Helper to generate mesh data from Wavefront OBJ format (vertices, normals,
+  // texcoords)
+  void generateFromWavefrontObj(const std::string &data);
+
   // Access to the underlying IMesh for render device operations
   api::IMesh &getImpl() {
     return *m_impl;

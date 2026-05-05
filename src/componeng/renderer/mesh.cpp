@@ -1,5 +1,5 @@
-#include "componeng/core/logger.hpp"
 #include "componeng/renderer/mesh.hpp"
+#include "componeng/core/logger.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
 #include <array>
 #include <sstream>
@@ -20,7 +20,7 @@ void Mesh::uploadToGPU() {
                  m_indices.size(), api::defaultMeshLayout());
 }
 
-void Mesh::generateFromWavefrontObj(const std::string& data) {
+void Mesh::generateFromWavefrontObj(const std::string &data) {
   LOG_INFO("Generating model");
   std::istringstream stream(data);
   std::string line;
@@ -84,9 +84,9 @@ void Mesh::generateFromWavefrontObj(const std::string& data) {
           continue;
         }
 
-        const auto& pos = positions[posIndex];
-        const auto& norm = normals[normIndex];
-        const auto& tex = texCoords[texIndex];
+        const auto &pos = positions[posIndex];
+        const auto &norm = normals[normIndex];
+        const auto &tex = texCoords[texIndex];
 
         m_vertices.push_back(pos[0]);
         m_vertices.push_back(pos[1]);
