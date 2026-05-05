@@ -1,5 +1,5 @@
-#include "componeng/core/logger.hpp"
 #include "componeng/renderer/opengl/gl_mesh.hpp"
+#include "componeng/core/logger.hpp"
 
 namespace componeng::renderer::opengl {
 
@@ -10,9 +10,9 @@ GLMesh::~GLMesh() {
   release();
 }
 
-void GLMesh::upload(const float* vertices, size_t vertexCount,
-                      const uint32_t* indices, size_t indexCount,
-                      const VertexLayout& layout) {
+void GLMesh::upload(const float *vertices, size_t vertexCount,
+                    const uint32_t *indices, size_t indexCount,
+                    const api::VertexLayout &layout) {
   if (m_vao != 0) {
     glDeleteVertexArrays(1, &m_vao);
     m_vao = 0;
@@ -43,10 +43,10 @@ void GLMesh::upload(const float* vertices, size_t vertexCount,
                GL_STATIC_DRAW);
 
   for (size_t i = 0; i < layout.attributes.size(); ++i) {
-    const auto& attr = layout.attributes[i];
+    const auto &attr = layout.attributes[i];
     glVertexAttribPointer(i, attr.componentCount, GL_FLOAT, attr.normalized,
                           layout.stride,
-                          reinterpret_cast<const void*>(attr.offset));
+                          reinterpret_cast<const void *>(attr.offset));
     glEnableVertexAttribArray(i);
   }
 

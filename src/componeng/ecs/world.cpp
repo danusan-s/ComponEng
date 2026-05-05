@@ -16,7 +16,7 @@ EntityID World::createEntity() {
 }
 
 void World::destroyEntity(EntityID entity) {
-  Archetype* currArchetype = m_archetypeManager->getBySignature(
+  Archetype *currArchetype = m_archetypeManager->getBySignature(
       m_entityManager->getRecord(entity).signature);
   if (currArchetype) {
     currArchetype->removeEntity(entity);

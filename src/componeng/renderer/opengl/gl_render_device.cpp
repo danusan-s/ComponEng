@@ -55,23 +55,23 @@ int GLRenderDevice::checkErrors() const {
   return count;
 }
 
-std::unique_ptr<IShader> GLRenderDevice::createShader() {
+std::unique_ptr<api::IShader> GLRenderDevice::createShader() {
   return std::make_unique<GLShader>();
 }
 
-std::unique_ptr<ITexture> GLRenderDevice::createTexture() {
+std::unique_ptr<api::ITexture> GLRenderDevice::createTexture() {
   return std::make_unique<GLTexture>();
 }
 
-std::unique_ptr<IMesh> GLRenderDevice::createMesh() {
+std::unique_ptr<api::IMesh> GLRenderDevice::createMesh() {
   return std::make_unique<GLMesh>();
 }
 
-std::unique_ptr<IBuffer> GLRenderDevice::createBuffer() {
+std::unique_ptr<api::IBuffer> GLRenderDevice::createBuffer() {
   return std::make_unique<GLBuffer>();
 }
 
-void GLRenderDevice::setupInstanceAttributes(IBuffer &instanceBuffer) {
+void GLRenderDevice::setupInstanceAttributes(api::IBuffer &instanceBuffer) {
   GLuint instanceVBO = static_cast<GLBuffer &>(instanceBuffer).handle();
 
   glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
@@ -102,7 +102,7 @@ void GLRenderDevice::unbindInstanceAttributes() {
 }
 
 void GLRenderDevice::drawIndexedInstanced(size_t indexCount,
-                                            uint32_t instanceCount) {
+                                          uint32_t instanceCount) {
   glDrawElementsInstanced(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr,
                           instanceCount);
 }

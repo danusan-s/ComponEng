@@ -100,7 +100,7 @@ static void cursorPosCallback(GLFWwindow *window, double xposIn,
 }
 
 void Window::init(int width, int height, const char *title,
-                  IRenderDevice *renderDevice) {
+                  componeng::renderer::api::IRenderDevice *renderDevice) {
   this->m_width = width;
   this->m_height = height;
 

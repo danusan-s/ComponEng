@@ -17,16 +17,19 @@ public:
     const int count = 100;
 
     for (int i = 0; i < count; ++i) {
-      EntityID entity = world.createEntity();
+      componeng::ecs::EntityID entity = world.createEntity();
 
       float scale = randScale(generator);
       world.addComponents(
-          entity, MeshComponent{.meshID = ResourceManager::getMeshID("cube")},
-          TransformComponent{.position = Vec3(randPosition(generator),
-                                              randPosition(generator),
-                                              randPosition(generator)),
-                             .rotation = Vec3(0.0f),
-                             .scale = Vec3(scale)},
+          entity,
+          componeng::components::MeshComponent{
+              .meshID =
+                  componeng::renderer::ResourceManager::getMeshID("cube")},
+          componeng::components::TransformComponent{
+              .position = Vec3(randPosition(generator), randPosition(generator),
+                               randPosition(generator)),
+              .rotation = Vec3(0.0f),
+              .scale = Vec3(scale)},
           RigidBodyComponent{.type = RigidBodyComponent::Dynamic,
                              .mass = randMass(generator),
                              .restitution = 1.0f},

@@ -25,8 +25,8 @@ uint32_t ResourceManager::nextTextureID = 1;
 uint32_t ResourceManager::nextMeshID = 1;
 
 void ResourceManager::loadShader(const char *vShaderFile,
-                               const char *fShaderFile,
-                               const char *gShaderFile, std::string name) {
+                                 const char *fShaderFile,
+                                 const char *gShaderFile, std::string name) {
   LOG_INFO("Loading Shader: %s", name.c_str());
   ShaderID id = nextShaderID++;
   s_shaders[name] = id;
@@ -43,7 +43,7 @@ ShaderID ResourceManager::getShaderID(std::string name) {
 }
 
 void ResourceManager::loadTexture(const char *file, bool alpha,
-                                std::string name) {
+                                  std::string name) {
   LOG_INFO("Loading Texture: %s", name.c_str());
   TextureID id = nextTextureID++;
   s_textures[name] = id;

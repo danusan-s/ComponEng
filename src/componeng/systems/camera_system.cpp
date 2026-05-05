@@ -14,27 +14,28 @@ static constexpr float DEFAULT_MOVE_SPEED = 100.0f;
 static constexpr float MOUSE_SENSITIVITY = 1.0f;
 static constexpr float PITCH_LIMIT = 89.0f;
 
-static void updateCameraVectors(const TransformComponent &transform,
-                                Vec3 &front, Vec3 &right, Vec3 &up) {
-  float cosYaw = cos(radians(transform.rotation.y));
-  float sinYaw = sin(radians(transform.rotation.y));
-  float cosPitch = cos(radians(transform.rotation.x));
-  float sinPitch = sin(radians(transform.rotation.x));
+static void updateCameraVectors(const components::TransformComponent &transform,
+                                core::Vec3 &front, core::Vec3 &right,
+                                core::Vec3 &up) {
+  float cosYaw = cos(core::radians(transform.rotation.y));
+  float sinYaw = sin(core::radians(transform.rotation.y));
+  float cosPitch = cos(core::radians(transform.rotation.x));
+  float sinPitch = sin(core::radians(transform.rotation.x));
 
   front.x = cosYaw * cosPitch;
   front.y = sinPitch;
   front.z = sinYaw * cosPitch;
   front = normalize(front);
 
-  right = normalize(cross(front, Vec3(0.0f, 1.0f, 0.0f)));
+  right = normalize(cross(front, core::Vec3(0.0f, 1.0f, 0.0f)));
   up = normalize(cross(right, front));
 }
 
-static void processKeyboardInput(TransformComponent &transform,
-                                   const InputComponent &input, float deltaTime,
-                                   float speed) {
+static void processKeyboardInput(components::TransformComponent &transform,
+                                 const components::InputComponent &input,
+                                 float deltaTime, float speed) {
   float velocity = speed * deltaTime;
-  Vec3 front, right, up;
+  core::Vec3 front, right, up;
   updateCameraVectors(transform, front, right, up);
 
   if (input.forward)
@@ -46,14 +47,16 @@ static void processKeyboardInput(TransformComponent &transform,
   if (input.right)
     transform.position = transform.position + right * velocity;
   if (input.jump)
-    transform.position = transform.position + Vec3(0.0f, 1.0f, 0.0f) * velocity;
+    transform.position =
+        transform.position + core::Vec3(0.0f, 1.0f, 0.0f) * velocity;
   if (input.crouch)
-    transform.position = transform.position - Vec3(0.0f, 1.0f, 0.0f) * velocity;
+    transform.position =
+        transform.position - core::Vec3(0.0f, 1.0f, 0.0f) * velocity;
 }
 
-static void processMouseInput(TransformComponent &transform,
-                                const MouseInputComponent &mouseInput,
-                                float sensitivity) {
+static void processMouseInput(components::TransformComponent &transform,
+                              const components::MouseInputComponent &mouseInput,
+                              float sensitivity) {
   transform.rotation.y += mouseInput.deltaX * sensitivity;
   transform.rotation.x -= mouseInput.deltaY * sensitivity;
 
@@ -63,34 +66,38 @@ static void processMouseInput(TransformComponent &transform,
     transform.rotation.x = -PITCH_LIMIT;
 }
 
-void CameraSystem::onUpdate(const SystemState &state) {
-  EntityID mainCameraEntity =
-      state.world->getSingleton<MainCameraSingleton>().entity;
+void CameraSystem::onUpdate(const ecs::SystemState &state) {
+  ecs::EntityID mainCameraEntity =
+      state.world->getSingleton<components::MainCameraSingleton>().entity;
 
-  TransformComponent &transform =
-      state.world->getComponent<TransformComponent>(mainCameraEntity);
-  CameraComponent &camera =
-      state.world->getComponent<CameraComponent>(mainCameraEntity);
-  InputComponent &input =
-      state.world->getComponent<InputComponent>(mainCameraEntity);
-  MouseInputComponent &mouseInput =
-      state.world->getComponent<MouseInputComponent>(mainCameraEntity);
+  components::TransformComponent &transform =
+      state.world->getComponent<components::TransformComponent>(
+          mainCameraEntity);
+  components::CameraComponent &camera =
+      state.world->getComponent<components::CameraComponent>(mainCameraEntity);
+  components::InputComponent &input =
+      state.world->getComponent<components::InputComponent>(mainCameraEntity);
+  components::MouseInputComponent &mouseInput =
+      state.world->getComponent<components::MouseInputComponent>(
+          mainCameraEntity);
 
   processKeyboardInput(transform, input, state.deltaTime, DEFAULT_MOVE_SPEED);
 
   processMouseInput(transform, mouseInput, MOUSE_SENSITIVITY);
 
-  Vec3 front, right, up;
+  core::Vec3 front, right, up;
   updateCameraVectors(transform, front, right, up);
 
-  Mat4 viewMatrix = lookAt(transform.position, transform.position + front, up);
+  core::Mat4 viewMatrix =
+      lookAt(transform.position, transform.position + front, up);
 
-  Mat4 projectionMatrix = perspective(radians(camera.fov), camera.aspectRatio,
-                                        camera.nearPlane, camera.farPlane);
+  core::Mat4 projectionMatrix =
+      core::perspective(core::radians(camera.fov), camera.aspectRatio,
+                        camera.nearPlane, camera.farPlane);
 
   camera.viewProjectionMatrix = projectionMatrix * viewMatrix;
 
-  DebugUI::addVec3("Camera Position", transform.position);
+  core::DebugUI::addVec3("Camera Position", transform.position);
 }
 
 } // namespace componeng::systems

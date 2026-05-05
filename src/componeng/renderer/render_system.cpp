@@ -15,11 +15,12 @@
 
 namespace componeng::renderer {
 
-static constexpr Vec3 DEFAULT_LIGHT_POS = Vec3(1000.0f, 1000.0f, 1000.0f);
-static constexpr Vec3 DEFAULT_LIGHT_COLOR = Vec3(1.0f, 1.0f, 1.0f);
+static constexpr core::Vec3 DEFAULT_LIGHT_POS =
+    core::Vec3(1000.0f, 1000.0f, 1000.0f);
+static constexpr core::Vec3 DEFAULT_LIGHT_COLOR = core::Vec3(1.0f, 1.0f, 1.0f);
 
 struct FrustumPlane {
-  Vec3 normal;
+  core::Vec3 normal;
   float distance;
 };
 
@@ -27,21 +28,22 @@ struct Frustum {
   FrustumPlane planes[6];
 };
 
-static Mat4 getModelMatrix(const TransformComponent &transform) {
-  Mat4 model = Mat4(1.0f);
+static core::Mat4
+getModelMatrix(const components::TransformComponent &transform) {
+  core::Mat4 model = core::Mat4(1.0f);
   model = translate(model, transform.position);
-  model = rotate(model, transform.rotation.x, Vec3(1.0f, 0.0f, 0.0f));
-  model = rotate(model, transform.rotation.y, Vec3(0.0f, 1.0f, 0.0f));
-  model = rotate(model, transform.rotation.z, Vec3(0.0f, 0.0f, 1.0f));
+  model = rotate(model, transform.rotation.x, core::Vec3(1.0f, 0.0f, 0.0f));
+  model = rotate(model, transform.rotation.y, core::Vec3(0.0f, 1.0f, 0.0f));
+  model = rotate(model, transform.rotation.z, core::Vec3(0.0f, 0.0f, 1.0f));
   model = scale(model, transform.scale);
   return model;
 }
 
-static bool isBoxInFrustum(const Frustum &frustum, const Vec3 &boxMin,
-                           const Vec3 &boxMax) {
+static bool isBoxInFrustum(const Frustum &frustum, const core::Vec3 &boxMin,
+                           const core::Vec3 &boxMax) {
   for (int i = 0; i < 6; i++) {
     const FrustumPlane &plane = frustum.planes[i];
-    Vec3 positiveVertex;
+    core::Vec3 positiveVertex;
     positiveVertex.x = (plane.normal.x >= 0) ? boxMax.x : boxMin.x;
     positiveVertex.y = (plane.normal.y >= 0) ? boxMax.y : boxMin.y;
     positiveVertex.z = (plane.normal.z >= 0) ? boxMax.z : boxMin.z;
@@ -53,7 +55,7 @@ static bool isBoxInFrustum(const Frustum &frustum, const Vec3 &boxMin,
   return true;
 }
 
-static Frustum generateFrustum(const Mat4 &m) {
+static Frustum generateFrustum(const core::Mat4 &m) {
   Frustum f;
 
   f.planes[0].normal.x = m[0][3] + m[0][0];
@@ -95,51 +97,59 @@ static Frustum generateFrustum(const Mat4 &m) {
   return f;
 }
 
-static void populateBatch(const TransformComponent &t, const MeshComponent &m,
-                        const MaterialComponent &mat, BatchMap &batches) {
+static void populateBatch(const components::TransformComponent &t,
+                          const components::MeshComponent &m,
+                          const components::MaterialComponent &mat,
+                          BatchMap &batches) {
   DrawKey key{m.meshID, mat.textureID, mat.shaderID};
   batches.add(key, {getModelMatrix(t), mat.color});
 }
 
-void RenderSystem::onCreate(const SystemState &state) {
-  IRenderDevice *renderDevice = state.world->getRenderDevice();
+void RenderSystem::onCreate(const ecs::SystemState &state) {
+  api::IRenderDevice *renderDevice = state.world->getRenderDevice();
   m_batches = std::make_unique<BatchMap>(*renderDevice);
 }
 
-void RenderSystem::onUpdate(const SystemState &state) {
-  IRenderDevice *renderDevice = state.world->getRenderDevice();
+void RenderSystem::onUpdate(const ecs::SystemState &state) {
+  api::IRenderDevice *renderDevice = state.world->getRenderDevice();
   renderDevice->clear(0.0f, 0.0f, 0.0f, 1.0f);
 
-  EntityID mainCameraID =
-      state.world->getSingleton<MainCameraSingleton>().entity;
+  ecs::EntityID mainCameraID =
+      state.world->getSingleton<components::MainCameraSingleton>().entity;
 
-  Vec3 &cameraPos =
-      state.world->getComponent<TransformComponent>(mainCameraID).position;
-  Mat4 &viewProj = state.world->getComponent<CameraComponent>(mainCameraID)
-                       .viewProjectionMatrix;
+  core::Vec3 &cameraPos =
+      state.world->getComponent<components::TransformComponent>(mainCameraID)
+          .position;
+  core::Mat4 &viewProj =
+      state.world->getComponent<components::CameraComponent>(mainCameraID)
+          .viewProjectionMatrix;
 
   Frustum frustum = generateFrustum(viewProj);
 
   int drawCalls = 0;
 
   state.world
-      ->query<TransformComponent, MeshComponent, MaterialComponent,
-              ColliderComponent>()
-      .eachParallel(state.world->threadPool(),
-                    [&](TransformComponent &t, MeshComponent &m,
-                          MaterialComponent &mat, ColliderComponent &col) {
-                      Vec3 center = col.transform.position + t.position;
-                      Vec3 worldMin = center - col.transform.scale * t.scale;
-                      Vec3 worldMax = center + col.transform.scale * t.scale;
-                      m.visible = isBoxInFrustum(frustum, worldMin, worldMax);
-                    });
-
-  state.world->query<TransformComponent, MeshComponent, MaterialComponent>()
-      .each(
-          [&](TransformComponent &t, MeshComponent &m, MaterialComponent &mat) {
-            if (m.visible)
-              populateBatch(t, m, mat, *m_batches.get());
+      ->query<components::TransformComponent, components::MeshComponent,
+              components::MaterialComponent, components::ColliderComponent>()
+      .eachParallel(
+          state.world->threadPool(),
+          [&](components::TransformComponent &t, components::MeshComponent &m,
+              components::MaterialComponent &mat,
+              components::ColliderComponent &col) {
+            core::Vec3 center = col.transform.position + t.position;
+            core::Vec3 worldMin = center - col.transform.scale * t.scale;
+            core::Vec3 worldMax = center + col.transform.scale * t.scale;
+            m.visible = isBoxInFrustum(frustum, worldMin, worldMax);
           });
+
+  state.world
+      ->query<components::TransformComponent, components::MeshComponent,
+              components::MaterialComponent>()
+      .each([&](components::TransformComponent &t, components::MeshComponent &m,
+                components::MaterialComponent &mat) {
+        if (m.visible)
+          populateBatch(t, m, mat, *m_batches.get());
+      });
 
   const auto &batches = m_batches->getMap();
   for (const auto &pair : batches) {
@@ -183,11 +193,11 @@ void RenderSystem::onUpdate(const SystemState &state) {
 
   m_batches->clear();
 
-  DebugUI::addValue("Instances Rendered", instancesRendered);
-  DebugUI::addValue("Draw Calls", drawCalls);
+  core::DebugUI::addValue("Instances Rendered", instancesRendered);
+  core::DebugUI::addValue("Draw Calls", drawCalls);
 }
 
-void RenderSystem::onDestroy(const SystemState &state) {
+void RenderSystem::onDestroy(const ecs::SystemState &state) {
   m_batches.reset();
 }
 

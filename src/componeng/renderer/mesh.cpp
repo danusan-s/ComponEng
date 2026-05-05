@@ -15,9 +15,9 @@ void Mesh::uploadToGPU() {
     return;
   }
 
-  m_impl = std::make_unique<GLMesh>();
+  m_impl = std::make_unique<opengl::GLMesh>();
   m_impl->upload(m_vertices.data(), m_vertices.size() / 8, m_indices.data(),
-                 m_indices.size(), defaultMeshLayout());
+                 m_indices.size(), api::defaultMeshLayout());
 }
 
 void Mesh::generateFromWavefrontObj(const std::string& data) {

@@ -87,13 +87,12 @@ public:
     std::size_t newRow = newArchetype.getRowForEntity(entity);
 
     if (oldArchetype == nullptr) {
-      core::LOG_INFO("Adding first component to entity %llu",
-                     (unsigned long long)entity);
+      LOG_INFO("Adding first component to entity %llu",
+               (unsigned long long)entity);
     } else {
-      core::LOG_INFO(
-          "Moving entity %llu to new archetype %s from old archetype %s",
-          (unsigned long long)entity, newSig.to_string().c_str(),
-          oldSig.to_string().c_str());
+      LOG_INFO("Moving entity %llu to new archetype %s from old archetype %s",
+               (unsigned long long)entity, newSig.to_string().c_str(),
+               oldSig.to_string().c_str());
     }
 
     if (oldArchetype) {
@@ -207,16 +206,16 @@ public:
     return m_windowHandle;
   }
 
-  void setRenderDevice(IRenderDevice *device) {
+  void setRenderDevice(renderer::api::IRenderDevice *device) {
     m_renderDevice = device;
   }
-  IRenderDevice *getRenderDevice() const {
+  renderer::api::IRenderDevice *getRenderDevice() const {
     return m_renderDevice;
   }
 
 private:
   void *m_windowHandle = nullptr;
-  IRenderDevice *m_renderDevice = nullptr;
+  renderer::api::IRenderDevice *m_renderDevice = nullptr;
 };
 
 } // namespace componeng::ecs

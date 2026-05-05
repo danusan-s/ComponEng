@@ -11,7 +11,8 @@
 namespace componeng::core {
 
 void Engine::init() {
-  GLRenderDevice *renderDevice = new GLRenderDevice;
+  renderer::opengl::GLRenderDevice *renderDevice =
+      new renderer::opengl::GLRenderDevice;
   m_render_device = renderDevice;
   m_window.init(1280, 720, "ECS Game", renderDevice);
   m_world.init();
@@ -19,17 +20,17 @@ void Engine::init() {
   m_world.setRenderDevice(m_render_device);
   DebugUI::init();
 
-  ResourceManager::loadShader(
+  renderer::ResourceManager::loadShader(
       Utils::getAssetPath("assets/shaders/diffuse.vert").c_str(),
       Utils::getAssetPath("assets/shaders/diffuse.frag").c_str(), nullptr,
       "default");
 
-  ResourceManager::loadTexture(
+  renderer::ResourceManager::loadTexture(
       Utils::getAssetPath("assets/textures/white.png").c_str(), false, "white");
 
-  ResourceManager::loadMesh(
+  renderer::ResourceManager::loadMesh(
       Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");
-  ResourceManager::loadMesh(
+  renderer::ResourceManager::loadMesh(
       Utils::getAssetPath("assets/models/sphere_smooth.obj").c_str(), "sphere");
 
   registerComponents();
@@ -38,42 +39,46 @@ void Engine::init() {
 }
 
 void Engine::registerComponents() {
-  m_world.registerComponents<TransformComponent, MeshComponent,
-                             MaterialComponent, CameraComponent,
-                             MouseInputComponent, RigidBodyComponent,
-                             InputComponent, ColliderComponent>();
-  m_world.registerComponents<MainCameraSingleton>();
+  m_world.registerComponents<
+      components::TransformComponent, components::MeshComponent,
+      components::MaterialComponent, components::CameraComponent,
+      components::MouseInputComponent, components::RigidBodyComponent,
+      components::InputComponent, components::ColliderComponent>();
+  m_world.registerComponents<components::MainCameraSingleton>();
 }
 
 void Engine::registerSystems() {
-  m_world.registerSystem<InputSystem>(SystemGroup::Initialization);
-  m_world.registerSystem<CameraSystem>(SystemGroup::Simulation);
-  m_world.registerSystem<PhysicsSystem>(SystemGroup::Simulation);
-  m_world.registerSystem<RenderSystem>(SystemGroup::Presentation);
+  m_world.registerSystem<systems::InputSystem>(
+      ecs::SystemGroup::Initialization);
+  m_world.registerSystem<systems::CameraSystem>(ecs::SystemGroup::Simulation);
+  m_world.registerSystem<physics::PhysicsSystem>(ecs::SystemGroup::Simulation);
+  m_world.registerSystem<renderer::RenderSystem>(
+      ecs::SystemGroup::Presentation);
 }
 
 void Engine::initObjects() {
-  EntityID cameraEntity = m_world.createEntity();
-  m_world.addComponents(cameraEntity,
-                        TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
-                                           .rotation = Vec3(0.0f, 0.0f, 0.0f),
-                                           .scale = Vec3(1.0f)},
-                        CameraComponent{.fov = 45.0f,
-                                        .aspectRatio = 16.0f / 9.0f,
-                                        .nearPlane = 0.1f,
-                                        .farPlane = 10000.0f},
-                        InputComponent{.forward = false,
-                                       .backward = false,
-                                       .left = false,
-                                       .right = false,
-                                       .jump = false,
-                                       .crouch = false},
-                        MouseInputComponent{.deltaX = 0.0f,
-                                            .deltaY = 0.0f,
-                                            .leftButton = false,
-                                            .rightButton = false});
-  m_world.setSingleton<MainCameraSingleton>(
-      MainCameraSingleton{.entity = cameraEntity});
+  ecs::EntityID cameraEntity = m_world.createEntity();
+  m_world.addComponents(
+      cameraEntity,
+      components::TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
+                                     .rotation = Vec3(0.0f, 0.0f, 0.0f),
+                                     .scale = Vec3(1.0f)},
+      components::CameraComponent{.fov = 45.0f,
+                                  .aspectRatio = 16.0f / 9.0f,
+                                  .nearPlane = 0.1f,
+                                  .farPlane = 10000.0f},
+      components::InputComponent{.forward = false,
+                                 .backward = false,
+                                 .left = false,
+                                 .right = false,
+                                 .jump = false,
+                                 .crouch = false},
+      components::MouseInputComponent{.deltaX = 0.0f,
+                                      .deltaY = 0.0f,
+                                      .leftButton = false,
+                                      .rightButton = false});
+  m_world.setSingleton<components::MainCameraSingleton>(
+      components::MainCameraSingleton{.entity = cameraEntity});
 }
 
 void Engine::run(IGame &game) {
@@ -120,7 +125,7 @@ void Engine::run(IGame &game) {
 
 void Engine::shutdown() {
   DebugUI::shutdown();
-  ResourceManager::clear();
+  renderer::ResourceManager::clear();
   m_window.shutdown();
   delete m_render_device;
 }

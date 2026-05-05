@@ -14,7 +14,7 @@ void DebugUI::init() {
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
   ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -41,15 +41,15 @@ void DebugUI::endFrame() {
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void DebugUI::addText(const std::string& label, const std::string& value) {
+void DebugUI::addText(const std::string &label, const std::string &value) {
   ImGui::Text("%s: %s", label.c_str(), value.c_str());
 }
 
-void DebugUI::addValue(const std::string& label, float v) {
+void DebugUI::addValue(const std::string &label, float v) {
   ImGui::Text("%s: %.2f", label.c_str(), v);
 }
 
-void DebugUI::addVec3(const std::string& label, Vec3 v) {
+void DebugUI::addVec3(const std::string &label, Vec3 v) {
   ImGui::Text("%s: (%.2f, %.2f, %.2f)", label.c_str(), v.x, v.y, v.z);
 }
 

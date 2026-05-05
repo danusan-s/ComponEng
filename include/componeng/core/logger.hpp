@@ -7,9 +7,9 @@
 namespace componeng::core {
 
 #define LOG_INFO(fmt, ...)                                                     \
-  Logger::Log(__FILE__, __FUNCTION__, "INFO", fmt, ##__VA_ARGS__)
+  core::Logger::Log(__FILE__, __FUNCTION__, "INFO", fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...)                                                    \
-  Logger::Log(__FILE__, __FUNCTION__, "ERROR", fmt, ##__VA_ARGS__)
+  core::Logger::Log(__FILE__, __FUNCTION__, "ERROR", fmt, ##__VA_ARGS__)
 
 /**
  * @brief Minimal printf-style logger that prints timestamped messages to

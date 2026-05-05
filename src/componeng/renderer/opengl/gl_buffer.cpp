@@ -1,5 +1,5 @@
-#include "componeng/core/logger.hpp"
 #include "componeng/renderer/opengl/gl_buffer.hpp"
+#include "componeng/core/logger.hpp"
 
 namespace componeng::renderer::opengl {
 
@@ -11,14 +11,16 @@ GLBuffer::~GLBuffer() {
   release();
 }
 
-void GLBuffer::setData(const void* data, size_t sizeBytes, IBuffer::Usage usage) {
+void GLBuffer::setData(const void *data, size_t sizeBytes,
+                       IBuffer::Usage usage) {
   m_size = sizeBytes;
   glBindBuffer(GL_ARRAY_BUFFER, m_id);
-  GLenum glUsage = (usage == IBuffer::Usage::Static) ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW;
+  GLenum glUsage =
+      (usage == IBuffer::Usage::Static) ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW;
   glBufferData(GL_ARRAY_BUFFER, sizeBytes, data, glUsage);
 }
 
-void GLBuffer::setSubData(size_t offset, const void* data, size_t sizeBytes) {
+void GLBuffer::setSubData(size_t offset, const void *data, size_t sizeBytes) {
   glBindBuffer(GL_ARRAY_BUFFER, m_id);
   glBufferSubData(GL_ARRAY_BUFFER, offset, sizeBytes, data);
 }
