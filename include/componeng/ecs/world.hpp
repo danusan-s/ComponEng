@@ -45,6 +45,12 @@ public:
   void createSystems();
   void updateSystems(float deltaTime);
   void destroySystems();
+  EventBus &eventBus();
+  ThreadPool &threadPool();
+  void setWindowHandle(void *handle);
+  void *getWindowHandle() const;
+  void setRenderDevice(renderer::api::IRenderDevice *device);
+  renderer::api::IRenderDevice *getRenderDevice() const;
 
   template <typename T> void registerComponent() {
     m_componentRegistry.registerComponent<T>();
@@ -197,24 +203,6 @@ public:
   std::shared_ptr<T>
   registerSystem(SystemGroup group = SystemGroup::Simulation) {
     return m_systemManager.registerSystem<T>(group);
-  }
-
-  ThreadPool &threadPool() {
-    return m_threadPool;
-  }
-
-  void setWindowHandle(void *handle) {
-    m_windowHandle = handle;
-  }
-  void *getWindowHandle() const {
-    return m_windowHandle;
-  }
-
-  void setRenderDevice(renderer::api::IRenderDevice *device) {
-    m_renderDevice = device;
-  }
-  renderer::api::IRenderDevice *getRenderDevice() const {
-    return m_renderDevice;
   }
 };
 

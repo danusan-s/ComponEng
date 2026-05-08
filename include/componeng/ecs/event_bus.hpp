@@ -10,20 +10,27 @@ namespace componeng::ecs {
 class IEventQueue {
 public:
   virtual ~IEventQueue() = default;
+  virtual void swapBuffers() = 0;
 };
 
 template <typename EventType> class EventQueue : public IEventQueue {
 public:
   void emit(const EventType &event) {
-    m_events.push_back(event);
+    m_write.push_back(event);
   }
 
   const std::vector<EventType> &getEvents() const {
-    return m_events;
+    return m_read;
+  }
+
+  void swapBuffers() override {
+    m_read.swap(m_write);
+    m_write.clear();
   }
 
 private:
-  std::vector<EventType> m_events;
+  std::vector<EventType> m_read;
+  std::vector<EventType> m_write;
 };
 
 class EventBus {
@@ -34,6 +41,12 @@ public:
 
   template <typename EventType> const std::vector<EventType> &getEvents() {
     return getQueue<EventType>().getEvents();
+  }
+
+  void swapBuffers() {
+    for (auto &pair : m_queues) {
+      pair.second->swapBuffers();
+    }
   }
 
 private:
