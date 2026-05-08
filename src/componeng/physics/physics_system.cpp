@@ -1,10 +1,12 @@
 #include "componeng/physics/physics_system.hpp"
+
 #include "componeng/components/collider_component.hpp"
 #include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
+#include "componeng/events/collision_event.hpp"
 #include "componeng/physics/collision_detection.hpp"
 #include <algorithm>
 #include <vector>
@@ -27,8 +29,6 @@ struct CollisionPair {
 };
 
 static double g_accumulatedTime = 0.0f;
-static int g_collisionCount = 0;
-static int g_runCount = 0;
 
 static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
                              const CollisionInfo &info) {
@@ -101,11 +101,6 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
 void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
   g_accumulatedTime += state.deltaTime;
   constexpr float fixedTimeStep = 1 / 60.0f;
-  if (g_accumulatedTime < fixedTimeStep) {
-    core::DebugUI::addValue("Collisions: ",
-                            float(g_collisionCount) / g_runCount);
-    return;
-  }
 
   while (g_accumulatedTime >= fixedTimeStep) {
     g_accumulatedTime -= fixedTimeStep;
@@ -191,20 +186,17 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
       f.wait();
 
     for (size_t t = 0; t < threadCollisions.size(); ++t) {
-      g_collisionCount += threadCollisions[t].size();
-    }
-    g_runCount++;
-
-    for (size_t t = 0; t < threadCollisions.size(); ++t) {
       for (auto &pair : threadCollisions[t]) {
         resolveCollision(colliders[pair.indexA], colliders[pair.indexB],
                          pair.info);
+
+        state.world->eventBus().emit<events::CollisionEvent>(
+            {.entityA = colliders[pair.indexA].entity,
+             .entityB = colliders[pair.indexB].entity,
+             .info = pair.info});
       }
     }
   }
-  core::DebugUI::addValue("Collisions: ", float(g_collisionCount) / g_runCount);
-  g_collisionCount = 0;
-  g_runCount = 0;
 }
 
 } // namespace componeng::physics

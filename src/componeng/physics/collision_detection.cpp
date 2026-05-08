@@ -1,4 +1,5 @@
 #include "componeng/physics/collision_detection.hpp"
+
 #include "componeng/components/transform_component.hpp"
 #include <algorithm>
 #include <cmath>
@@ -70,8 +71,8 @@ bool testSphereSphere(const components::TransformComponent &a,
 }
 
 bool testBoxSphere(const components::TransformComponent &a,
-                    const components::TransformComponent &b,
-                    CollisionInfo &info) {
+                   const components::TransformComponent &b,
+                   CollisionInfo &info) {
   core::Vec3 centerA = a.position;
   core::Vec3 sphereCenter = b.position;
 
