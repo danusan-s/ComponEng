@@ -27,7 +27,7 @@ makeArchetypes(componeng::ecs::ComponentRegistry &reg) {
   // Archetype 0: Pos only
   componeng::ecs::Signature sig0;
   sig0.set(reg.getComponentID<Pos>());
-  archs[0].init(sig0, &reg);
+  archs[0].init(sig0, reg);
   archs[0].addEntity(0);
   archs[0].addEntity(1);
 
@@ -35,7 +35,7 @@ makeArchetypes(componeng::ecs::ComponentRegistry &reg) {
   componeng::ecs::Signature sig1;
   sig1.set(reg.getComponentID<Pos>());
   sig1.set(reg.getComponentID<Vel>());
-  archs[1].init(sig1, &reg);
+  archs[1].init(sig1, reg);
   archs[1].addEntity(2);
   archs[1].addEntity(3);
 
@@ -44,7 +44,7 @@ makeArchetypes(componeng::ecs::ComponentRegistry &reg) {
   sig2.set(reg.getComponentID<Pos>());
   sig2.set(reg.getComponentID<Vel>());
   sig2.set(reg.getComponentID<Mass>());
-  archs[2].init(sig2, &reg);
+  archs[2].init(sig2, reg);
   archs[2].addEntity(4);
 
   return archs;

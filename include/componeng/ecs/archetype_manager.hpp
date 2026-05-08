@@ -21,7 +21,7 @@ private:
 
 public:
   Archetype &getOrCreate(const Signature &signature,
-                         ComponentRegistry *componentRegistry) {
+                         ComponentRegistry &componentRegistry) {
     if (signature == Signature(0)) {
       throw std::runtime_error("ArchetypeManager: signature cannot be empty");
     }

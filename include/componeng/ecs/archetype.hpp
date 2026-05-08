@@ -193,13 +193,13 @@ private:
 public:
   Signature m_signature;
 
-  void init(Signature signature, ComponentRegistry *registry) {
+  void init(Signature signature, ComponentRegistry &registry) {
     this->m_signature = signature;
 
     // build columns for each component in signature
     for (size_t i = 0; i < MAX_COMPONENTS; ++i) {
       if (signature.test(i)) {
-        ComponentInfo &info = registry->getComponentInfo(i);
+        ComponentInfo &info = registry.getComponentInfo(i);
         m_indexMap[i] = m_columns.size();
         m_columns.emplace_back(info.size, info.alignment, info.destructor);
       }

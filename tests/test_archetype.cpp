@@ -21,7 +21,7 @@ TEST(ArchetypeTest, InitSetsSignature) {
   sig.set(reg.getComponentID<Pos>());
 
   componeng::ecs::Archetype arch;
-  arch.init(sig, &reg);
+  arch.init(sig, reg);
   EXPECT_EQ(arch.m_signature, sig);
 }
 
@@ -31,7 +31,7 @@ TEST(ArchetypeTest, AddEntityIncreasesCount) {
   sig.set(reg.getComponentID<Pos>());
 
   componeng::ecs::Archetype arch;
-  arch.init(sig, &reg);
+  arch.init(sig, reg);
   arch.addEntity(0);
   arch.addEntity(1);
 
@@ -44,7 +44,7 @@ TEST(ArchetypeTest, GetColumnReturnsValidColumn) {
   sig.set(reg.getComponentID<Pos>());
 
   componeng::ecs::Archetype arch;
-  arch.init(sig, &reg);
+  arch.init(sig, reg);
   arch.addEntity(0);
 
   auto &col = arch.getColumn(reg.getComponentID<Pos>());
@@ -58,7 +58,7 @@ TEST(ArchetypeTest, GetReturnsCorrectComponent) {
   sig.set(reg.getComponentID<Pos>());
 
   componeng::ecs::Archetype arch;
-  arch.init(sig, &reg);
+  arch.init(sig, reg);
   arch.addEntity(0);
 
   Pos &p = arch.get<Pos>(reg.getComponentID<Pos>(), 0);
@@ -78,7 +78,7 @@ TEST(ArchetypeTest, RemoveEntityDecreasesCount) {
   sig.set(reg.getComponentID<Pos>());
 
   componeng::ecs::Archetype arch;
-  arch.init(sig, &reg);
+  arch.init(sig, reg);
   arch.addEntity(0);
   arch.addEntity(1);
   arch.addEntity(2);
@@ -93,7 +93,7 @@ TEST(ArchetypeTest, RemoveEntityReturnsSwappedEntity) {
   sig.set(reg.getComponentID<Pos>());
 
   componeng::ecs::Archetype arch;
-  arch.init(sig, &reg);
+  arch.init(sig, reg);
   arch.addEntity(10);
   arch.addEntity(20);
 
@@ -109,7 +109,7 @@ TEST(ArchetypeTest, GetRowForEntity) {
   sig.set(reg.getComponentID<Pos>());
 
   componeng::ecs::Archetype arch;
-  arch.init(sig, &reg);
+  arch.init(sig, reg);
   arch.addEntity(5);
   arch.addEntity(10);
 
@@ -123,7 +123,7 @@ TEST(ArchetypeTest, ThrowsOnInvalidColumn) {
   sig.set(reg.getComponentID<Pos>());
 
   componeng::ecs::Archetype arch;
-  arch.init(sig, &reg);
+  arch.init(sig, reg);
   arch.addEntity(0);
 
   EXPECT_THROW(arch.getColumn(reg.getComponentID<Vel>()), std::runtime_error);
@@ -136,7 +136,7 @@ TEST(ArchetypeTest, MultiComponentArchetype) {
   sig.set(reg.getComponentID<Vel>());
 
   componeng::ecs::Archetype arch;
-  arch.init(sig, &reg);
+  arch.init(sig, reg);
   arch.addEntity(0);
 
   Pos &p = arch.get<Pos>(reg.getComponentID<Pos>(), 0);

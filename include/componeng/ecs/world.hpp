@@ -6,6 +6,7 @@
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/entity_manager.hpp"
+#include "componeng/ecs/event_bus.hpp"
 #include "componeng/ecs/query.hpp"
 #include "componeng/ecs/system_manager.hpp"
 #include "componeng/ecs/thread_pool.hpp"
@@ -24,13 +25,16 @@ namespace componeng::ecs {
  */
 class World {
 private:
-  std::unique_ptr<ComponentRegistry> m_componentRegistry;
-  std::unique_ptr<EntityManager> m_entityManager;
-  std::unique_ptr<SystemManager> m_systemManager;
-  std::unique_ptr<ArchetypeManager> m_archetypeManager;
-  std::unique_ptr<ThreadPool> m_threadPool;
-
+  ComponentRegistry m_componentRegistry;
+  EntityManager m_entityManager;
+  SystemManager m_systemManager;
+  ArchetypeManager m_archetypeManager;
+  ThreadPool m_threadPool;
+  EventBus m_eventBus;
   std::unordered_map<ComponentID, std::vector<uint8_t>> m_singletons;
+
+  void *m_windowHandle = nullptr;
+  renderer::api::IRenderDevice *m_renderDevice = nullptr;
 
 public:
   double time = 0.0f;
@@ -43,7 +47,7 @@ public:
   void destroySystems();
 
   template <typename T> void registerComponent() {
-    m_componentRegistry->registerComponent<T>();
+    m_componentRegistry.registerComponent<T>();
   }
 
   template <typename... Components> void registerComponents() {
@@ -51,14 +55,14 @@ public:
   }
 
   template <typename T> T &getComponent(EntityID entity) {
-    EntityRecord &record = m_entityManager->getRecord(entity);
-    ComponentID componentID = m_componentRegistry->getComponentID<T>();
+    EntityRecord &record = m_entityManager.getRecord(entity);
+    ComponentID componentID = m_componentRegistry.getComponentID<T>();
 
     if (!record.signature.test(componentID)) {
       throw std::runtime_error("Entity does not have component");
     }
 
-    Archetype *archetype = m_archetypeManager->getBySignature(record.signature);
+    Archetype *archetype = m_archetypeManager.getBySignature(record.signature);
     return archetype->get<T>(componentID, record.row);
   }
 
@@ -68,20 +72,20 @@ public:
 
   template <typename... Ts>
   void addComponents(EntityID entity, Ts &&...components) {
-    EntityRecord &record = m_entityManager->getRecord(entity);
+    EntityRecord &record = m_entityManager.getRecord(entity);
 
     Signature oldSig = record.signature;
-    Archetype *oldArchetype = m_archetypeManager->getBySignature(oldSig);
+    Archetype *oldArchetype = m_archetypeManager.getBySignature(oldSig);
 
-    if ((oldSig & m_componentRegistry->makeSignature<Ts...>()).any()) {
+    if ((oldSig & m_componentRegistry.makeSignature<Ts...>()).any()) {
       throw std::runtime_error("Entity already has component");
     }
 
     Signature newSig = oldSig;
-    newSig = oldSig | m_componentRegistry->makeSignature<Ts...>();
+    newSig = oldSig | m_componentRegistry.makeSignature<Ts...>();
 
     Archetype &newArchetype =
-        m_archetypeManager->getOrCreate(newSig, m_componentRegistry.get());
+        m_archetypeManager.getOrCreate(newSig, m_componentRegistry);
     newArchetype.addEntity(entity);
 
     std::size_t newRow = newArchetype.getRowForEntity(entity);
@@ -106,11 +110,11 @@ public:
       }
       EntityID moved = oldArchetype->removeEntity(entity);
       if (moved != entity) {
-        m_entityManager->getRecord(moved).row = oldRow;
+        m_entityManager.getRecord(moved).row = oldRow;
       }
     }
 
-    (new (newArchetype.getColumn(m_componentRegistry->getComponentID<Ts>())
+    (new (newArchetype.getColumn(m_componentRegistry.getComponentID<Ts>())
               .at(newRow)) Ts(std::forward<Ts>(components)),
      ...);
 
@@ -119,11 +123,11 @@ public:
   }
 
   template <typename T> void removeComponent(EntityID entity) {
-    ComponentID componentID = m_componentRegistry->getComponentID<T>();
-    EntityRecord &record = m_entityManager->getRecord(entity);
+    ComponentID componentID = m_componentRegistry.getComponentID<T>();
+    EntityRecord &record = m_entityManager.getRecord(entity);
 
     Signature oldSig = record.signature;
-    Archetype *oldArchetype = m_archetypeManager->getBySignature(oldSig);
+    Archetype *oldArchetype = m_archetypeManager.getBySignature(oldSig);
 
     if (!oldSig.test(componentID)) {
       throw std::runtime_error("Entity does not have component");
@@ -133,7 +137,7 @@ public:
     newSig.reset(componentID);
 
     Archetype &newArchetype =
-        m_archetypeManager->getOrCreate(newSig, m_componentRegistry.get());
+        m_archetypeManager.getOrCreate(newSig, m_componentRegistry);
     newArchetype.addEntity(entity);
     std::size_t newRow = newArchetype.getRowForEntity(entity);
 
@@ -147,7 +151,7 @@ public:
     }
     EntityID moved = oldArchetype->removeEntity(entity);
     if (moved != entity) {
-      m_entityManager->getRecord(moved).row = oldRow;
+      m_entityManager.getRecord(moved).row = oldRow;
     }
 
     record.signature = newSig;
@@ -155,13 +159,13 @@ public:
   }
 
   template <typename T> bool hasComponent(EntityID entity) {
-    ComponentID componentID = m_componentRegistry->getComponentID<T>();
-    EntityRecord &record = m_entityManager->getRecord(entity);
+    ComponentID componentID = m_componentRegistry.getComponentID<T>();
+    EntityRecord &record = m_entityManager.getRecord(entity);
     return record.signature.test(componentID);
   }
 
   template <typename T> T &getSingleton() {
-    ComponentID componentID = m_componentRegistry->getComponentID<T>();
+    ComponentID componentID = m_componentRegistry.getComponentID<T>();
     auto it = m_singletons.find(componentID);
     if (it == m_singletons.end()) {
       throw std::runtime_error("Singleton not found");
@@ -170,7 +174,7 @@ public:
   }
 
   template <typename T> void setSingleton(const T &value) {
-    ComponentID componentID = m_componentRegistry->getComponentID<T>();
+    ComponentID componentID = m_componentRegistry.getComponentID<T>();
     std::vector<uint8_t> &storage = m_singletons[componentID];
     if (storage.empty()) {
       storage.resize(sizeof(T));
@@ -179,24 +183,24 @@ public:
   }
 
   template <typename T> bool hasSingleton() {
-    ComponentID componentID = m_componentRegistry->getComponentID<T>();
+    ComponentID componentID = m_componentRegistry.getComponentID<T>();
     return m_singletons.find(componentID) != m_singletons.end();
   }
 
   template <typename... Ts> Query<Ts...> query() {
     std::array<Archetype, MAX_ARCHETYPES> &archetypes =
-        m_archetypeManager->getArchetypes();
-    return Query<Ts...>(archetypes, *m_componentRegistry.get());
+        m_archetypeManager.getArchetypes();
+    return Query<Ts...>(archetypes, m_componentRegistry);
   }
 
   template <typename T>
   std::shared_ptr<T>
   registerSystem(SystemGroup group = SystemGroup::Simulation) {
-    return m_systemManager->registerSystem<T>(group);
+    return m_systemManager.registerSystem<T>(group);
   }
 
   ThreadPool &threadPool() {
-    return *m_threadPool;
+    return m_threadPool;
   }
 
   void setWindowHandle(void *handle) {
@@ -212,10 +216,6 @@ public:
   renderer::api::IRenderDevice *getRenderDevice() const {
     return m_renderDevice;
   }
-
-private:
-  void *m_windowHandle = nullptr;
-  renderer::api::IRenderDevice *m_renderDevice = nullptr;
 };
 
 } // namespace componeng::ecs
