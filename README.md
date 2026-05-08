@@ -6,7 +6,7 @@
 ![GLFW](https://img.shields.io/badge/GLFW-3.3-20232A)
 ![Status](https://img.shields.io/badge/Project-Learning%20Project-6C8E5E)
 
-An ECS-based game engine built in C++ using modern OpenGL. With an ImGui editor further down the line.
+An ECS-based game engine built in C++ using modern OpenGL, featuring an ImGui debug overlay.
 
 ## What This Project Does
 
@@ -25,7 +25,7 @@ Well the project initially started for a really silly reason. I was kinda tired 
 - **Physics System** - Fixed-timestep physics with gravity, velocity integration, and impulse-based collision resolution
 - **Collision Detection** - AABB vs AABB, Sphere vs Sphere, and AABB vs Sphere collision tests with proper contact normal and penetration depth calculation
 - **Diffuse Lighting** - Ambient + lambertian diffuse shading
-- **Debug UI** - ImGui overlay showing camera inspector and real-time FPS
+- **Debug UI** - ImGui overlay showing real-time FPS and average FPS
 
 https://github.com/user-attachments/assets/9a45ef11-346c-4247-b8d2-d867f22ae4d3
 
@@ -71,7 +71,6 @@ The ECS is built from scratch with no external dependencies. Key design decision
 | **Variadic Templates** | `World::registerComponents<Ts...>()`, `Query<Req...>`, `World::addComponents<Ts...>()` |
 | **Fold Expressions** | Component registration `(this->registerComponent<Components>(), ...)` |
 | **`std::index_sequence`** | Query iteration with compile-time tuple unpacking |
-| **`std::variant`** | `ColliderComponent` shape storage (AABB, Sphere, OBB, Capsule, Plane) |
 | **`std::unique_ptr`** | RAII management of registry, entity manager, system manager, archetype manager |
 | **Placement `new`** | Component construction in pre-allocated archetype memory |
 | **`std::type_index`** | Runtime type-to-ID mapping in `ComponentRegistry` |
@@ -110,7 +109,7 @@ make
 You can run the executable from any directory. For example, from the project root:
 
 ```bash
-./build/GameEngine
+./build/GameEngineTest
 ```
 
 ## Running Tests
@@ -119,7 +118,18 @@ The project includes unit tests for the ECS core and collision detection, built 
 
 ```bash
 cd build
-./EcsTests
+make
+```
+
+Individual test executables are created for each test suite:
+
+```bash
+cd build
+./test_entity_manager
+./test_component_registry
+./test_archetype
+./test_query
+./test_collision
 ```
 
 Or via CMake's test runner:
@@ -172,7 +182,7 @@ The following are the components and systems along with the example scene that a
 | InputComponent | Keyboard state (WASD, jump, crouch) |
 | MouseInputComponent | Mouse delta and button state |
 | RigidBodyComponent | Type (Static/Dynamic/Kinematic), velocity, mass, restitution |
-| ColliderComponent | Shape variant (AABB, Sphere, OBB, Capsule, Plane) |
+| ColliderComponent | Shape type (Box, Sphere) |
 
 ### ECS Systems
 | System | Description |
