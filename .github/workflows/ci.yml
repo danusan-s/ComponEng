@@ -38,3 +38,17 @@ jobs:
         run: |
           cd build
           xvfb-run ctest --output-on-failure
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install clang-format
+      run: sudo apt-get install -y clang-format
+
+    - name: Check formatting
+      run: |
+        find include src tests \
+          -name "*.hpp" -o -name "*.cpp" | \
+          xargs clang-format --dry-run --Werror
