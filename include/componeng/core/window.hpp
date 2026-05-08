@@ -17,8 +17,8 @@ namespace componeng::core {
 class Window {
 public:
   // Initialize GLFW, create window and OpenGL context, set up input callbacks
-void init(int width, int height, const char *title,
-           componeng::renderer::api::IRenderDevice *renderDevice);
+  void init(int width, int height, const char *title,
+            componeng::renderer::api::IRenderDevice *renderDevice);
   // Clean up GLFW resources and destroy window
   void shutdown();
 
