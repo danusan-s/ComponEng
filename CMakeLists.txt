@@ -28,20 +28,20 @@ file(GLOB ENGINE_SOURCES
 list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*main\\.cpp$")
 
 # Create STATIC library instead of executable
-add_library(GameEngine STATIC ${ENGINE_SOURCES})
+add_library(ComponEng STATIC ${ENGINE_SOURCES})
 
 # Include directories (PUBLIC so game can access them)
-target_include_directories(GameEngine
+target_include_directories(ComponEng
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/include/imgui
 )
 
 # GLM experimental
-target_compile_definitions(GameEngine PUBLIC GLM_ENABLE_EXPERIMENTAL)
+target_compile_definitions(ComponEng PUBLIC GLM_ENABLE_EXPERIMENTAL)
 
 # Link dependencies
-target_link_libraries(GameEngine
+target_link_libraries(ComponEng
     PUBLIC
         glfw
         OpenGL::GL
@@ -81,10 +81,14 @@ target_link_libraries(GameEngine
 #     target_compile_definitions(GameEngine PUBLIC RENDERER_BACKEND_VULKAN)
 # endif()
 
-add_executable(GameEngineTest src/main.cpp)
+file(GLOB EXAMPLE_SOURCES
+    "example/*.cpp"
+)
 
-target_link_libraries(GameEngineTest
-    PRIVATE GameEngine
+add_executable(ComponEx ${EXAMPLE_SOURCES})
+
+target_link_libraries(ComponEx
+  PRIVATE ComponEng
 )
 
 # Google Test
@@ -112,7 +116,7 @@ set(TEST_SOURCES
 foreach(TEST_SRC ${TEST_SOURCES})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
     add_executable(${TEST_NAME} ${TEST_SRC})
-    target_link_libraries(${TEST_NAME} PRIVATE GameEngine gtest_main)
+    target_link_libraries(${TEST_NAME} PRIVATE ComponEng gtest_main)
     target_compile_definitions(${TEST_NAME} PRIVATE GLM_ENABLE_EXPERIMENTAL)
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()
