@@ -22,7 +22,7 @@ using MeshID = uint32_t;
  * and returns const references on subsequent lookups. All access is through
  * static methods — no public constructor exists.
  */
-class ResourceManager {
+class AssetManager {
 public:
   static std::unordered_map<std::string, ShaderID> s_shaders;
   static std::unordered_map<std::string, TextureID> s_textures;
@@ -49,7 +49,7 @@ public:
   static void clear();
 
 private:
-  ResourceManager() {
+  AssetManager() {
   }
 
   static std::unique_ptr<Shader>
