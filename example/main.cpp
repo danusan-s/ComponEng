@@ -28,7 +28,7 @@ public:
     std::uniform_real_distribution<float> randMass(0.5f, 5.0f);
     std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);
 
-    const int count = 100;
+    const int count = 2500;
 
     for (int i = 0; i < count; ++i) {
       componeng::ecs::EntityID entity = world.createEntity();

@@ -1,5 +1,5 @@
 #include "componeng/renderer/shader.hpp"
-#include "componeng/core/logger.hpp"
+#include "componeng/utils/logger.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
 
 namespace componeng::renderer {

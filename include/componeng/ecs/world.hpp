@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/core/logger.hpp"
+#include "componeng/utils/logger.hpp"
 #include "componeng/ecs/archetype.hpp"
 #include "componeng/ecs/archetype_manager.hpp"
 #include "componeng/ecs/component_registry.hpp"

@@ -1,8 +1,8 @@
 #include "componeng/core/window.hpp"
 #include "componeng/core/engine.hpp"
-#include "componeng/core/logger.hpp"
 #include "componeng/core/raw_input_state.hpp"
 #include "componeng/resources/input_state.hpp"
+#include "componeng/utils/logger.hpp"
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
@@ -119,6 +119,8 @@ void Window::init(int width, int height, const char *title) {
   }
 
   glfwMakeContextCurrent(m_handle);
+
+  glfwSwapInterval(0);
 
   Engine &engine = Engine::get();
 

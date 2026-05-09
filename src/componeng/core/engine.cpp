@@ -7,8 +7,7 @@
 #include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
-#include "componeng/core/logger.hpp"
-#include "componeng/core/utils.hpp"
+#include "componeng/utils/utils.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/physics/physics_system.hpp"
 #include "componeng/renderer/asset_manager.hpp"
@@ -18,6 +17,7 @@
 #include "componeng/resources/main_camera.hpp"
 #include "componeng/systems/camera_system.hpp"
 #include "componeng/systems/input_system.hpp"
+#include "componeng/utils/logger.hpp"
 
 namespace componeng::core {
 
@@ -33,17 +33,17 @@ void Engine::init() {
   DebugUI::init();
 
   renderer::AssetManager::loadShader(
-      Utils::getAssetPath("assets/shaders/diffuse.vert").c_str(),
-      Utils::getAssetPath("assets/shaders/diffuse.frag").c_str(), nullptr,
+      utils::Utils::getAssetPath("assets/shaders/diffuse.vert").c_str(),
+      utils::Utils::getAssetPath("assets/shaders/diffuse.frag").c_str(), nullptr,
       "default");
 
   renderer::AssetManager::loadTexture(
-      Utils::getAssetPath("assets/textures/white.png").c_str(), false, "white");
+      utils::Utils::getAssetPath("assets/textures/white.png").c_str(), false, "white");
 
   renderer::AssetManager::loadMesh(
-      Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");
+      utils::Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");
   renderer::AssetManager::loadMesh(
-      Utils::getAssetPath("assets/models/sphere_smooth.obj").c_str(), "sphere");
+      utils::Utils::getAssetPath("assets/models/sphere_smooth.obj").c_str(), "sphere");
 
   registerComponents();
   registerSystems();

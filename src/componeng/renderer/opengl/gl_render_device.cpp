@@ -1,5 +1,5 @@
 #include "componeng/renderer/opengl/gl_render_device.hpp"
-#include "componeng/core/logger.hpp"
+#include "componeng/utils/logger.hpp"
 #include <GLFW/glfw3.h>
 #include <cstdint>
 

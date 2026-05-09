@@ -1,10 +1,10 @@
 #include "player_controller.hpp"
 #include "componeng/components/transform_component.hpp"
-#include "componeng/core/logger.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/resources/action_state.hpp"
 #include "componeng/resources/input_state.hpp"
 #include "componeng/resources/main_camera.hpp"
+#include "componeng/utils/logger.hpp"
 
 using namespace componeng;
 

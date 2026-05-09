@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace componeng::core {
+namespace componeng::utils {
 
 /**
  * @brief Static utility functions for filesystem path resolution.

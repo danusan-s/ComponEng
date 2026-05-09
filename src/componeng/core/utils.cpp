@@ -1,4 +1,4 @@
-#include "componeng/core/utils.hpp"
+#include "componeng/utils/utils.hpp"
 #include <filesystem>
 
 #if defined(_WIN32)
@@ -10,7 +10,7 @@
 #include <unistd.h>
 #endif
 
-namespace componeng::core {
+namespace componeng::utils {
 
 std::string Utils::getExecutablePath() {
 #if defined(_WIN32)

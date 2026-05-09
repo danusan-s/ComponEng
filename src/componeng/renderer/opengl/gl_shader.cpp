@@ -1,5 +1,5 @@
 #include "componeng/renderer/opengl/gl_shader.hpp"
-#include "componeng/core/logger.hpp"
+#include "componeng/utils/logger.hpp"
 #include <fstream>
 #include <sstream>
 

@@ -1,5 +1,5 @@
 #include "componeng/core/debug_ui.hpp"
-#include "componeng/core/logger.hpp"
+#include "componeng/utils/logger.hpp"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
