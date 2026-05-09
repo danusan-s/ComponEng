@@ -3,21 +3,10 @@
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
-#include "componeng/components/camera_component.hpp"
-#include "componeng/components/collider_component.hpp"
-#include "componeng/components/input_component.hpp"
-#include "componeng/components/material_component.hpp"
-#include "componeng/components/mesh_component.hpp"
-#include "componeng/components/rigidbody_component.hpp"
-#include "componeng/components/transform_component.hpp"
 #include "componeng/core/game.hpp"
 #include "componeng/core/window.hpp"
 #include "componeng/ecs/world.hpp"
-#include "componeng/physics/physics_system.hpp"
 #include "componeng/renderer/api/irender_device.hpp"
-#include "componeng/renderer/render_system.hpp"
-#include "componeng/systems/camera_system.hpp"
-#include "componeng/systems/input_system.hpp"
 
 namespace componeng::core {
 

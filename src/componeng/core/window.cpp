@@ -1,6 +1,8 @@
 #include "componeng/core/window.hpp"
-#include "componeng/core/input_state.hpp"
+#include "componeng/core/engine.hpp"
 #include "componeng/core/logger.hpp"
+#include "componeng/core/raw_input_state.hpp"
+#include "componeng/resources/input_state.hpp"
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
@@ -28,9 +30,8 @@ static void framebufferSizeCallback(GLFWwindow *window, int width, int height) {
 
 static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
                         int mode) {
-  auto *inputState =
-      static_cast<InputState *>(glfwGetWindowUserPointer(window));
-  if (!inputState)
+  auto *engine = static_cast<Engine *>(glfwGetWindowUserPointer(window));
+  if (!engine)
     return;
 
   if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
@@ -46,11 +47,14 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
   if (!g_mouseLocked)
     return;
 
+  RawInputState &inputState =
+      engine->m_world.get_resource<resources::InputState>().current_state;
+
   if (key >= 0 && key < 1024) {
     if (action == GLFW_PRESS)
-      inputState->keys[key] = true;
+      inputState.keys[key] = true;
     else if (action == GLFW_RELEASE)
-      inputState->keys[key] = false;
+      inputState.keys[key] = false;
   }
 
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
@@ -59,48 +63,38 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
 
 static void mouseButtonCallback(GLFWwindow *window, int button, int action,
                                 int mods) {
-  auto *inputState =
-      static_cast<InputState *>(glfwGetWindowUserPointer(window));
-  if (!inputState)
+  auto *engine = static_cast<Engine *>(glfwGetWindowUserPointer(window));
+  if (!engine)
     return;
+
+  RawInputState &inputState =
+      engine->m_world.get_resource<resources::InputState>().current_state;
 
   if (!g_mouseLocked)
     return;
 
   if (button >= 0 && button < 8) {
-    inputState->mouseButtons[button] = (action == GLFW_PRESS);
+    inputState.mouseButtons[button] = (action == GLFW_PRESS);
   }
 }
 
 static void cursorPosCallback(GLFWwindow *window, double xposIn,
                               double yposIn) {
-  auto *inputState =
-      static_cast<InputState *>(glfwGetWindowUserPointer(window));
-  if (!inputState)
+  auto *engine = static_cast<Engine *>(glfwGetWindowUserPointer(window));
+  if (!engine)
     return;
 
-  if (!g_mouseLocked) {
-    inputState->firstMouse = true;
-    return;
-  }
+  RawInputState &inputState =
+      engine->m_world.get_resource<resources::InputState>().current_state;
 
   float xpos = static_cast<float>(xposIn);
   float ypos = static_cast<float>(yposIn);
 
-  if (inputState->firstMouse) {
-    inputState->lastMouseX = xpos;
-    inputState->lastMouseY = ypos;
-    inputState->firstMouse = false;
-  }
-
-  inputState->lastMouseX = inputState->mouseX;
-  inputState->lastMouseY = inputState->mouseY;
-  inputState->mouseX = xpos;
-  inputState->mouseY = ypos;
+  inputState.mouseX = xpos;
+  inputState.mouseY = ypos;
 }
 
-void Window::init(int width, int height, const char *title,
-                  componeng::renderer::api::IRenderDevice *renderDevice) {
+void Window::init(int width, int height, const char *title) {
   this->m_width = width;
   this->m_height = height;
 
@@ -125,10 +119,12 @@ void Window::init(int width, int height, const char *title,
 
   glfwMakeContextCurrent(m_handle);
 
-  m_renderDevice = renderDevice;
+  Engine &engine = Engine::get();
+
+  m_renderDevice = engine.m_render_device;
   m_renderDevice->init(m_handle);
 
-  glfwSetWindowUserPointer(m_handle, &m_inputState);
+  glfwSetWindowUserPointer(m_handle, &engine);
   glfwSetKeyCallback(m_handle, keyCallback);
   glfwSetMouseButtonCallback(m_handle, mouseButtonCallback);
   glfwSetCursorPosCallback(m_handle, cursorPosCallback);

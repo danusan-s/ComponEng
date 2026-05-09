@@ -2,7 +2,6 @@
 
 #include "componeng/renderer/api/irender_device.hpp"
 #include "glad/glad.h"
-#include "input_state.hpp"
 #include <GLFW/glfw3.h>
 
 namespace componeng::core {
@@ -17,8 +16,8 @@ namespace componeng::core {
 class Window {
 public:
   // Initialize GLFW, create window and OpenGL context, set up input callbacks
-  void init(int width, int height, const char *title,
-            componeng::renderer::api::IRenderDevice *renderDevice);
+  void init(int width, int height, const char *title);
+
   // Clean up GLFW resources and destroy window
   void shutdown();
 
@@ -30,8 +29,6 @@ public:
   GLFWwindow *getHandle() const {
     return m_handle;
   }
-
-  InputState m_inputState;
 
 private:
   GLFWwindow *m_handle = nullptr;

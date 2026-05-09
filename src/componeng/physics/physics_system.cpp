@@ -190,7 +190,7 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
         resolveCollision(colliders[pair.indexA], colliders[pair.indexB],
                          pair.info);
 
-        state.world->eventBus().emit<events::CollisionEvent>(
+        state.world->emit_event<events::CollisionEvent>(
             {.entityA = colliders[pair.indexA].entity,
              .entityB = colliders[pair.indexB].entity,
              .info = pair.info});

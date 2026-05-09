@@ -1,5 +1,5 @@
 #pragma once
-#include "componeng/renderer/resource_manager.hpp"
+#include "componeng/renderer/asset_manager.hpp"
 
 namespace componeng::components {
 

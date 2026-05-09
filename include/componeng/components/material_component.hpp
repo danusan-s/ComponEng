@@ -1,6 +1,6 @@
 #pragma once
 #include "componeng/core/types.hpp"
-#include "componeng/renderer/resource_manager.hpp"
+#include "componeng/renderer/asset_manager.hpp"
 
 namespace componeng::components {
 

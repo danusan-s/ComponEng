@@ -1,11 +1,8 @@
-#include "componeng/core/logger.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/renderer/api/irender_device.hpp"
-#include "componeng/renderer/resource_manager.hpp"
+#include "componeng/renderer/asset_manager.hpp"
 #include <memory>
-#include <mutex>
-#include <thread>
 #include <unordered_map>
 #include <vector>
 

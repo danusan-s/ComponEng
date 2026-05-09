@@ -1,12 +1,24 @@
 #include "componeng/core/engine.hpp"
+
+#include "componeng/components/camera_component.hpp"
+#include "componeng/components/collider_component.hpp"
+#include "componeng/components/input_component.hpp"
+#include "componeng/components/material_component.hpp"
+#include "componeng/components/mesh_component.hpp"
+#include "componeng/components/rigidbody_component.hpp"
+#include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/core/logger.hpp"
 #include "componeng/core/utils.hpp"
 #include "componeng/ecs/entity.hpp"
+#include "componeng/physics/physics_system.hpp"
+#include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
-#include "componeng/renderer/resource_manager.hpp"
-
 #include "componeng/renderer/render_system.hpp"
+#include "componeng/resources/input_state.hpp"
+#include "componeng/resources/main_camera.hpp"
+#include "componeng/systems/camera_system.hpp"
+#include "componeng/systems/input_system.hpp"
 
 namespace componeng::core {
 
@@ -14,23 +26,24 @@ void Engine::init() {
   renderer::opengl::GLRenderDevice *renderDevice =
       new renderer::opengl::GLRenderDevice;
   m_render_device = renderDevice;
-  m_window.init(1280, 720, "ECS Game", renderDevice);
   m_world.init();
+
+  m_window.init(1280, 720, "ECS Game");
   m_world.setWindowHandle(m_window.getHandle());
   m_world.setRenderDevice(m_render_device);
   DebugUI::init();
 
-  renderer::ResourceManager::loadShader(
+  renderer::AssetManager::loadShader(
       Utils::getAssetPath("assets/shaders/diffuse.vert").c_str(),
       Utils::getAssetPath("assets/shaders/diffuse.frag").c_str(), nullptr,
       "default");
 
-  renderer::ResourceManager::loadTexture(
+  renderer::AssetManager::loadTexture(
       Utils::getAssetPath("assets/textures/white.png").c_str(), false, "white");
 
-  renderer::ResourceManager::loadMesh(
+  renderer::AssetManager::loadMesh(
       Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");
-  renderer::ResourceManager::loadMesh(
+  renderer::AssetManager::loadMesh(
       Utils::getAssetPath("assets/models/sphere_smooth.obj").c_str(), "sphere");
 
   registerComponents();
@@ -44,7 +57,6 @@ void Engine::registerComponents() {
       components::MaterialComponent, components::CameraComponent,
       components::MouseInputComponent, components::RigidBodyComponent,
       components::InputComponent, components::ColliderComponent>();
-  m_world.registerComponents<components::MainCameraSingleton>();
 }
 
 void Engine::registerSystems() {
@@ -77,8 +89,7 @@ void Engine::initObjects() {
                                       .deltaY = 0.0f,
                                       .leftButton = false,
                                       .rightButton = false});
-  m_world.setSingleton<components::MainCameraSingleton>(
-      components::MainCameraSingleton{.entity = cameraEntity});
+  m_world.set_resource(resources::MainCamera{.entity = cameraEntity});
 }
 
 void Engine::run(IGame &game) {
@@ -112,6 +123,9 @@ void Engine::run(IGame &game) {
     DebugUI::endFrame();
 
     m_window.swapBuffers();
+    resources::InputState &inputState =
+        m_world.get_resource<resources::InputState>();
+    inputState.previous_state = inputState.current_state;
     m_window.pollEvents();
 
     while (GLenum err = glGetError()) {
@@ -125,7 +139,7 @@ void Engine::run(IGame &game) {
 
 void Engine::shutdown() {
   DebugUI::shutdown();
-  renderer::ResourceManager::clear();
+  renderer::AssetManager::clear();
   m_window.shutdown();
   delete m_render_device;
 }

@@ -1,9 +1,12 @@
 #include "componeng/ecs/world.hpp"
+#include "componeng/core/raw_input_state.hpp"
 #include "componeng/events/entity_event.hpp"
+#include "componeng/resources/input_state.hpp"
 
 namespace componeng::ecs {
 
 void World::init() {
+  set_resource(resources::InputState());
   time = 0.0f;
 }
 
@@ -34,10 +37,6 @@ void World::updateSystems(float deltaTime) {
 
 void World::destroySystems() {
   m_systemManager.destroyAll(this);
-}
-
-EventBus &World::eventBus() {
-  return m_eventBus;
 }
 
 ThreadPool &World::threadPool() {

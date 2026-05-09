@@ -5,13 +5,14 @@
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/api/irender_device.hpp"
-#include "componeng/renderer/resource_manager.hpp"
+#include "componeng/renderer/asset_manager.hpp"
 
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
 #include "componeng/renderer/render_system.hpp"
+#include "componeng/resources/main_camera.hpp"
 
 namespace componeng::renderer {
 
@@ -115,7 +116,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   renderDevice->clear(0.0f, 0.0f, 0.0f, 1.0f);
 
   ecs::EntityID mainCameraID =
-      state.world->getSingleton<components::MainCameraSingleton>().entity;
+      state.world->get_resource<resources::MainCamera>().entity;
 
   core::Vec3 &cameraPos =
       state.world->getComponent<components::TransformComponent>(mainCameraID)
@@ -156,9 +157,9 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     const DrawKey &key = pair.first;
     const BatchData &data = pair.second;
 
-    const Shader &shader = ResourceManager::getShader(key.shaderID);
-    const Texture2D &texture = ResourceManager::getTexture(key.textureID);
-    const Mesh &model = ResourceManager::getMesh(key.meshID);
+    const Shader &shader = AssetManager::getShader(key.shaderID);
+    const Texture2D &texture = AssetManager::getTexture(key.textureID);
+    const Mesh &model = AssetManager::getMesh(key.meshID);
 
     shader.use();
     shader.setMatrix4("viewProj", viewProj);
