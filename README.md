@@ -39,13 +39,14 @@ The ECS is built from scratch with no external dependencies. Key design decision
 - **Bitset Signatures**: Component presence is tracked via `std::bitset<32>`, enabling O(1) signature comparison and fast archetype lookups.
 - **Type-Safe Queries**: The query system uses variadic templates and `std::index_sequence` for compile-time type resolution. Systems declare exactly which components they need, and the query engine iterates only matching archetypes.
 - **Entity Movement**: Adding or removing components moves entities between archetypes via `memcpy` of raw component bytes, with swap-remove to maintain dense storage.
-- **Singleton Support**: Special singleton components (e.g., `MainCameraSingleton`) are stored separately for global access patterns.
+- **Resource Manager**: Singleton or shared resources such as main camera entity or input state are stored in a `ResourceManager` accessible by systems during updates.
 
 ### Rendering Pipeline
 
 - **Batch Grouping**: Draw calls are grouped by (mesh, texture, shader) tuple with a custom hash function. Each batch creates a single instance VBO and uses `glDrawElementsInstanced`.
 - **Frustum Culling**: The view-projection matrix is decomposed into 6 frustum planes. Each entity's AABB is tested against all planes before being added to a batch.
 - **Matrix Upload**: Instance model matrices are uploaded as 4 `vec4` attributes with `glVertexAttribDivisor(1)` for per-instance data.
+- **Asset Management**: Shaders, textures, and meshes are loaded on demand and cached in a `ResourceManager` to avoid redundant loading.
 
 ### Physics
 
@@ -55,7 +56,7 @@ The ECS is built from scratch with no external dependencies. Key design decision
 
 ## Tech Stack
 
-- **C++17** - Variadic templates, `std::variant`, `std::unique_ptr`, fold expressions, structured bindings
+- **C++17** - Variadic templates, `std::unique_ptr`, fold expressions, structured bindings
 - **OpenGL 3.3 Core Profile** - Instanced rendering, VAOs/VBOs, shader compilation
 - **GLFW 3.3** - Window management, input handling
 - **GLAD** - OpenGL function loading
@@ -99,27 +100,20 @@ Ensure these are available before building:
 ```bash
 git clone <repository-url>
 cd ComponEng
-mkdir build && cd build
-cmake ..
-make
+make build
 ```
 
-## Running the Simulation
+## Running the Example
 
 You can run the executable from any directory. For example, from the project root:
 
 ```bash
-./build/ComponEx
+./build/example/ComponEx
 ```
 
 ## Running Tests
 
 The project includes unit tests for the ECS core and collision detection, built with Google Test.
-
-```bash
-cd build
-make
-```
 
 Individual test executables are created for each test suite:
 
@@ -143,8 +137,18 @@ For testing the graphical parts, run the example scene:
 
 ```bash
 cd build
-./GameEngineTest
+./example/ComponEx
 ```
+## Controls for Example
+
+| Input | Action |
+|-------|--------|
+| `W` / `A` / `S` / `D` | Move camera forward/left/backward/right |
+| `Space` | Move camera up |
+| `Left Shift` | Move camera down |
+| `Mouse` | Look around |
+| `F11` | Toggle mouse cursor lock |
+| `Escape` | Close window |
 
 ### Test Coverage
 
@@ -156,16 +160,6 @@ cd build
 | `QueryTest` | Required/excluded component matching, iteration over matching archetypes, `exclude()` returning reference |
 | `CollisionTest` | AABB-AABB, Sphere-Sphere, AABB-Sphere overlap detection, collision normals, edge cases |
 
-## Controls
-
-| Input | Action |
-|-------|--------|
-| `W` / `A` / `S` / `D` | Move camera forward/left/backward/right |
-| `Space` | Move camera up |
-| `Left Shift` | Move camera down |
-| `Mouse` | Look around |
-| `F11` | Toggle mouse cursor lock |
-| `Escape` | Close window |
 
 ## Components and Systems
 
