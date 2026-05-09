@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace componeng::ecs {
+namespace componeng::events {
 
 class IEventQueue {
 public:
@@ -63,4 +63,4 @@ private:
   }
 };
 
-} // namespace componeng::ecs
+} // namespace componeng::events

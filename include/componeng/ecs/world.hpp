@@ -6,11 +6,13 @@
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/entity_manager.hpp"
-#include "componeng/ecs/event_bus.hpp"
 #include "componeng/ecs/query.hpp"
 #include "componeng/ecs/system_manager.hpp"
 #include "componeng/ecs/thread_pool.hpp"
+#include "componeng/events/event_bus.hpp"
 #include "componeng/renderer/api/irender_device.hpp"
+#include "componeng/resources/resource_manager.hpp"
+#include <any>
 #include <memory>
 
 namespace componeng::ecs {
@@ -30,8 +32,8 @@ private:
   SystemManager m_systemManager;
   ArchetypeManager m_archetypeManager;
   ThreadPool m_threadPool;
-  EventBus m_eventBus;
-  std::unordered_map<ComponentID, std::vector<uint8_t>> m_singletons;
+  events::EventBus m_eventBus;
+  resources::ResourceManager m_resourceManager;
 
   void *m_windowHandle = nullptr;
   renderer::api::IRenderDevice *m_renderDevice = nullptr;
@@ -45,7 +47,6 @@ public:
   void createSystems();
   void updateSystems(float deltaTime);
   void destroySystems();
-  EventBus &eventBus();
   ThreadPool &threadPool();
   void setWindowHandle(void *handle);
   void *getWindowHandle() const;
@@ -170,27 +171,20 @@ public:
     return record.signature.test(componentID);
   }
 
-  template <typename T> T &getSingleton() {
-    ComponentID componentID = m_componentRegistry.getComponentID<T>();
-    auto it = m_singletons.find(componentID);
-    if (it == m_singletons.end()) {
-      throw std::runtime_error("Singleton not found");
-    }
-    return *reinterpret_cast<T *>(m_singletons[componentID].data());
+  template <typename T> void set_resource(T &&value) {
+    m_resourceManager.set<T>(std::forward<T>(value));
   }
 
-  template <typename T> void setSingleton(const T &value) {
-    ComponentID componentID = m_componentRegistry.getComponentID<T>();
-    std::vector<uint8_t> &storage = m_singletons[componentID];
-    if (storage.empty()) {
-      storage.resize(sizeof(T));
-    }
-    *reinterpret_cast<T *>(storage.data()) = value;
+  template <typename T> T &get_resource() {
+    return m_resourceManager.get<T>();
   }
 
-  template <typename T> bool hasSingleton() {
-    ComponentID componentID = m_componentRegistry.getComponentID<T>();
-    return m_singletons.find(componentID) != m_singletons.end();
+  template <typename T> void emit_event(const T &event) {
+    m_eventBus.emit<T>(event);
+  }
+
+  template <typename T> const std::vector<T> &get_events() {
+    return m_eventBus.getEvents<T>();
   }
 
   template <typename... Ts> Query<Ts...> query() {
