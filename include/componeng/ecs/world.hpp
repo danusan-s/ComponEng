@@ -11,8 +11,9 @@
 #include "componeng/ecs/thread_pool.hpp"
 #include "componeng/events/event_bus.hpp"
 #include "componeng/renderer/api/irender_device.hpp"
+#include "componeng/resources/action_state.hpp"
+#include "componeng/resources/input_state.hpp"
 #include "componeng/resources/resource_manager.hpp"
-#include <any>
 #include <memory>
 
 namespace componeng::ecs {
@@ -52,6 +53,13 @@ public:
   void *getWindowHandle() const;
   void setRenderDevice(renderer::api::IRenderDevice *device);
   renderer::api::IRenderDevice *getRenderDevice() const;
+
+  void swapInputBuffers() {
+    auto &inputState = get_resource<resources::InputState>();
+    auto &actionState = get_resource<resources::ActionState>();
+    inputState.previous_state = inputState.current_state;
+    actionState.swapBuffers();
+  }
 
   template <typename T> void registerComponent() {
     m_componentRegistry.registerComponent<T>();

@@ -2,7 +2,6 @@
 
 #include "componeng/components/camera_component.hpp"
 #include "componeng/components/collider_component.hpp"
-#include "componeng/components/input_component.hpp"
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
 #include "componeng/components/rigidbody_component.hpp"
@@ -55,8 +54,7 @@ void Engine::registerComponents() {
   m_world.registerComponents<
       components::TransformComponent, components::MeshComponent,
       components::MaterialComponent, components::CameraComponent,
-      components::MouseInputComponent, components::RigidBodyComponent,
-      components::InputComponent, components::ColliderComponent>();
+      components::RigidBodyComponent, components::ColliderComponent>();
 }
 
 void Engine::registerSystems() {
@@ -78,17 +76,8 @@ void Engine::initObjects() {
       components::CameraComponent{.fov = 45.0f,
                                   .aspectRatio = 16.0f / 9.0f,
                                   .nearPlane = 0.1f,
-                                  .farPlane = 10000.0f},
-      components::InputComponent{.forward = false,
-                                 .backward = false,
-                                 .left = false,
-                                 .right = false,
-                                 .jump = false,
-                                 .crouch = false},
-      components::MouseInputComponent{.deltaX = 0.0f,
-                                      .deltaY = 0.0f,
-                                      .leftButton = false,
-                                      .rightButton = false});
+                                  .farPlane = 10000.0f});
+
   m_world.set_resource(resources::MainCamera{.entity = cameraEntity});
 }
 
@@ -123,9 +112,7 @@ void Engine::run(IGame &game) {
     DebugUI::endFrame();
 
     m_window.swapBuffers();
-    resources::InputState &inputState =
-        m_world.get_resource<resources::InputState>();
-    inputState.previous_state = inputState.current_state;
+    m_world.swapInputBuffers();
     m_window.pollEvents();
 
     while (GLenum err = glGetError()) {

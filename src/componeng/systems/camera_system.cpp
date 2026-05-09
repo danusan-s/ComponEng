@@ -1,6 +1,5 @@
 #include "componeng/systems/camera_system.hpp"
 #include "componeng/components/camera_component.hpp"
-#include "componeng/components/input_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/core/types.hpp"

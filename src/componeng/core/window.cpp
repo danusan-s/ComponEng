@@ -51,10 +51,11 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
       engine->m_world.get_resource<resources::InputState>().current_state;
 
   if (key >= 0 && key < 1024) {
-    if (action == GLFW_PRESS)
+    if (action == GLFW_PRESS) {
       inputState.keys[key] = true;
-    else if (action == GLFW_RELEASE)
+    } else if (action == GLFW_RELEASE) {
       inputState.keys[key] = false;
+    }
   }
 
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)

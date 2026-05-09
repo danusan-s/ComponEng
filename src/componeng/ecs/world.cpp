@@ -1,12 +1,13 @@
 #include "componeng/ecs/world.hpp"
-#include "componeng/core/raw_input_state.hpp"
 #include "componeng/events/entity_event.hpp"
+#include "componeng/resources/action_state.hpp"
 #include "componeng/resources/input_state.hpp"
 
 namespace componeng::ecs {
 
 void World::init() {
   set_resource(resources::InputState());
+  set_resource(resources::ActionState());
   time = 0.0f;
 }
 

@@ -12,6 +12,10 @@ struct InputState {
     return current_state.keys[key] && !previous_state.keys[key];
   }
 
+  bool isKeyDown(int key) const {
+    return current_state.keys[key];
+  }
+
   bool isKeyReleased(int key) const {
     return !current_state.keys[key] && previous_state.keys[key];
   }
