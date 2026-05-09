@@ -40,6 +40,8 @@ target_include_directories(ComponEng
 # GLM experimental
 target_compile_definitions(ComponEng PUBLIC GLM_ENABLE_EXPERIMENTAL)
 
+target_compile_options(ComponEng PRIVATE -O3 -march=native -Wall -Wextra -Wpedantic)
+
 # Link dependencies
 target_link_libraries(ComponEng
     PUBLIC
