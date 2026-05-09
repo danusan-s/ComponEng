@@ -36,12 +36,6 @@ static void processKeyboardInput(components::TransformComponent &transform,
   core::Vec3 front, right, up;
   getCameraVectors(transform, front, right, up);
 
-  for (int i = 0; i < (int)resources::Action::Count; i++) {
-    if (actions.pressed((resources::Action)i)) {
-      LOG_INFO("Action %d is pressed", i);
-    }
-  }
-
   if (actions.down(resources::Action::Sprint))
     velocity *= 2.0f;
 

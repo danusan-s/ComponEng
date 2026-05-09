@@ -11,8 +11,8 @@ constexpr auto BACKWARD_KEY = GLFW_KEY_S;
 constexpr auto LEFT_KEY = GLFW_KEY_A;
 constexpr auto RIGHT_KEY = GLFW_KEY_D;
 constexpr auto JUMP_KEY = GLFW_KEY_SPACE;
-constexpr auto CROUCH_KEY = GLFW_KEY_LEFT_CONTROL;
-constexpr auto SPRINT_KEY = GLFW_KEY_LEFT_SHIFT;
+constexpr auto CROUCH_KEY = GLFW_KEY_LEFT_SHIFT;
+constexpr auto SPRINT_KEY = GLFW_KEY_LEFT_CONTROL;
 
 void InputSystem::onUpdate(const ecs::SystemState &state) {
   auto &inputState = state.world->get_resource<resources::InputState>();

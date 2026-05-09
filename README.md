@@ -109,7 +109,7 @@ make
 You can run the executable from any directory. For example, from the project root:
 
 ```bash
-./build/GameEngineTest
+./build/ComponEx
 ```
 
 ## Running Tests

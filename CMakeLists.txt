@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(GameEngine)
+project(ComponEng)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -81,15 +81,12 @@ target_link_libraries(ComponEng
 #     target_compile_definitions(GameEngine PUBLIC RENDERER_BACKEND_VULKAN)
 # endif()
 
-file(GLOB EXAMPLE_SOURCES
-    "example/*.cpp"
-)
+if (EXCLUDE_EXAMPLE)
+  message(STATUS "Excluding example executables")
+else()
+  add_subdirectory(example)
+endif()
 
-add_executable(ComponEx ${EXAMPLE_SOURCES})
-
-target_link_libraries(ComponEx
-  PRIVATE ComponEng
-)
 
 # Google Test
 include(FetchContent)
