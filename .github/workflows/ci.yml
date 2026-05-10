@@ -49,6 +49,6 @@ jobs:
 
     - name: Check formatting
       run: |
-        find include/componeng src/componeng tests \
+        find include/componeng src/componeng tests example \
           -name "*.hpp" -o -name "*.cpp" | \
           xargs clang-format --dry-run --Werror
