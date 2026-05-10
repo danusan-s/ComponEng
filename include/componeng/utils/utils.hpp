@@ -17,4 +17,4 @@ public:
   static std::string getAssetPath(const std::string &relativePath);
 };
 
-} // namespace componeng::core
+} // namespace componeng::utils

@@ -55,4 +55,4 @@ std::string Utils::getAssetPath(const std::string &relativePath) {
   return std::filesystem::weakly_canonical(assetPath).string();
 }
 
-} // namespace componeng::core
+} // namespace componeng::utils

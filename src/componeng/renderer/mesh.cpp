@@ -1,6 +1,6 @@
 #include "componeng/renderer/mesh.hpp"
-#include "componeng/utils/logger.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
+#include "componeng/utils/logger.hpp"
 #include <array>
 #include <sstream>
 

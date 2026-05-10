@@ -8,7 +8,7 @@ namespace componeng::utils {
 
 #define LOG_INFO(fmt, ...)                                                     \
   utils::Logger::Log(__FILE__, __FUNCTION__, "INFO", fmt, ##__VA_ARGS__)
-#define LOG_ERROR(fmt, ...)                                                     \
+#define LOG_ERROR(fmt, ...)                                                    \
   utils::Logger::Log(__FILE__, __FUNCTION__, "ERROR", fmt, ##__VA_ARGS__)
 
 /**
