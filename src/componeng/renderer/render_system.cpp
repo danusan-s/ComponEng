@@ -157,9 +157,10 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     const DrawKey &key = pair.first;
     const BatchData &data = pair.second;
 
-    const Shader &shader = AssetManager::getShader(key.shaderID);
-    const Texture2D &texture = AssetManager::getTexture(key.textureID);
-    const Mesh &model = AssetManager::getMesh(key.meshID);
+    const auto &assetManager = state.world->get_resource<AssetManager>();
+    const Shader &shader = assetManager.getShader(key.shaderID);
+    const Texture2D &texture = assetManager.getTexture(key.textureID);
+    const Mesh &model = assetManager.getMesh(key.meshID);
 
     shader.use();
     shader.setMatrix4("viewProj", viewProj);

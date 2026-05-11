@@ -5,21 +5,30 @@
 #include "player_controller.hpp"
 #include <random>
 
+#include "componeng/components/audio_component.hpp"
 #include "componeng/components/collider_component.hpp"
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
 #include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/ecs/world.hpp"
+#include "componeng/renderer/asset_manager.hpp"
+#include "componeng/utils/utils.hpp"
 
 using namespace componeng::core;
 using namespace componeng::components;
 using namespace componeng::ecs;
 using namespace componeng::renderer;
+using namespace componeng::utils;
 
 class Game : public IGame {
 public:
   void init(World &world) override {
+    auto &assetManager = world.get_resource<AssetManager>();
+
+    assetManager.loadAudio(Utils::getAssetPath("assets/audio/boop.wav").c_str(),
+                           "boop");
+
     std::default_random_engine generator;
     std::uniform_real_distribution<float> randPosition(-500.0f, 500.0f);
     std::uniform_real_distribution<float> randScale(1.0f, 5.0f);
@@ -28,7 +37,18 @@ public:
     std::uniform_real_distribution<float> randMass(0.5f, 5.0f);
     std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);
 
-    const int count = 2500;
+    EntityID soundEntity = world.createEntity();
+    world.addComponents(
+        soundEntity, TransformComponent{.position = glm::vec3(0, 0, 0)},
+        AudioComponent{.audioID = assetManager.getAudioID("boop"),
+                       .playOnAwake = true,
+                       .loop = true,
+                       .volume = 0.8f,
+                       .is3D = true,
+                       .minDistance = 1.0f,
+                       .maxDistance = 300.0f});
+
+    const int count = 100;
 
     for (int i = 0; i < count; ++i) {
       componeng::ecs::EntityID entity = world.createEntity();
@@ -37,7 +57,7 @@ public:
       world.addComponents(
           entity,
           componeng::components::MeshComponent{
-              .meshID = componeng::renderer::AssetManager::getMeshID("cube")},
+              .meshID = assetManager.getMeshID("cube")},
           componeng::components::TransformComponent{
               .position = Vec3(randPosition(generator), randPosition(generator),
                                randPosition(generator)),
@@ -49,8 +69,8 @@ public:
           MaterialComponent{.color =
                                 Vec4(randColor(generator), randColor(generator),
                                      randColor(generator), 1.0f),
-                            .textureID = AssetManager::getTextureID("white"),
-                            .shaderID = AssetManager::getShaderID("default")},
+                            .textureID = assetManager.getTextureID("white"),
+                            .shaderID = assetManager.getShaderID("default")},
           ColliderComponent{.type = ColliderType::Box,
                             .transform =
                                 TransformComponent{.position = Vec3(0.0f),
@@ -63,7 +83,7 @@ public:
 
       float scale = randScale(generator);
       world.addComponents(
-          entity, MeshComponent{.meshID = AssetManager::getMeshID("sphere")},
+          entity, MeshComponent{.meshID = assetManager.getMeshID("sphere")},
           TransformComponent{.position = Vec3(randPosition(generator),
                                               randPosition(generator),
                                               randPosition(generator)),
@@ -77,8 +97,8 @@ public:
           MaterialComponent{.color =
                                 Vec4(randColor(generator), randColor(generator),
                                      randColor(generator), 1.0f),
-                            .textureID = AssetManager::getTextureID("white"),
-                            .shaderID = AssetManager::getShaderID("default")},
+                            .textureID = assetManager.getTextureID("white"),
+                            .shaderID = assetManager.getShaderID("default")},
           ColliderComponent{.type = ColliderType::Sphere,
                             .transform =
                                 TransformComponent{.position = Vec3(0.0f),
@@ -92,10 +112,10 @@ public:
         TransformComponent{.position = Vec3(0.0f, -1000.0f, 0.0f),
                            .rotation = Vec3(0.0f),
                            .scale = Vec3(1000.0f, 1.0f, 1000.0f)},
-        MeshComponent{.meshID = AssetManager::getMeshID("cube")},
+        MeshComponent{.meshID = assetManager.getMeshID("cube")},
         MaterialComponent{.color = Vec4(0.5f, 0.5f, 0.5f, 1.0f),
-                          .textureID = AssetManager::getTextureID("white"),
-                          .shaderID = AssetManager::getShaderID("default")},
+                          .textureID = assetManager.getTextureID("white"),
+                          .shaderID = assetManager.getShaderID("default")},
         RigidBodyComponent{.type = RigidBodyComponent::Static,
                            .restitution = 1.0f},
         ColliderComponent{.type = ColliderType::Box,

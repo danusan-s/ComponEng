@@ -1,19 +1,21 @@
 #include "componeng/core/engine.hpp"
 
+#include "componeng/components/audio_component.hpp"
 #include "componeng/components/camera_component.hpp"
 #include "componeng/components/collider_component.hpp"
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
 #include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
+#include "componeng/core/audio_engine.hpp"
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/physics/physics_system.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
 #include "componeng/renderer/render_system.hpp"
-#include "componeng/resources/input_state.hpp"
 #include "componeng/resources/main_camera.hpp"
+#include "componeng/systems/audio_system.hpp"
 #include "componeng/systems/camera_system.hpp"
 #include "componeng/systems/input_system.hpp"
 #include "componeng/utils/logger.hpp"
@@ -32,18 +34,27 @@ void Engine::init() {
   m_world.setRenderDevice(m_render_device);
   DebugUI::init();
 
-  renderer::AssetManager::loadShader(
+  m_world.set_resource<core::AudioEngine>(core::AudioEngine());
+  auto &audioEngine = m_world.get_resource<core::AudioEngine>();
+  audioEngine.init();
+
+  m_world.set_resource<renderer::AssetManager>(renderer::AssetManager());
+  auto &assetManager = m_world.get_resource<renderer::AssetManager>();
+
+  assetManager.setAudioEngine(audioEngine);
+
+  assetManager.loadShader(
       utils::Utils::getAssetPath("assets/shaders/diffuse.vert").c_str(),
       utils::Utils::getAssetPath("assets/shaders/diffuse.frag").c_str(),
       nullptr, "default");
 
-  renderer::AssetManager::loadTexture(
+  assetManager.loadTexture(
       utils::Utils::getAssetPath("assets/textures/white.png").c_str(), false,
       "white");
 
-  renderer::AssetManager::loadMesh(
+  assetManager.loadMesh(
       utils::Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");
-  renderer::AssetManager::loadMesh(
+  assetManager.loadMesh(
       utils::Utils::getAssetPath("assets/models/sphere_smooth.obj").c_str(),
       "sphere");
 
@@ -56,14 +67,16 @@ void Engine::registerComponents() {
   m_world.registerComponents<
       components::TransformComponent, components::MeshComponent,
       components::MaterialComponent, components::CameraComponent,
-      components::RigidBodyComponent, components::ColliderComponent>();
+      components::RigidBodyComponent, components::ColliderComponent,
+      components::AudioComponent>();
 }
 
 void Engine::registerSystems() {
   m_world.registerSystem<systems::InputSystem>(
       ecs::SystemGroup::Initialization);
-  m_world.registerSystem<systems::CameraSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<physics::PhysicsSystem>(ecs::SystemGroup::Simulation);
+  m_world.registerSystem<systems::CameraSystem>(ecs::SystemGroup::Simulation);
+  m_world.registerSystem<systems::AudioSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<renderer::RenderSystem>(
       ecs::SystemGroup::Presentation);
 }
@@ -128,7 +141,10 @@ void Engine::run(IGame &game) {
 
 void Engine::shutdown() {
   DebugUI::shutdown();
-  renderer::AssetManager::clear();
+  auto &assetManager = m_world.get_resource<renderer::AssetManager>();
+  auto &audioEngine = m_world.get_resource<core::AudioEngine>();
+  assetManager.clear();
+  audioEngine.shutdown();
   m_window.shutdown();
   delete m_render_device;
 }
