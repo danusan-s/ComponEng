@@ -5,6 +5,9 @@
 #include <string>
 #include <unordered_map>
 
+#include <miniaudio.h>
+
+#include "componeng/core/audio_engine.hpp"
 #include "componeng/renderer/mesh.hpp"
 #include "componeng/renderer/shader.hpp"
 #include "componeng/renderer/texture.hpp"
@@ -14,9 +17,10 @@ namespace componeng::renderer {
 using ShaderID = uint32_t;
 using TextureID = uint32_t;
 using MeshID = uint32_t;
+using AudioID = uint32_t;
 
 /**
- * @brief Static asset manager for shaders, textures, and meshes.
+ * @brief Asset manager for shaders, textures, and meshes.
  *
  * Loads assets from disk on first request, caches them by string handle,
  * and returns const references on subsequent lookups. All access is through
@@ -24,44 +28,59 @@ using MeshID = uint32_t;
  */
 class AssetManager {
 public:
-  static std::unordered_map<std::string, ShaderID> s_shaders;
-  static std::unordered_map<std::string, TextureID> s_textures;
-  static std::unordered_map<std::string, MeshID> s_meshes;
+  AssetManager() = default;
+  ~AssetManager() = default;
 
-  static std::unordered_map<ShaderID, std::unique_ptr<Shader>>
-      s_shaderResources;
-  static std::unordered_map<TextureID, std::unique_ptr<Texture2D>>
-      s_textureResources;
-  static std::unordered_map<MeshID, std::unique_ptr<Mesh>> s_meshResources;
+  // Non-copyable, Movable
+  AssetManager(const AssetManager &) = delete;
+  AssetManager &operator=(const AssetManager &) = delete;
 
-  static void loadShader(const char *vShaderFile, const char *fShaderFile,
-                         const char *gShaderFile, std::string name);
-  static const Shader &getShader(ShaderID id);
-  static ShaderID getShaderID(std::string name);
-  static void loadTexture(const char *file, bool alpha, std::string name);
-  static const Texture2D &getTexture(TextureID id);
-  static TextureID getTextureID(std::string name);
-  static bool textureExists(std::string name);
-  static void addMesh(std::string name, std::unique_ptr<Mesh> mesh);
-  static void loadMesh(const char *file, std::string name);
-  static const Mesh &getMesh(MeshID id);
-  static MeshID getMeshID(std::string name);
-  static void clear();
+  AssetManager(AssetManager &&) = default;
+  AssetManager &operator=(AssetManager &&) = default;
+
+  ma_engine *m_audioEngine = nullptr;
+
+  void loadShader(const char *vShaderFile, const char *fShaderFile,
+                  const char *gShaderFile, std::string name);
+  const Shader &getShader(ShaderID id) const;
+  ShaderID getShaderID(std::string name) const;
+  void loadTexture(const char *file, bool alpha, std::string name);
+  const Texture2D &getTexture(TextureID id) const;
+  TextureID getTextureID(std::string name) const;
+  bool textureExists(std::string name) const;
+  void addMesh(std::string name, std::unique_ptr<Mesh> mesh);
+  void loadMesh(const char *file, std::string name);
+  const Mesh &getMesh(MeshID id) const;
+  MeshID getMeshID(std::string name) const;
+  void setAudioEngine(core::AudioEngine &audioEngine);
+  void loadAudio(const char *file, std::string name);
+  AudioID getAudioID(std::string name) const;
+  ma_sound *getAudio(AudioID id) const;
+
+  void clear();
 
 private:
-  AssetManager() {
-  }
+  std::unordered_map<std::string, ShaderID> m_shaders;
+  std::unordered_map<std::string, TextureID> m_textures;
+  std::unordered_map<std::string, MeshID> m_meshes;
 
-  static std::unique_ptr<Shader>
-  loadShaderFromFile(const char *vShaderFile, const char *fShaderFile,
-                     const char *gShaderFile = nullptr);
-  static std::unique_ptr<Texture2D> loadTextureFromFile(const char *file,
-                                                        bool alpha);
-  static std::unique_ptr<Mesh> loadMeshFromFile(const char *file);
+  std::unordered_map<ShaderID, std::unique_ptr<Shader>> m_shaderResources;
+  std::unordered_map<TextureID, std::unique_ptr<Texture2D>> m_textureResources;
+  std::unordered_map<MeshID, std::unique_ptr<Mesh>> m_meshResources;
 
-  static uint32_t nextShaderID;
-  static uint32_t nextTextureID;
-  static uint32_t nextMeshID;
+  std::unordered_map<std::string, AudioID> m_audioClips;
+  std::unordered_map<AudioID, std::unique_ptr<ma_sound>> m_audioResources;
+
+  std::unique_ptr<Shader> loadShaderFromFile(const char *vShaderFile,
+                                             const char *fShaderFile,
+                                             const char *gShaderFile = nullptr);
+  std::unique_ptr<Texture2D> loadTextureFromFile(const char *file, bool alpha);
+  std::unique_ptr<Mesh> loadMeshFromFile(const char *file);
+
+  uint32_t m_nextShaderID = 1;
+  uint32_t m_nextTextureID = 1;
+  uint32_t m_nextMeshID = 1;
+  uint32_t m_nextAudioID = 1;
 };
 
 } // namespace componeng::renderer

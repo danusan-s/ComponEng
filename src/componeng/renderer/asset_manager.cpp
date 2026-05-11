@@ -1,4 +1,8 @@
 #include "componeng/renderer/asset_manager.hpp"
+
+#define MINIAUDIO_IMPLEMENTATION
+#include <miniaudio.h>
+
 #include "componeng/utils/logger.hpp"
 #include <fstream>
 #include <sstream>
@@ -9,84 +13,63 @@
 
 namespace componeng::renderer {
 
-std::unordered_map<std::string, ShaderID> AssetManager::s_shaders;
-std::unordered_map<std::string, TextureID> AssetManager::s_textures;
-std::unordered_map<std::string, MeshID> AssetManager::s_meshes;
-
-std::unordered_map<ShaderID, std::unique_ptr<Shader>>
-    AssetManager::s_shaderResources;
-std::unordered_map<TextureID, std::unique_ptr<Texture2D>>
-    AssetManager::s_textureResources;
-std::unordered_map<MeshID, std::unique_ptr<Mesh>> AssetManager::s_meshResources;
-
-uint32_t AssetManager::nextShaderID = 1;
-uint32_t AssetManager::nextTextureID = 1;
-uint32_t AssetManager::nextMeshID = 1;
-
 void AssetManager::loadShader(const char *vShaderFile, const char *fShaderFile,
                               const char *gShaderFile, std::string name) {
   LOG_INFO("Loading Shader: %s", name.c_str());
-  ShaderID id = nextShaderID++;
-  s_shaders[name] = id;
-  s_shaderResources[id] =
+  ShaderID id = m_nextShaderID++;
+  m_shaders[name] = id;
+  m_shaderResources[id] =
       loadShaderFromFile(vShaderFile, fShaderFile, gShaderFile);
 }
 
-const Shader &AssetManager::getShader(ShaderID id) {
-  return *s_shaderResources.at(id);
+const Shader &AssetManager::getShader(ShaderID id) const {
+  return *m_shaderResources.at(id);
 }
 
-ShaderID AssetManager::getShaderID(std::string name) {
-  return s_shaders.at(name);
+ShaderID AssetManager::getShaderID(std::string name) const {
+  return m_shaders.at(name);
 }
 
 void AssetManager::loadTexture(const char *file, bool alpha, std::string name) {
   LOG_INFO("Loading Texture: %s", name.c_str());
-  TextureID id = nextTextureID++;
-  s_textures[name] = id;
-  s_textureResources[id] = loadTextureFromFile(file, alpha);
+  TextureID id = m_nextTextureID++;
+  m_textures[name] = id;
+  m_textureResources[id] = loadTextureFromFile(file, alpha);
 }
 
-const Texture2D &AssetManager::getTexture(TextureID id) {
-  return *s_textureResources.at(id);
+const Texture2D &AssetManager::getTexture(TextureID id) const {
+  return *m_textureResources.at(id);
 }
 
-TextureID AssetManager::getTextureID(std::string name) {
-  return s_textures.at(name);
+TextureID AssetManager::getTextureID(std::string name) const {
+  return m_textures.at(name);
 }
 
-bool AssetManager::textureExists(std::string name) {
-  return s_textures.find(name) != s_textures.end();
+bool AssetManager::textureExists(std::string name) const {
+  return m_textures.find(name) != m_textures.end();
 }
 
 void AssetManager::addMesh(std::string name, std::unique_ptr<Mesh> mesh) {
   LOG_INFO("Adding Mesh: %s", name.c_str());
   mesh->uploadToGPU();
-  MeshID id = nextMeshID++;
-  s_meshes[name] = id;
-  s_meshResources[id] = std::move(mesh);
+  MeshID id = m_nextMeshID++;
+  m_meshes[name] = id;
+  m_meshResources[id] = std::move(mesh);
 }
 
 void AssetManager::loadMesh(const char *file, std::string name) {
   LOG_INFO("Loading Model: %s", name.c_str());
-  MeshID id = nextMeshID++;
-  s_meshes[name] = id;
-  s_meshResources[id] = loadMeshFromFile(file);
+  MeshID id = m_nextMeshID++;
+  m_meshes[name] = id;
+  m_meshResources[id] = loadMeshFromFile(file);
 }
 
-const Mesh &AssetManager::getMesh(MeshID id) {
-  return *s_meshResources.at(id);
+const Mesh &AssetManager::getMesh(MeshID id) const {
+  return *m_meshResources.at(id);
 }
 
-MeshID AssetManager::getMeshID(std::string name) {
-  return s_meshes.at(name);
-}
-
-void AssetManager::clear() {
-  LOG_INFO("Deleting loaded resources");
-  s_shaders.clear();
-  s_textures.clear();
-  s_meshes.clear();
+MeshID AssetManager::getMeshID(std::string name) const {
+  return m_meshes.at(name);
 }
 
 std::unique_ptr<Shader> AssetManager::loadShaderFromFile(
@@ -148,6 +131,52 @@ std::unique_ptr<Mesh> AssetManager::loadMeshFromFile(const char *file) {
   mesh->generateFromWavefrontObj(modelData);
   mesh->uploadToGPU();
   return mesh;
+}
+
+void AssetManager::setAudioEngine(core::AudioEngine &audioEngine) {
+  m_audioEngine = &audioEngine.getEngine();
+  LOG_INFO("Audio engine initialized");
+}
+
+void AssetManager::loadAudio(const char *file, std::string name) {
+  LOG_INFO("Loading Audio: %s", name.c_str());
+
+  auto sound = std::make_unique<ma_sound>();
+  ma_result result = ma_sound_init_from_file(m_audioEngine, file, 0, nullptr,
+                                             nullptr, sound.get());
+  if (result != MA_SUCCESS) {
+    LOG_ERROR("Failed to load audio file: %s", file);
+    return;
+  }
+
+  AudioID id = m_nextAudioID++;
+  m_audioClips[name] = id;
+  m_audioResources[id] = std::move(sound);
+  LOG_INFO("Audio loaded successfully: %s (ID: %u)", name.c_str(), id);
+}
+
+AudioID AssetManager::getAudioID(std::string name) const {
+  return m_audioClips.at(name);
+}
+
+ma_sound *AssetManager::getAudio(AudioID id) const {
+  return m_audioResources.at(id).get();
+}
+
+void AssetManager::clear() {
+  LOG_INFO("Deleting loaded resources");
+
+  for (auto &pair : m_audioResources) {
+    ma_sound_uninit(pair.second.get());
+  }
+  m_audioResources.clear();
+  m_audioClips.clear();
+  m_shaders.clear();
+  m_shaderResources.clear();
+  m_textures.clear();
+  m_textureResources.clear();
+  m_meshes.clear();
+  m_meshResources.clear();
 }
 
 } // namespace componeng::renderer
