@@ -7,10 +7,10 @@
 
 #include <miniaudio.h>
 
-#include "componeng/core/audio_engine.hpp"
 #include "componeng/renderer/mesh.hpp"
 #include "componeng/renderer/shader.hpp"
 #include "componeng/renderer/texture.hpp"
+#include "componeng/resources/audio_engine.hpp"
 
 namespace componeng::renderer {
 
@@ -52,7 +52,7 @@ public:
   void loadMesh(const char *file, std::string name);
   const Mesh &getMesh(MeshID id) const;
   MeshID getMeshID(std::string name) const;
-  void setAudioEngine(core::AudioEngine &audioEngine);
+  void setAudioEngine(resources::AudioEngine &audioEngine);
   void loadAudio(const char *file, std::string name);
   AudioID getAudioID(std::string name) const;
   ma_sound *getAudio(AudioID id) const;

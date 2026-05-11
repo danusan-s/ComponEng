@@ -1,7 +1,7 @@
-#include "componeng/core/audio_engine.hpp"
+#include "componeng/resources/audio_engine.hpp"
 #include "componeng/utils/logger.hpp"
 
-namespace componeng::core {
+namespace componeng::resources {
 
 AudioEngine::AudioEngine() {
 }
@@ -34,4 +34,4 @@ ma_sound AudioEngine::loadAudioFromFile(const char *file) {
   return sound;
 }
 
-} // namespace componeng::core
+} // namespace componeng::resources

@@ -7,13 +7,13 @@
 #include "componeng/components/mesh_component.hpp"
 #include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
-#include "componeng/core/audio_engine.hpp"
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/physics/physics_system.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
 #include "componeng/renderer/render_system.hpp"
+#include "componeng/resources/audio_engine.hpp"
 #include "componeng/resources/main_camera.hpp"
 #include "componeng/systems/audio_system.hpp"
 #include "componeng/systems/camera_system.hpp"
@@ -34,8 +34,8 @@ void Engine::init() {
   m_world.setRenderDevice(m_render_device);
   DebugUI::init();
 
-  m_world.set_resource<core::AudioEngine>(core::AudioEngine());
-  auto &audioEngine = m_world.get_resource<core::AudioEngine>();
+  m_world.set_resource<resources::AudioEngine>(resources::AudioEngine());
+  auto &audioEngine = m_world.get_resource<resources::AudioEngine>();
   audioEngine.init();
 
   m_world.set_resource<renderer::AssetManager>(renderer::AssetManager());
@@ -142,7 +142,7 @@ void Engine::run(IGame &game) {
 void Engine::shutdown() {
   DebugUI::shutdown();
   auto &assetManager = m_world.get_resource<renderer::AssetManager>();
-  auto &audioEngine = m_world.get_resource<core::AudioEngine>();
+  auto &audioEngine = m_world.get_resource<resources::AudioEngine>();
   assetManager.clear();
   audioEngine.shutdown();
   m_window.shutdown();

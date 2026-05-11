@@ -2,7 +2,7 @@
 
 #include <miniaudio.h>
 
-namespace componeng::core {
+namespace componeng::resources {
 
 class AudioEngine {
 public:
@@ -21,4 +21,4 @@ private:
   ma_engine m_audioEngine;
 };
 
-} // namespace componeng::core
+} // namespace componeng::resources

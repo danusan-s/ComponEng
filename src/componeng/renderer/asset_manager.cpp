@@ -133,7 +133,7 @@ std::unique_ptr<Mesh> AssetManager::loadMeshFromFile(const char *file) {
   return mesh;
 }
 
-void AssetManager::setAudioEngine(core::AudioEngine &audioEngine) {
+void AssetManager::setAudioEngine(resources::AudioEngine &audioEngine) {
   m_audioEngine = &audioEngine.getEngine();
   LOG_INFO("Audio engine initialized");
 }
