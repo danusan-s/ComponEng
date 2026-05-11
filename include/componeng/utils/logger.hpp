@@ -4,12 +4,14 @@
 #include <cstring>
 #include <iostream>
 
-namespace componeng::utils {
-
 #define LOG_INFO(fmt, ...)                                                     \
-  utils::Logger::Log(__FILE__, __FUNCTION__, "INFO", fmt, ##__VA_ARGS__)
+  componeng::utils::Logger::Log(__FILE__, __FUNCTION__, "INFO", fmt,           \
+                                ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...)                                                    \
-  utils::Logger::Log(__FILE__, __FUNCTION__, "ERROR", fmt, ##__VA_ARGS__)
+  componeng::utils::Logger::Log(__FILE__, __FUNCTION__, "ERROR", fmt,          \
+                                ##__VA_ARGS__)
+
+namespace componeng::utils {
 
 /**
  * @brief Minimal printf-style logger that prints timestamped messages to

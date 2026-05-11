@@ -2,6 +2,7 @@
 #include "componeng/core/game.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 
+#include "collision_sounds.hpp"
 #include "player_controller.hpp"
 #include <random>
 
@@ -37,16 +38,23 @@ public:
     std::uniform_real_distribution<float> randMass(0.5f, 5.0f);
     std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);
 
-    EntityID soundEntity = world.createEntity();
-    world.addComponents(
-        soundEntity, TransformComponent{.position = glm::vec3(0, 0, 0)},
-        AudioComponent{.audioID = assetManager.getAudioID("boop"),
-                       .playOnAwake = true,
-                       .loop = true,
-                       .volume = 0.8f,
-                       .is3D = true,
-                       .minDistance = 1.0f,
-                       .maxDistance = 300.0f});
+    // EntityID soundEntity = world.createEntity();
+    // world.addComponents(
+    //     soundEntity,
+    //     TransformComponent{.position = glm::vec3(0, 0, 0),
+    //                        .rotation = glm::vec3(0, 0, 0),
+    //                        .scale = glm::vec3(1, 1, 1)},
+    //     AudioComponent{.audioID = assetManager.getAudioID("boop"),
+    //                    .playOnAwake = true,
+    //                    .loop = true,
+    //                    .volume = 0.8f,
+    //                    .is3D = true,
+    //                    .minDistance = 1.0f,
+    //                    .maxDistance = 300.0f},
+    //     MaterialComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f),
+    //                       .textureID = assetManager.getTextureID("white"),
+    //                       .shaderID = assetManager.getShaderID("default")},
+    //     MeshComponent{.meshID = assetManager.getMeshID("cube")});
 
     const int count = 100;
 
@@ -125,6 +133,7 @@ public:
                                                  .scale = Vec3(1.0f)}});
 
     world.registerSystem<PlayerController>(SystemGroup::Simulation);
+    world.registerSystem<CollisionSounds>(SystemGroup::Simulation);
   }
 
   void shutdown(World &world) override {

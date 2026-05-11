@@ -34,8 +34,7 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
       return;
     }
 
-    std::unique_ptr<ma_sound> sound =
-        audioEngine.decodeSound(assetManager.getAudio(audio.audioID));
+    auto sound = audioEngine.decodeSound(assetManager.getAudio(audio.audioID));
 
     if (audio.is3D) {
       audioEngine.setSoundPosition(sound.get(), transform.position.x,
@@ -46,25 +45,12 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
     audioEngine.setSoundSettings(sound.get(), audio.volume, audio.pitch,
                                  audio.loop ? MA_TRUE : MA_FALSE);
 
-    if (audioEngine.playSound(sound.get())) {
+    if (audioEngine.playSound(std::move(sound))) {
       audio.isPlaying = true;
     }
-
-    m_activeSounds.push_back(std::move(sound));
   });
 
-  for (size_t i = 0; i < m_activeSounds.size();) {
-    auto &sound = m_activeSounds[i];
-
-    if (!ma_sound_is_playing(sound.get())) {
-      ma_sound_uninit(sound.get());
-
-      m_activeSounds[i] = std::move(m_activeSounds.back());
-      m_activeSounds.pop_back();
-    } else {
-      ++i;
-    }
-  }
+  audioEngine.cleanupFinishedSounds();
 }
 
 } // namespace componeng::systems

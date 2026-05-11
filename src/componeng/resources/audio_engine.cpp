@@ -61,13 +61,40 @@ void AudioEngine::setSound3D(ma_sound *sound, float minDistance,
   ma_sound_set_attenuation_model(sound, ma_attenuation_model_linear);
 }
 
-bool AudioEngine::playSound(ma_sound *sound) {
-  ma_result result = ma_sound_start(sound);
+bool AudioEngine::playSound(std::unique_ptr<ma_sound> sound) {
+  ma_result result = ma_sound_start(sound.get());
+  m_activeSounds.push_back(std::move(sound));
   if (result != MA_SUCCESS) {
     LOG_ERROR("Failed to play sound");
     return false;
   }
   return true;
+}
+
+bool AudioEngine::playSoundFromDataSource(ma_decoder *decoder, float x, float y,
+                                          float z, float volume, float pitch,
+                                          bool loop, float minDistance,
+                                          float maxDistance) {
+  auto sound = decodeSound(decoder);
+  setSoundPosition(sound.get(), x, y, z);
+  setSoundSettings(sound.get(), volume, pitch, loop);
+  setSound3D(sound.get(), minDistance, maxDistance);
+  return playSound(std::move(sound));
+}
+
+void AudioEngine::cleanupFinishedSounds() {
+  for (size_t i = 0; i < m_activeSounds.size();) {
+    auto &sound = m_activeSounds[i];
+
+    if (!ma_sound_is_playing(sound.get())) {
+      ma_sound_uninit(sound.get());
+
+      m_activeSounds[i] = std::move(m_activeSounds.back());
+      m_activeSounds.pop_back();
+    } else {
+      ++i;
+    }
+  }
 }
 
 std::unique_ptr<ma_decoder> AudioEngine::getDecodedAudioFile(const char *file) {
