@@ -1,8 +1,9 @@
 #pragma once
 
 #include "componeng/ecs/system.hpp"
-#include "vector"
+#include <memory>
 #include <miniaudio.h>
+#include <vector>
 
 namespace componeng::systems {
 
@@ -11,7 +12,7 @@ public:
   void onUpdate(const ecs::SystemState &state) override;
 
 private:
-  std::vector<ma_sound *> m_activeSounds;
+  std::vector<std::unique_ptr<ma_sound>> m_activeSounds;
 };
 
 } // namespace componeng::systems

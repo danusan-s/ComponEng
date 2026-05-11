@@ -31,14 +31,13 @@ void AudioEngine::setListenerPosition(float x, float y, float z) {
   ma_engine_listener_set_position(&m_audioEngine, 0, x, y, z);
 }
 
-ma_sound *AudioEngine::decodeSound(ma_decoder *decoder) {
-  ma_sound *sound = new ma_sound;
+std::unique_ptr<ma_sound> AudioEngine::decodeSound(ma_decoder *decoder) {
+  std::unique_ptr<ma_sound> sound = std::make_unique<ma_sound>();
   ma_result result = ma_sound_init_from_data_source(
-      &m_audioEngine, decoder, MA_SOUND_FLAG_DECODE, nullptr, sound);
+      &m_audioEngine, decoder, MA_SOUND_FLAG_DECODE, nullptr, sound.get());
 
   if (result != MA_SUCCESS) {
     LOG_ERROR("Failed to decode sound from decoder");
-    delete sound;
     return nullptr;
   }
   return sound;
@@ -71,9 +70,9 @@ bool AudioEngine::playSound(ma_sound *sound) {
   return true;
 }
 
-ma_decoder AudioEngine::getDecodedAudioFile(const char *file) {
-  ma_decoder decoder;
-  ma_result result = ma_decoder_init_file(file, nullptr, &decoder);
+std::unique_ptr<ma_decoder> AudioEngine::getDecodedAudioFile(const char *file) {
+  std::unique_ptr<ma_decoder> decoder = std::make_unique<ma_decoder>();
+  ma_result result = ma_decoder_init_file(file, nullptr, decoder.get());
   if (result != MA_SUCCESS) {
     LOG_ERROR("Failed to load audio file: %s", file);
   }

@@ -34,33 +34,32 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
       return;
     }
 
-    ma_sound *sound =
+    std::unique_ptr<ma_sound> sound =
         audioEngine.decodeSound(assetManager.getAudio(audio.audioID));
 
     if (audio.is3D) {
-      audioEngine.setSoundPosition(sound, transform.position.x,
+      audioEngine.setSoundPosition(sound.get(), transform.position.x,
                                    transform.position.y, transform.position.z);
-      audioEngine.setSound3D(sound, audio.minDistance, audio.maxDistance);
+      audioEngine.setSound3D(sound.get(), audio.minDistance, audio.maxDistance);
     }
 
-    audioEngine.setSoundSettings(sound, audio.volume, audio.pitch,
+    audioEngine.setSoundSettings(sound.get(), audio.volume, audio.pitch,
                                  audio.loop ? MA_TRUE : MA_FALSE);
 
-    if (audioEngine.playSound(sound)) {
+    if (audioEngine.playSound(sound.get())) {
       audio.isPlaying = true;
     }
 
-    m_activeSounds.push_back(sound);
+    m_activeSounds.push_back(std::move(sound));
   });
 
   for (size_t i = 0; i < m_activeSounds.size();) {
-    ma_sound *sound = m_activeSounds[i];
+    auto &sound = m_activeSounds[i];
 
-    if (!ma_sound_is_playing(sound)) {
-      ma_sound_uninit(sound);
-      delete sound;
+    if (!ma_sound_is_playing(sound.get())) {
+      ma_sound_uninit(sound.get());
 
-      m_activeSounds[i] = m_activeSounds.back();
+      m_activeSounds[i] = std::move(m_activeSounds.back());
       m_activeSounds.pop_back();
     } else {
       ++i;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <miniaudio.h>
 
 namespace componeng::resources {
@@ -16,13 +17,13 @@ public:
   }
 
   void setListenerPosition(float x, float y, float z);
-  ma_sound *decodeSound(ma_decoder *decoder);
+  std::unique_ptr<ma_sound> decodeSound(ma_decoder *decoder);
   void setSoundPosition(ma_sound *sound, float x, float y, float z);
   void setSoundSettings(ma_sound *sound, float volume, float pitch, bool loop);
   void setSound3D(ma_sound *sound, float minDistance, float maxDistance);
   bool playSound(ma_sound *sound);
 
-  ma_decoder getDecodedAudioFile(const char *file);
+  std::unique_ptr<ma_decoder> getDecodedAudioFile(const char *file);
 
 private:
   ma_engine m_audioEngine;

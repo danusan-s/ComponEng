@@ -141,12 +141,11 @@ void AssetManager::setAudioEngine(resources::AudioEngine &audioEngine) {
 void AssetManager::loadAudio(const char *file, std::string name) {
   LOG_INFO("Loading Audio: %s", name.c_str());
 
-  ma_decoder decoder = m_audioEngine->getDecodedAudioFile(file);
-  auto decoderPtr = std::make_unique<ma_decoder>(decoder);
+  auto decoder = m_audioEngine->getDecodedAudioFile(file);
 
   AudioID id = m_nextAudioID++;
   m_audioClips[name] = id;
-  m_audioResources[id] = std::move(decoderPtr);
+  m_audioResources[id] = std::move(decoder);
   LOG_INFO("Audio loaded successfully: %s (ID: %u)", name.c_str(), id);
 }
 
