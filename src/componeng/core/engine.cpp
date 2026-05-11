@@ -41,8 +41,6 @@ void Engine::init() {
   m_world.set_resource<renderer::AssetManager>(renderer::AssetManager());
   auto &assetManager = m_world.get_resource<renderer::AssetManager>();
 
-  assetManager.setAudioEngine(audioEngine);
-
   assetManager.loadShader(
       utils::Utils::getAssetPath("assets/shaders/diffuse.vert").c_str(),
       utils::Utils::getAssetPath("assets/shaders/diffuse.frag").c_str(),

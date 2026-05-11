@@ -5,8 +5,6 @@
 #include <string>
 #include <unordered_map>
 
-#include <miniaudio.h>
-
 #include "componeng/renderer/mesh.hpp"
 #include "componeng/renderer/shader.hpp"
 #include "componeng/renderer/texture.hpp"
@@ -52,24 +50,21 @@ public:
   void loadMesh(const char *file, std::string name);
   const Mesh &getMesh(MeshID id) const;
   MeshID getMeshID(std::string name) const;
-  void setAudioEngine(resources::AudioEngine &audioEngine);
   void loadAudio(const char *file, std::string name);
   AudioID getAudioID(std::string name) const;
-  ma_decoder *getAudio(AudioID id) const;
-
+  const char *getAudio(AudioID id) const;
   void clear();
 
 private:
   std::unordered_map<std::string, ShaderID> m_shaders;
   std::unordered_map<std::string, TextureID> m_textures;
   std::unordered_map<std::string, MeshID> m_meshes;
+  std::unordered_map<std::string, AudioID> m_audios;
 
   std::unordered_map<ShaderID, std::unique_ptr<Shader>> m_shaderResources;
   std::unordered_map<TextureID, std::unique_ptr<Texture2D>> m_textureResources;
   std::unordered_map<MeshID, std::unique_ptr<Mesh>> m_meshResources;
-
-  std::unordered_map<std::string, AudioID> m_audioClips;
-  std::unordered_map<AudioID, std::unique_ptr<ma_decoder>> m_audioResources;
+  std::unordered_map<AudioID, std::string> m_audioPaths;
 
   std::unique_ptr<Shader> loadShaderFromFile(const char *vShaderFile,
                                              const char *fShaderFile,

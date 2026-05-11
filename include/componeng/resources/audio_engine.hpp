@@ -22,19 +22,18 @@ public:
     return m_audioEngine;
   }
 
-  std::unique_ptr<ma_decoder> getDecodedAudioFile(const char *file);
-  std::unique_ptr<ma_sound> decodeSound(ma_decoder *decoder);
-
   void setListenerPosition(float x, float y, float z);
+
+  std::unique_ptr<ma_sound> createSound(const char *filePath);
   void setSoundPosition(ma_sound *sound, float x, float y, float z);
   void setSoundSettings(ma_sound *sound, float volume, float pitch, bool loop);
   void setSound3D(ma_sound *sound, float minDistance, float maxDistance);
 
   bool playSound(std::unique_ptr<ma_sound> sound);
 
-  bool playSoundFromDataSource(ma_decoder *decoder, float x, float y, float z,
-                               float volume, float pitch, bool loop,
-                               float minDistance, float maxDistance);
+  bool playSoundFromFile(const char *filePath, float x, float y, float z,
+                         float volume, float pitch, bool loop,
+                         float minDistance, float maxDistance);
 
   void cleanupFinishedSounds();
 

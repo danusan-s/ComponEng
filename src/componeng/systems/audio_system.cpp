@@ -34,7 +34,8 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
       return;
     }
 
-    auto sound = audioEngine.decodeSound(assetManager.getAudio(audio.audioID));
+    auto soundPath = assetManager.getAudio(audio.audioID);
+    auto sound = audioEngine.createSound(soundPath);
 
     if (audio.is3D) {
       audioEngine.setSoundPosition(sound.get(), transform.position.x,

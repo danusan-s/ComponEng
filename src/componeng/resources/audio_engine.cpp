@@ -1,5 +1,6 @@
+#define MINIAUDIO_IMPLEMENTATION
+
 #include "componeng/resources/audio_engine.hpp"
-#include "componeng/renderer/asset_manager.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <miniaudio.h>
@@ -23,6 +24,9 @@ void AudioEngine::init() {
 }
 
 void AudioEngine::shutdown() {
+  for (auto &sound : m_activeSounds) {
+    ma_sound_uninit(sound.get());
+  }
   ma_engine_uninit(&m_audioEngine);
   LOG_INFO("Audio engine shutdown");
 }
@@ -31,13 +35,14 @@ void AudioEngine::setListenerPosition(float x, float y, float z) {
   ma_engine_listener_set_position(&m_audioEngine, 0, x, y, z);
 }
 
-std::unique_ptr<ma_sound> AudioEngine::decodeSound(ma_decoder *decoder) {
+std::unique_ptr<ma_sound> AudioEngine::createSound(const char *filePath) {
   std::unique_ptr<ma_sound> sound = std::make_unique<ma_sound>();
-  ma_result result = ma_sound_init_from_data_source(
-      &m_audioEngine, decoder, MA_SOUND_FLAG_DECODE, nullptr, sound.get());
+  ma_result result =
+      ma_sound_init_from_file(&m_audioEngine, filePath, MA_SOUND_FLAG_DECODE,
+                              nullptr, nullptr, sound.get());
 
   if (result != MA_SUCCESS) {
-    LOG_ERROR("Failed to decode sound from decoder");
+    LOG_ERROR("Failed to create sound from file: %s", filePath);
     return nullptr;
   }
   return sound;
@@ -71,11 +76,14 @@ bool AudioEngine::playSound(std::unique_ptr<ma_sound> sound) {
   return true;
 }
 
-bool AudioEngine::playSoundFromDataSource(ma_decoder *decoder, float x, float y,
-                                          float z, float volume, float pitch,
-                                          bool loop, float minDistance,
-                                          float maxDistance) {
-  auto sound = decodeSound(decoder);
+bool AudioEngine::playSoundFromFile(const char *filePath, float x, float y,
+                                    float z, float volume, float pitch,
+                                    bool loop, float minDistance,
+                                    float maxDistance) {
+  auto sound = createSound(filePath);
+  if (!sound) {
+    return false;
+  }
   setSoundPosition(sound.get(), x, y, z);
   setSoundSettings(sound.get(), volume, pitch, loop);
   setSound3D(sound.get(), minDistance, maxDistance);
@@ -95,15 +103,6 @@ void AudioEngine::cleanupFinishedSounds() {
       ++i;
     }
   }
-}
-
-std::unique_ptr<ma_decoder> AudioEngine::getDecodedAudioFile(const char *file) {
-  std::unique_ptr<ma_decoder> decoder = std::make_unique<ma_decoder>();
-  ma_result result = ma_decoder_init_file(file, nullptr, decoder.get());
-  if (result != MA_SUCCESS) {
-    LOG_ERROR("Failed to load audio file: %s", file);
-  }
-  return decoder;
 }
 
 } // namespace componeng::resources

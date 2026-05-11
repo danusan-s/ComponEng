@@ -1,8 +1,5 @@
 #include "componeng/renderer/asset_manager.hpp"
 
-#define MINIAUDIO_IMPLEMENTATION
-#include <miniaudio.h>
-
 #include "componeng/utils/logger.hpp"
 #include <fstream>
 #include <sstream>
@@ -133,38 +130,28 @@ std::unique_ptr<Mesh> AssetManager::loadMeshFromFile(const char *file) {
   return mesh;
 }
 
-void AssetManager::setAudioEngine(resources::AudioEngine &audioEngine) {
-  m_audioEngine = &audioEngine;
-  LOG_INFO("Audio engine initialized");
-}
-
 void AssetManager::loadAudio(const char *file, std::string name) {
   LOG_INFO("Loading Audio: %s", name.c_str());
 
-  auto decoder = m_audioEngine->getDecodedAudioFile(file);
-
   AudioID id = m_nextAudioID++;
-  m_audioClips[name] = id;
-  m_audioResources[id] = std::move(decoder);
+  m_audios[name] = id;
+  m_audioPaths[id] = file;
   LOG_INFO("Audio loaded successfully: %s (ID: %u)", name.c_str(), id);
 }
 
 AudioID AssetManager::getAudioID(std::string name) const {
-  return m_audioClips.at(name);
+  return m_audios.at(name);
 }
 
-ma_decoder *AssetManager::getAudio(AudioID id) const {
-  return m_audioResources.at(id).get();
+const char *AssetManager::getAudio(AudioID id) const {
+  return m_audioPaths.at(id).c_str();
 }
 
 void AssetManager::clear() {
   LOG_INFO("Deleting loaded resources");
 
-  for (auto &pair : m_audioResources) {
-    ma_decoder_uninit(pair.second.get());
-  }
-  m_audioResources.clear();
-  m_audioClips.clear();
+  m_audios.clear();
+  m_audioPaths.clear();
   m_shaders.clear();
   m_shaderResources.clear();
   m_textures.clear();

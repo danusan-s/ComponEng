@@ -26,7 +26,6 @@ class Game : public IGame {
 public:
   void init(World &world) override {
     auto &assetManager = world.get_resource<AssetManager>();
-
     assetManager.loadAudio(Utils::getAssetPath("assets/audio/boop.wav").c_str(),
                            "boop");
 
@@ -56,7 +55,7 @@ public:
     //                       .shaderID = assetManager.getShaderID("default")},
     //     MeshComponent{.meshID = assetManager.getMeshID("cube")});
 
-    const int count = 100;
+    const int count = 10;
 
     for (int i = 0; i < count; ++i) {
       componeng::ecs::EntityID entity = world.createEntity();

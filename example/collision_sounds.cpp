@@ -15,7 +15,7 @@ void CollisionSounds::onUpdate(const componeng::ecs::SystemState &state) {
   auto &audioEngine =
       state.world->get_resource<componeng::resources::AudioEngine>();
 
-  auto soundDataSource = assetManager.getAudio(assetManager.getAudioID("boop"));
+  auto soundPath = assetManager.getAudio(assetManager.getAudioID("boop"));
 
   auto &mainCamera =
       state.world->get_resource<componeng::resources::MainCamera>();
@@ -40,12 +40,13 @@ void CollisionSounds::onUpdate(const componeng::ecs::SystemState &state) {
     auto position = a_transform.position -
                     event.info.normal * event.info.penetration * 0.5f;
 
-    audioEngine.playSoundFromDataSource(soundDataSource, position.x, position.y,
-                                        position.z, 0.8f, 1.0f, false, 1.0f,
-                                        300.0f);
+    audioEngine.playSoundFromFile(soundPath, position.x, position.y, position.z,
+                                  0.8f, 1.0f, false, 1.0f, 1000.0f);
 
-    LOG_INFO("Collision detected between Entity %d and Entity %d at position "
-             "(%.2f, %.2f, %.2f)",
-             event.entityA, event.entityB, position.x, position.y, position.z);
+    // LOG_INFO("Collision detected between Entity %d and Entity %d at position
+    // "
+    //          "(%.2f, %.2f, %.2f)",
+    //          event.entityA, event.entityB, position.x, position.y,
+    //          position.z);
   }
 }
