@@ -134,24 +134,19 @@ std::unique_ptr<Mesh> AssetManager::loadMeshFromFile(const char *file) {
 }
 
 void AssetManager::setAudioEngine(resources::AudioEngine &audioEngine) {
-  m_audioEngine = &audioEngine.getEngine();
+  m_audioEngine = &audioEngine;
   LOG_INFO("Audio engine initialized");
 }
 
 void AssetManager::loadAudio(const char *file, std::string name) {
   LOG_INFO("Loading Audio: %s", name.c_str());
 
-  auto sound = std::make_unique<ma_sound>();
-  ma_result result = ma_sound_init_from_file(m_audioEngine, file, 0, nullptr,
-                                             nullptr, sound.get());
-  if (result != MA_SUCCESS) {
-    LOG_ERROR("Failed to load audio file: %s", file);
-    return;
-  }
+  ma_decoder decoder = m_audioEngine->getDecodedAudioFile(file);
+  auto decoderPtr = std::make_unique<ma_decoder>(decoder);
 
   AudioID id = m_nextAudioID++;
   m_audioClips[name] = id;
-  m_audioResources[id] = std::move(sound);
+  m_audioResources[id] = std::move(decoderPtr);
   LOG_INFO("Audio loaded successfully: %s (ID: %u)", name.c_str(), id);
 }
 
@@ -159,7 +154,7 @@ AudioID AssetManager::getAudioID(std::string name) const {
   return m_audioClips.at(name);
 }
 
-ma_sound *AssetManager::getAudio(AudioID id) const {
+ma_decoder *AssetManager::getAudio(AudioID id) const {
   return m_audioResources.at(id).get();
 }
 
@@ -167,7 +162,7 @@ void AssetManager::clear() {
   LOG_INFO("Deleting loaded resources");
 
   for (auto &pair : m_audioResources) {
-    ma_sound_uninit(pair.second.get());
+    ma_decoder_uninit(pair.second.get());
   }
   m_audioResources.clear();
   m_audioClips.clear();

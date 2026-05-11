@@ -17,6 +17,7 @@ file(GLOB ENGINE_SOURCES
     "src/componeng/core/*.cpp"
     "src/componeng/renderer/*.cpp"
     "src/componeng/renderer/opengl/*.cpp"
+    "src/componeng/resources/*.cpp"
     "src/componeng/systems/*.cpp"
     "src/componeng/physics/*.cpp"
     "src/componeng/ecs/*.cpp"

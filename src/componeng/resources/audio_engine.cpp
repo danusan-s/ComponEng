@@ -1,0 +1,83 @@
+#include "componeng/resources/audio_engine.hpp"
+#include "componeng/renderer/asset_manager.hpp"
+#include "componeng/utils/logger.hpp"
+
+#include <miniaudio.h>
+
+namespace componeng::resources {
+
+AudioEngine::AudioEngine() {
+}
+
+AudioEngine::~AudioEngine() {
+}
+
+void AudioEngine::init() {
+  ma_result result = ma_engine_init(nullptr, &m_audioEngine);
+  if (result != MA_SUCCESS) {
+    LOG_ERROR("Failed to initialize audio engine");
+    return;
+  }
+  ma_engine_listener_set_position(&m_audioEngine, 0, 0, 0, 0);
+  LOG_INFO("Audio engine initialized");
+}
+
+void AudioEngine::shutdown() {
+  ma_engine_uninit(&m_audioEngine);
+  LOG_INFO("Audio engine shutdown");
+}
+
+void AudioEngine::setListenerPosition(float x, float y, float z) {
+  ma_engine_listener_set_position(&m_audioEngine, 0, x, y, z);
+}
+
+ma_sound *AudioEngine::decodeSound(ma_decoder *decoder) {
+  ma_sound *sound = new ma_sound;
+  ma_result result = ma_sound_init_from_data_source(
+      &m_audioEngine, decoder, MA_SOUND_FLAG_DECODE, nullptr, sound);
+
+  if (result != MA_SUCCESS) {
+    LOG_ERROR("Failed to decode sound from decoder");
+    delete sound;
+    return nullptr;
+  }
+  return sound;
+}
+
+void AudioEngine::setSoundPosition(ma_sound *sound, float x, float y, float z) {
+  ma_sound_set_position(sound, x, y, z);
+}
+
+void AudioEngine::setSoundSettings(ma_sound *sound, float volume, float pitch,
+                                   bool loop) {
+  ma_sound_set_volume(sound, volume);
+  ma_sound_set_pitch(sound, pitch);
+  ma_sound_set_looping(sound, loop ? MA_TRUE : MA_FALSE);
+}
+
+void AudioEngine::setSound3D(ma_sound *sound, float minDistance,
+                             float maxDistance) {
+  ma_sound_set_min_distance(sound, minDistance);
+  ma_sound_set_max_distance(sound, maxDistance);
+  ma_sound_set_attenuation_model(sound, ma_attenuation_model_linear);
+}
+
+bool AudioEngine::playSound(ma_sound *sound) {
+  ma_result result = ma_sound_start(sound);
+  if (result != MA_SUCCESS) {
+    LOG_ERROR("Failed to play sound");
+    return false;
+  }
+  return true;
+}
+
+ma_decoder AudioEngine::getDecodedAudioFile(const char *file) {
+  ma_decoder decoder;
+  ma_result result = ma_decoder_init_file(file, nullptr, &decoder);
+  if (result != MA_SUCCESS) {
+    LOG_ERROR("Failed to load audio file: %s", file);
+  }
+  return decoder;
+}
+
+} // namespace componeng::resources

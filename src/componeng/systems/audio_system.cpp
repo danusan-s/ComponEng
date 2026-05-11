@@ -10,6 +10,7 @@ namespace componeng::systems {
 
 void AudioSystem::onUpdate(const ecs::SystemState &state) {
   auto &assetManager = state.world->get_resource<renderer::AssetManager>();
+  auto &audioEngine = state.world->get_resource<resources::AudioEngine>();
 
   auto &mainCamera =
       state.world->get_resource<componeng::resources::MainCamera>();
@@ -18,9 +19,9 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
     auto &camTransform =
         state.world->getComponent<componeng::components::TransformComponent>(
             mainCamera.entity);
-    ma_engine_listener_set_position(
-        assetManager.m_audioEngine, 0, camTransform.position.x,
-        camTransform.position.y, camTransform.position.z);
+    audioEngine.setListenerPosition(camTransform.position.x,
+                                    camTransform.position.y,
+                                    camTransform.position.z);
   }
 
   auto view =
@@ -29,27 +30,42 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
 
   view.each([&](components::AudioComponent &audio,
                 components::TransformComponent &transform) {
-    ma_sound *sound = assetManager.getAudio(audio.audioID);
+    if (!audio.playOnAwake || audio.isPlaying) {
+      return;
+    }
+
+    ma_sound *sound =
+        audioEngine.decodeSound(assetManager.getAudio(audio.audioID));
 
     if (audio.is3D) {
-      ma_sound_set_position(sound, transform.position.x, transform.position.y,
-                            transform.position.z);
-      ma_sound_set_min_distance(sound, audio.minDistance);
-      ma_sound_set_max_distance(sound, audio.maxDistance);
-      ma_sound_set_attenuation_model(sound, ma_attenuation_model_linear);
+      audioEngine.setSoundPosition(sound, transform.position.x,
+                                   transform.position.y, transform.position.z);
+      audioEngine.setSound3D(sound, audio.minDistance, audio.maxDistance);
     }
 
-    ma_sound_set_volume(sound, audio.volume);
-    ma_sound_set_pitch(sound, audio.pitch);
-    ma_sound_set_looping(sound, audio.loop ? MA_TRUE : MA_FALSE);
+    audioEngine.setSoundSettings(sound, audio.volume, audio.pitch,
+                                 audio.loop ? MA_TRUE : MA_FALSE);
 
-    if (audio.playOnAwake && !audio.isPlaying) {
-      ma_result result = ma_sound_start(sound);
-      if (result == MA_SUCCESS) {
-        audio.isPlaying = true;
-      }
+    if (audioEngine.playSound(sound)) {
+      audio.isPlaying = true;
     }
+
+    m_activeSounds.push_back(sound);
   });
+
+  for (size_t i = 0; i < m_activeSounds.size();) {
+    ma_sound *sound = m_activeSounds[i];
+
+    if (!ma_sound_is_playing(sound)) {
+      ma_sound_uninit(sound);
+      delete sound;
+
+      m_activeSounds[i] = m_activeSounds.back();
+      m_activeSounds.pop_back();
+    } else {
+      ++i;
+    }
+  }
 }
 
 } // namespace componeng::systems

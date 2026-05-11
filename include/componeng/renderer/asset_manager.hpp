@@ -38,7 +38,7 @@ public:
   AssetManager(AssetManager &&) = default;
   AssetManager &operator=(AssetManager &&) = default;
 
-  ma_engine *m_audioEngine = nullptr;
+  resources::AudioEngine *m_audioEngine = nullptr;
 
   void loadShader(const char *vShaderFile, const char *fShaderFile,
                   const char *gShaderFile, std::string name);
@@ -55,7 +55,7 @@ public:
   void setAudioEngine(resources::AudioEngine &audioEngine);
   void loadAudio(const char *file, std::string name);
   AudioID getAudioID(std::string name) const;
-  ma_sound *getAudio(AudioID id) const;
+  ma_decoder *getAudio(AudioID id) const;
 
   void clear();
 
@@ -69,7 +69,7 @@ private:
   std::unordered_map<MeshID, std::unique_ptr<Mesh>> m_meshResources;
 
   std::unordered_map<std::string, AudioID> m_audioClips;
-  std::unordered_map<AudioID, std::unique_ptr<ma_sound>> m_audioResources;
+  std::unordered_map<AudioID, std::unique_ptr<ma_decoder>> m_audioResources;
 
   std::unique_ptr<Shader> loadShaderFromFile(const char *vShaderFile,
                                              const char *fShaderFile,
