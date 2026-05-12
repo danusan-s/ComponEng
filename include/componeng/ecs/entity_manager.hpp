@@ -13,6 +13,7 @@ namespace componeng::ecs {
 struct EntityRecord {
   std::size_t row;
   Signature signature;
+  uint32_t generation;
 };
 
 /**
@@ -41,6 +42,11 @@ public:
     EntityID id = m_freeIDs.front();
     m_freeIDs.pop();
     ++m_livingEntityCount;
+
+    EntityRecord &record = m_entityRecords[id];
+    record.row = 0;
+    record.signature.reset();
+    record.generation++;
 
     return id;
   }
