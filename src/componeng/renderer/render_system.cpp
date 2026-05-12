@@ -107,13 +107,13 @@ static void populateBatch(const components::TransformComponent &t,
 }
 
 void RenderSystem::onCreate(const ecs::SystemState &state) {
-  api::IRenderDevice *renderDevice = state.world->getRenderDevice();
-  m_batches = std::make_unique<BatchMap>(*renderDevice);
+  api::IRenderDevice &renderDevice = state.world->getRenderDevice();
+  m_batches = std::make_unique<BatchMap>(renderDevice);
 }
 
 void RenderSystem::onUpdate(const ecs::SystemState &state) {
-  api::IRenderDevice *renderDevice = state.world->getRenderDevice();
-  renderDevice->clear(0.0f, 0.0f, 0.0f, 1.0f);
+  api::IRenderDevice &renderDevice = state.world->getRenderDevice();
+  renderDevice.clear(0.0f, 0.0f, 0.0f, 1.0f);
 
   ecs::EntityID mainCameraID =
       state.world->get_resource<resources::MainCamera>().entity;
@@ -174,16 +174,16 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     texture.bind();
     model.getImpl().bind();
 
-    renderDevice->setupInstanceAttributes(*data.instanceBuffer);
+    renderDevice.setupInstanceAttributes(*data.instanceBuffer);
 
     data.instanceBuffer->setSubData(0, data.instanceDatas.data(),
                                     data.instanceDatas.size() *
                                         sizeof(InstanceData));
 
-    renderDevice->drawIndexedInstanced(model.indexCount(),
-                                       data.instanceDatas.size());
+    renderDevice.drawIndexedInstanced(model.indexCount(),
+                                      data.instanceDatas.size());
 
-    renderDevice->unbindInstanceAttributes();
+    renderDevice.unbindInstanceAttributes();
 
     ++drawCalls;
   }

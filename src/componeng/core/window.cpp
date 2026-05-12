@@ -124,7 +124,7 @@ void Window::init(int width, int height, const char *title) {
 
   Engine &engine = Engine::get();
 
-  m_renderDevice = engine.m_render_device;
+  m_renderDevice = &engine.m_world.getRenderDevice();
   m_renderDevice->init(m_handle);
 
   glfwSetWindowUserPointer(m_handle, &engine);

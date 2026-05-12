@@ -49,10 +49,9 @@ public:
   void updateSystems(float deltaTime);
   void destroySystems();
   ThreadPool &threadPool();
+  renderer::api::IRenderDevice &getRenderDevice();
   void setWindowHandle(void *handle);
   void *getWindowHandle() const;
-  void setRenderDevice(renderer::api::IRenderDevice *device);
-  renderer::api::IRenderDevice *getRenderDevice() const;
 
   void swapInputBuffers() {
     auto &inputState = get_resource<resources::InputState>();

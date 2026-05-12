@@ -52,12 +52,8 @@ void *World::getWindowHandle() const {
   return m_windowHandle;
 }
 
-void World::setRenderDevice(renderer::api::IRenderDevice *device) {
-  m_renderDevice = device;
-}
-
-renderer::api::IRenderDevice *World::getRenderDevice() const {
-  return m_renderDevice;
+renderer::api::IRenderDevice &World::getRenderDevice() {
+  return *get_resource<std::unique_ptr<renderer::api::IRenderDevice>>().get();
 }
 
 } // namespace componeng::ecs

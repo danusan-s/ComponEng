@@ -24,22 +24,30 @@
 namespace componeng::core {
 
 void Engine::init() {
-  renderer::opengl::GLRenderDevice *renderDevice =
-      new renderer::opengl::GLRenderDevice;
-  m_render_device = renderDevice;
   m_world.init();
+
+  std::unique_ptr<renderer::api::IRenderDevice> renderDevice =
+      std::make_unique<renderer::opengl::GLRenderDevice>();
+  m_world.set_resource<std::unique_ptr<renderer::api::IRenderDevice>>(
+      std::move(renderDevice));
 
   m_window.init(1280, 720, "ECS Game");
   m_world.setWindowHandle(m_window.getHandle());
-  m_world.setRenderDevice(m_render_device);
+
+  LOG_INFO("Initialized render device");
+
   DebugUI::init();
 
   m_world.set_resource<resources::AudioEngine>(resources::AudioEngine());
   auto &audioEngine = m_world.get_resource<resources::AudioEngine>();
   audioEngine.init();
 
+  LOG_INFO("Initialized audio engine");
+
   m_world.set_resource<renderer::AssetManager>(renderer::AssetManager());
   auto &assetManager = m_world.get_resource<renderer::AssetManager>();
+
+  LOG_INFO("Loading built-in assets...");
 
   assetManager.loadShader(
       utils::Utils::getAssetPath("assets/shaders/diffuse.vert").c_str(),
@@ -55,6 +63,8 @@ void Engine::init() {
   assetManager.loadMesh(
       utils::Utils::getAssetPath("assets/models/sphere_smooth.obj").c_str(),
       "sphere");
+
+  LOG_INFO("Finished loading built-in assets");
 
   registerComponents();
   registerSystems();
@@ -144,7 +154,6 @@ void Engine::shutdown() {
   assetManager.clear();
   audioEngine.shutdown();
   m_window.shutdown();
-  delete m_render_device;
 }
 
 } // namespace componeng::core

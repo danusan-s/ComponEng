@@ -6,7 +6,6 @@
 #include "componeng/core/game.hpp"
 #include "componeng/core/window.hpp"
 #include "componeng/ecs/world.hpp"
-#include "componeng/renderer/api/irender_device.hpp"
 
 namespace componeng::core {
 
@@ -35,7 +34,6 @@ public:
 
   ecs::World m_world;
   Window m_window;
-  renderer::api::IRenderDevice *m_render_device;
 
 private:
   Engine() = default;
