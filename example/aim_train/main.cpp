@@ -37,6 +37,24 @@ public:
         std::uniform_real_distribution<float> distY(0.5f, 10.0f);
         std::uniform_real_distribution<float> distZ(-15.0f, -60.0f);
 
+        auto spawnWall = [&](Vec3 pos, Vec3 scale) {
+            EntityID e = world.createEntity();
+            world.addComponents(e,
+                MeshComponent{.meshName = "cube"},
+                TransformComponent{.position = pos, .scale = scale},
+                MaterialComponent{
+                    .color = Vec3(0.5f, 0.5f, 0.5f),
+                    .textureName = "white",
+                    .shaderName = "default"
+                }
+            );
+        };
+        spawnWall(Vec3(0, -0.5f, -17.5f), Vec3(50, 0.5f, 85));
+        spawnWall(Vec3(0, 5, 25), Vec3(50, 10, 0.5f));
+        spawnWall(Vec3(0, 5, -60), Vec3(50, 10, 0.5f));
+        spawnWall(Vec3(-25, 5, -17.5f), Vec3(0.5f, 10, 85));
+        spawnWall(Vec3(25, 5, -17.5f), Vec3(0.5f, 10, 85));
+
         for (int i = 0; i < 20; ++i) {
             float s = distScale(gen);
             EntityID e = world.createEntity();
@@ -47,7 +65,7 @@ public:
                     .scale = Vec3(s)
                 },
                 MaterialComponent{
-                    .color = Vec3(0.0f, 1.0f, 0.0f),
+                    .color = Vec3(0.0f, 1.0f, 1.0f),
                     .textureName = "white",
                     .shaderName = "default"
                 },

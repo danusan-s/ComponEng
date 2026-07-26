@@ -12,6 +12,7 @@ componeng::core::Vec3 cameraFront(componeng::core::Vec3 rotation);
 
 class AimSystem : public componeng::ecs::ISystem {
     int m_score = 0;
+    float m_sensitivity = 0.05f;
 public:
     void onUpdate(const componeng::ecs::SystemState &state) override;
 };

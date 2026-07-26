@@ -41,6 +41,9 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
     } else {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
       g_mouseLocked = true;
+      auto &state = engine->m_world.get_resource<resources::InputState>();
+      state.previous_state.mouseX = state.current_state.mouseX;
+      state.previous_state.mouseY = state.current_state.mouseY;
     }
   }
 
@@ -81,6 +84,9 @@ static void mouseButtonCallback(GLFWwindow *window, int button, int action,
 
 static void cursorPosCallback(GLFWwindow *window, double xposIn,
                               double yposIn) {
+  if (!g_mouseLocked)
+    return;
+
   auto *engine = static_cast<Engine *>(glfwGetWindowUserPointer(window));
   if (!engine)
     return;

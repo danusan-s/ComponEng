@@ -66,8 +66,8 @@ void AimSystem::onUpdate(const ecs::SystemState &state) {
     auto &camTransform =
         state.world->getComponent<components::TransformComponent>(mainCam.entity);
 
-    camTransform.rotation.y += input.getMouseDeltaX() * 0.05f;
-    camTransform.rotation.x -= input.getMouseDeltaY() * 0.05f;
+    camTransform.rotation.y += input.getMouseDeltaX() * m_sensitivity;
+    camTransform.rotation.x -= input.getMouseDeltaY() * m_sensitivity;
 
     constexpr float PITCH_LIMIT = 89.0f;
     if (camTransform.rotation.x > PITCH_LIMIT)
@@ -94,6 +94,7 @@ void AimSystem::onUpdate(const ecs::SystemState &state) {
 
     drawCrosshair();
     core::DebugUI::addValue("Score", static_cast<float>(m_score));
+    ImGui::InputFloat("Sensitivity", &m_sensitivity, 0.01f, 0.1f, "%.3f");
 
     if (!input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
         return;
