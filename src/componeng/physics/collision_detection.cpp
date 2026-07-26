@@ -104,11 +104,18 @@ bool testBoxSphere(const components::TransformComponent &a,
 
     float minOverlap = std::min({dA.x, dB.x, dA.y, dB.y, dA.z, dB.z});
 
-    core::Vec3 floorToSphere = sphereCenter - centerA;
-    if (length(floorToSphere) > 1e-6f)
-      info.normal = normalize(floorToSphere);
-    else
+    if (dA.x == minOverlap)
+      info.normal = core::Vec3(-1, 0, 0);
+    else if (dB.x == minOverlap)
+      info.normal = core::Vec3(1, 0, 0);
+    else if (dA.y == minOverlap)
       info.normal = core::Vec3(0, -1, 0);
+    else if (dB.y == minOverlap)
+      info.normal = core::Vec3(0, 1, 0);
+    else if (dA.z == minOverlap)
+      info.normal = core::Vec3(0, 0, -1);
+    else
+      info.normal = core::Vec3(0, 0, 1);
     info.penetration = radius + minOverlap;
   }
 

@@ -82,7 +82,7 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
     b.rigidbody->velocity += impulse * inverseMassB;
   }
 
-  constexpr float percent = 0.2f;
+  constexpr float percent = 0.8f;
   constexpr float slop = 0.01f;
   float correctionMagnitude = std::max(info.penetration - slop, 0.0f) *
                               percent / (inverseMassA + inverseMassB);
@@ -116,15 +116,6 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
           if (rigidbody.type == components::RigidBodyComponent::Dynamic) {
             rigidbody.velocity += g_gravity * fixedTimeStep;
           }
-        });
-
-    state.world
-        ->query<components::TransformComponent,
-                components::RigidBodyComponent>()
-        .eachParallel(pool, [&](components::TransformComponent &transform,
-                                components::RigidBodyComponent &rigidbody) {
-          if (rigidbody.type == components::RigidBodyComponent::Static)
-            return;
           transform.position += rigidbody.velocity * fixedTimeStep;
         });
 

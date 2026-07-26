@@ -13,6 +13,8 @@ constexpr auto RIGHT_KEY = GLFW_KEY_D;
 constexpr auto JUMP_KEY = GLFW_KEY_SPACE;
 constexpr auto CROUCH_KEY = GLFW_KEY_LEFT_SHIFT;
 constexpr auto SPRINT_KEY = GLFW_KEY_LEFT_CONTROL;
+constexpr auto ATTACK_KEY = GLFW_MOUSE_BUTTON_LEFT;
+constexpr auto AIM_KEY = GLFW_MOUSE_BUTTON_RIGHT;
 
 void InputSystem::onUpdate(const ecs::SystemState &state) {
   auto &inputState = state.world->get_resource<resources::InputState>();
@@ -32,6 +34,10 @@ void InputSystem::onUpdate(const ecs::SystemState &state) {
       inputState.isKeyDown(CROUCH_KEY);
   actionState.current[(size_t)resources::Action::Sprint] =
       inputState.isKeyDown(SPRINT_KEY);
+  actionState.current[(size_t)resources::Action::Attack] =
+      inputState.isMouseButtonPressed(ATTACK_KEY);
+  actionState.current[(size_t)resources::Action::Aim] =
+      inputState.isMouseButtonPressed(AIM_KEY);
 }
 
 } // namespace componeng::systems
