@@ -233,6 +233,10 @@ public:
     return m_resourceManager.get<T>();
   }
 
+  template <typename T> bool has_resource() {
+    return m_resourceManager.contains<T>();
+  }
+
   template <typename T> void emit_event(const T &event) {
     m_eventBus.emit<T>(event);
   }

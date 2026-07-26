@@ -68,7 +68,6 @@ void Engine::init() {
 
   registerComponents();
   registerSystems();
-  initObjects();
 }
 
 void Engine::registerComponents() {
@@ -89,7 +88,11 @@ void Engine::registerSystems() {
       ecs::SystemGroup::Presentation);
 }
 
-void Engine::initObjects() {
+void Engine::ensureDefaultCamera() {
+  if (m_world.has_resource<resources::MainCamera>()) {
+    return;
+  }
+
   ecs::EntityID cameraEntity = m_world.createEntity();
   m_world.addComponents(
       cameraEntity,
@@ -105,6 +108,7 @@ void Engine::initObjects() {
 }
 
 void Engine::run(IGame &game) {
+  ensureDefaultCamera();
   game.init(m_world);
   m_world.createSystems();
 

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/renderer/api/irender_device.hpp"

@@ -32,6 +32,10 @@ public:
     return static_cast<ResourceHolder<T> *>(it->second.get())->value;
   }
 
+  template <typename T> bool contains() const {
+    return m_resources.find(std::type_index(typeid(T))) != m_resources.end();
+  }
+
 private:
   std::unordered_map<std::type_index, std::unique_ptr<IResource>> m_resources;
 };

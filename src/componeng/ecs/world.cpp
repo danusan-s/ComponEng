@@ -2,6 +2,7 @@
 #include "componeng/events/entity_event.hpp"
 #include "componeng/resources/action_state.hpp"
 #include "componeng/resources/input_state.hpp"
+#include "componeng/resources/main_camera.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <fstream>
@@ -93,6 +94,11 @@ void World::saveScene(const std::string &filename) {
         entityJson[info.name] = info.serializer(componentPtr);
       }
 
+      if (has_resource<resources::MainCamera>() &&
+          entity == get_resource<resources::MainCamera>().entity) {
+        entityJson["_isMainCamera"] = true;
+      }
+
       sceneJson["entities"].push_back(entityJson);
     }
   }
@@ -124,6 +130,8 @@ void World::loadScene(const std::string &filename) {
     return;
   }
 
+  ecs::EntityID mainCameraEntity = ecs::INVALID_ENTITY;
+
   for (const auto &entityJson : sceneJson["entities"]) {
     EntityID entity = createEntity();
     LOG_INFO("Created entity %d from scene", (unsigned long long)entity);
@@ -132,6 +140,10 @@ void World::loadScene(const std::string &filename) {
       const std::string &componentName = it.key();
       const nlohmann::json &componentData = it.value();
       LOG_INFO("Adding component %s to entity", componentName.c_str());
+
+      if (componentName == "_isMainCamera") {
+        continue;
+      }
 
       // Find component ID by name using O(1) lookup
       ComponentID componentID;
@@ -154,6 +166,17 @@ void World::loadScene(const std::string &filename) {
       void *componentPtr = info.deserializer(componentData);
       addComponentById(entity, componentID, componentPtr);
     }
+
+    if (entityJson.contains("_isMainCamera") &&
+        entityJson["_isMainCamera"].get<bool>()) {
+      mainCameraEntity = entity;
+    }
+  }
+
+  if (mainCameraEntity != ecs::INVALID_ENTITY) {
+    set_resource(resources::MainCamera{mainCameraEntity});
+    LOG_INFO("Main camera set to entity %d",
+             (unsigned long long)mainCameraEntity);
   }
 
   LOG_INFO("Scene loaded from %s", filename.c_str());

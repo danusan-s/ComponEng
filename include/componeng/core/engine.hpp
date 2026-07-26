@@ -41,8 +41,8 @@ private:
   // Helper to register engine components and systems
   void registerComponents();
   void registerSystems();
-  // Create some default entities (camera) to populate the world with
-  void initObjects();
+  // Ensure a default camera exists if none has been set
+  void ensureDefaultCamera();
 };
 
 } // namespace componeng::core
