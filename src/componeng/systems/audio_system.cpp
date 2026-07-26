@@ -8,6 +8,15 @@
 
 namespace componeng::systems {
 
+void AudioSystem::onCreate(const ecs::SystemState &state) {
+  state.world->query<components::AudioComponent>().each(
+      [&](components::AudioComponent &audio) {
+        audio.audioID =
+            state.world->get_resource<renderer::AssetManager>().getAudioID(
+                audio.audioName);
+      });
+}
+
 void AudioSystem::onUpdate(const ecs::SystemState &state) {
   auto &assetManager = state.world->get_resource<renderer::AssetManager>();
   auto &audioEngine = state.world->get_resource<resources::AudioEngine>();
@@ -24,32 +33,32 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
                                     camTransform.position.z);
   }
 
-  auto view =
-      state.world
-          ->query<components::AudioComponent, components::TransformComponent>();
-
-  view.each([&](components::AudioComponent &audio,
+  state.world
+      ->query<components::AudioComponent, components::TransformComponent>()
+      .each([&](components::AudioComponent &audio,
                 components::TransformComponent &transform) {
-    if (!audio.playOnAwake || audio.isPlaying) {
-      return;
-    }
+        if (!audio.playOnAwake || audio.isPlaying) {
+          return;
+        }
 
-    auto soundPath = assetManager.getAudio(audio.audioID);
-    auto sound = audioEngine.createSound(soundPath);
+        auto soundPath = assetManager.getAudio(audio.audioID);
+        auto sound = audioEngine.createSound(soundPath);
 
-    if (audio.is3D) {
-      audioEngine.setSoundPosition(sound.get(), transform.position.x,
-                                   transform.position.y, transform.position.z);
-      audioEngine.setSound3D(sound.get(), audio.minDistance, audio.maxDistance);
-    }
+        if (audio.is3D) {
+          audioEngine.setSoundPosition(sound.get(), transform.position.x,
+                                       transform.position.y,
+                                       transform.position.z);
+          audioEngine.setSound3D(sound.get(), audio.minDistance,
+                                 audio.maxDistance);
+        }
 
-    audioEngine.setSoundSettings(sound.get(), audio.volume, audio.pitch,
-                                 audio.loop ? MA_TRUE : MA_FALSE);
+        audioEngine.setSoundSettings(sound.get(), audio.volume, audio.pitch,
+                                     audio.loop ? MA_TRUE : MA_FALSE);
 
-    if (audioEngine.playSound(std::move(sound))) {
-      audio.isPlaying = true;
-    }
-  });
+        if (audioEngine.playSound(std::move(sound))) {
+          audio.isPlaying = true;
+        }
+      });
 
   audioEngine.cleanupFinishedSounds();
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "componeng/ecs/system.hpp"
+#include "componeng/utils/logger.hpp"
 #include <array>
 #include <assert.h>
 #include <memory>
@@ -62,6 +63,7 @@ public:
     for (SystemGroup group : GROUP_ORDER) {
       auto &groupSystems = m_systems[group];
       for (auto const &sysRec : groupSystems) {
+        LOG_INFO("Creating system: %s", sysRec.typeName);
         auto const &system = sysRec.system;
         system->onCreate(state);
       }
@@ -84,6 +86,7 @@ public:
     for (SystemGroup group : GROUP_ORDER) {
       auto &groupSystems = m_systems[group];
       for (auto const &sysRec : groupSystems) {
+        LOG_INFO("Destroying system: %s", sysRec.typeName);
         auto const &system = sysRec.system;
         system->onDestroy(state);
       }

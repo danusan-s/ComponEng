@@ -1,5 +1,6 @@
 #pragma once
 
+#include "componeng/components/component_serializer.hpp"
 #include "entity.hpp"
 #include <array>
 #include <stdexcept>
@@ -19,6 +20,8 @@ struct ComponentInfo {
   size_t size;
   size_t alignment;
   void (*destructor)(void *) = nullptr;
+  nlohmann::json (*serializer)(const void *) = nullptr;
+  void *(*deserializer)(const nlohmann::json &) = nullptr;
 };
 
 /**
@@ -62,6 +65,21 @@ public:
         static_cast<T *>(ptr)->~T();
       };
     }
+    // Store serializer and deserializer if specialization exists for this type.
+    if constexpr (std::is_base_of_v<components::ComponentSerializer<T>,
+                                    components::ComponentSerializer<T>>) {
+      m_componentInfos[id].serializer =
+          [](const void *componentPtr) -> nlohmann::json {
+        const T &component = *static_cast<const T *>(componentPtr);
+        return components::ComponentSerializer<T>::serialize(component);
+      };
+      m_componentInfos[id].deserializer =
+          [](const nlohmann::json &json) -> void * {
+        T component = components::ComponentSerializer<T>::deserialize(json);
+        return new T(std::move(component));
+      };
+    }
+
     return id;
   }
 

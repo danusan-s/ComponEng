@@ -60,6 +60,9 @@ public:
     actionState.swapBuffers();
   }
 
+  void saveScene(const std::string &filename);
+  void loadScene(const std::string &filename);
+
   template <typename T> void registerComponent() {
     m_componentRegistry.registerComponent<T>();
   }
@@ -131,6 +134,50 @@ public:
     (new (newArchetype.getColumn(m_componentRegistry.getComponentID<Ts>())
               .at(newRow)) Ts(std::forward<Ts>(components)),
      ...);
+
+    record.signature = newSig;
+    record.row = newRow;
+  }
+
+  void addComponentById(EntityID entity, ComponentID componentID,
+                        const void *componentData) {
+    EntityRecord &record = m_entityManager.getRecord(entity);
+
+    Signature oldSig = record.signature;
+    Archetype *oldArchetype = m_archetypeManager.getBySignature(oldSig);
+
+    if (oldSig.test(componentID)) {
+      throw std::runtime_error("Entity already has component");
+    }
+
+    Signature newSig = oldSig;
+    newSig.set(componentID);
+
+    Archetype &newArchetype =
+        m_archetypeManager.getOrCreate(newSig, m_componentRegistry);
+    newArchetype.addEntity(entity);
+
+    std::size_t newRow = newArchetype.getRowForEntity(entity);
+
+    if (oldArchetype) {
+      std::size_t oldRow = record.row;
+      for (ComponentID c = 0; c < MAX_COMPONENTS; ++c) {
+        if (!oldSig.test(c))
+          continue;
+        auto &src = oldArchetype->getColumn(c);
+        auto &dst = newArchetype.getColumn(c);
+        std::memcpy(dst.at(newRow), src.at(oldRow), src.m_stride);
+      }
+      EntityID moved = oldArchetype->removeEntity(entity);
+      if (moved != entity) {
+        m_entityManager.getRecord(moved).row = oldRow;
+      }
+    }
+
+    const ComponentInfo &info =
+        m_componentRegistry.getComponentInfo(componentID);
+    std::memcpy(newArchetype.getColumn(componentID).at(newRow), componentData,
+                info.size);
 
     record.signature = newSig;
     record.row = newRow;

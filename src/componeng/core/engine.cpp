@@ -91,15 +91,6 @@ void Engine::registerSystems() {
 
 void Engine::initObjects() {
   ecs::EntityID cameraEntity = m_world.createEntity();
-  m_world.addComponents(
-      cameraEntity,
-      components::TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
-                                     .rotation = Vec3(0.0f, 0.0f, 0.0f),
-                                     .scale = Vec3(1.0f)},
-      components::CameraComponent{.fov = 45.0f,
-                                  .aspectRatio = 16.0f / 9.0f,
-                                  .nearPlane = 0.1f,
-                                  .farPlane = 10000.0f});
 
   m_world.set_resource(resources::MainCamera{.entity = cameraEntity});
 }
@@ -113,6 +104,8 @@ void Engine::run(IGame &game) {
   double lastFrame = 0.0f;
   long long frameCount = 0;
   double avgFPS = 0.0f;
+
+  LOG_INFO("Starting main loop");
 
   while (!m_window.shouldClose()) {
     double currentFrame = glfwGetTime();
@@ -142,6 +135,8 @@ void Engine::run(IGame &game) {
       LOG_ERROR("OpenGL error: %d", err);
     }
   }
+
+  LOG_INFO("Exiting main loop");
 
   game.shutdown(m_world);
   m_world.destroySystems();

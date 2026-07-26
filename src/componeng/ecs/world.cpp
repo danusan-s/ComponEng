@@ -2,6 +2,9 @@
 #include "componeng/events/entity_event.hpp"
 #include "componeng/resources/action_state.hpp"
 #include "componeng/resources/input_state.hpp"
+#include "componeng/utils/logger.hpp"
+
+#include <fstream>
 
 namespace componeng::ecs {
 
@@ -54,6 +57,111 @@ void *World::getWindowHandle() const {
 
 renderer::api::IRenderDevice &World::getRenderDevice() {
   return *get_resource<std::unique_ptr<renderer::api::IRenderDevice>>().get();
+}
+
+void World::saveScene(const std::string &filename) {
+  std::array<Archetype, MAX_ARCHETYPES> &archetypes =
+      m_archetypeManager.getArchetypes();
+
+  nlohmann::json sceneJson;
+  sceneJson["entities"] = nlohmann::json::array();
+
+  for (Archetype &archetype : archetypes) {
+    if (archetype.getEntityCount() == 0)
+      continue;
+
+    const Signature &signature = archetype.m_signature;
+
+    // For each entity populate a JSON object with its components
+    for (size_t i = 0; i < archetype.getEntityCount(); ++i) {
+      EntityID entity = archetype.getEntityForRow(i);
+      nlohmann::json entityJson;
+
+      for (ComponentID c = 0; c < MAX_COMPONENTS; ++c) {
+        if (!signature.test(c))
+          continue;
+
+        const ComponentInfo &info = m_componentRegistry.getComponentInfo(c);
+        if (!info.serializer) {
+          LOG_ERROR(
+              "No serializer for component ID %d (%s), skipping serialization",
+              c, info.name);
+          continue;
+        }
+
+        const void *componentPtr = archetype.getColumn(c).at(i);
+        entityJson[info.name] = info.serializer(componentPtr);
+      }
+
+      sceneJson["entities"].push_back(entityJson);
+    }
+  }
+
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    LOG_ERROR("Failed to open file %s for saving scene", filename.c_str());
+    return;
+  }
+
+  file << sceneJson.dump(4);
+  file.close();
+  LOG_INFO("Scene saved to %s", filename.c_str());
+}
+
+void World::loadScene(const std::string &filename) {
+  std::ifstream file(filename);
+  if (!file.is_open()) {
+    LOG_ERROR("Failed to open file %s for loading scene", filename.c_str());
+    return;
+  }
+
+  nlohmann::json sceneJson;
+  file >> sceneJson;
+  file.close();
+
+  if (!sceneJson.contains("entities") || !sceneJson["entities"].is_array()) {
+    LOG_ERROR("Invalid scene format: missing 'entities' array");
+    return;
+  }
+
+  for (const auto &entityJson : sceneJson["entities"]) {
+    EntityID entity = createEntity();
+    LOG_INFO("Created entity %d from scene", (unsigned long long)entity);
+
+    for (auto it = entityJson.begin(); it != entityJson.end(); ++it) {
+      const std::string &componentName = it.key();
+      const nlohmann::json &componentData = it.value();
+      LOG_INFO("Adding component %s to entity", componentName.c_str());
+
+      // Find component ID by name
+      ComponentID componentID = MAX_COMPONENTS; // Invalid ID
+      for (ComponentID c = 0; c < MAX_COMPONENTS; ++c) {
+        if (m_componentRegistry.getComponentInfo(c).name == componentName) {
+          componentID = c;
+          break;
+        }
+      }
+
+      if (componentID == MAX_COMPONENTS) {
+        LOG_ERROR("Unknown component type '%s' in scene, skipping",
+                  componentName.c_str());
+        continue;
+      }
+
+      const ComponentInfo &info =
+          m_componentRegistry.getComponentInfo(componentID);
+      if (!info.deserializer) {
+        LOG_ERROR("No deserializer for component '%s' (ID %d), skipping",
+                  componentName.c_str(), componentID);
+        continue;
+      }
+
+      void *componentPtr = info.deserializer(componentData);
+      addComponentById(entity, componentID, componentPtr);
+    }
+  }
+
+  LOG_INFO("Scene loaded from %s", filename.c_str());
 }
 
 } // namespace componeng::ecs

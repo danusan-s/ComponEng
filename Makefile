@@ -3,7 +3,7 @@ BUILD_DIR := build
 CMAKE := cmake
 CTEST := ctest
 
-BUILD_TYPE ?= Release
+BUILD_TYPE ?= Debug
 
 # ===== Default =====
 .PHONY: all
