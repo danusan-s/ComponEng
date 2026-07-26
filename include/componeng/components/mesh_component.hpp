@@ -5,6 +5,8 @@
 namespace componeng::components {
 
 struct MeshComponent {
+  static constexpr const char* component_name = "MeshComponent";
+
   renderer::MeshID meshID;        // 4 bytes
   const char *meshName = nullptr; // Optional: store name for serialization
   bool visible = true;            // 1 byte

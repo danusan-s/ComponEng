@@ -133,16 +133,11 @@ void World::loadScene(const std::string &filename) {
       const nlohmann::json &componentData = it.value();
       LOG_INFO("Adding component %s to entity", componentName.c_str());
 
-      // Find component ID by name
-      ComponentID componentID = MAX_COMPONENTS; // Invalid ID
-      for (ComponentID c = 0; c < MAX_COMPONENTS; ++c) {
-        if (m_componentRegistry.getComponentInfo(c).name == componentName) {
-          componentID = c;
-          break;
-        }
-      }
-
-      if (componentID == MAX_COMPONENTS) {
+      // Find component ID by name using O(1) lookup
+      ComponentID componentID;
+      try {
+        componentID = m_componentRegistry.getComponentIDByName(componentName);
+      } catch (const std::runtime_error &) {
         LOG_ERROR("Unknown component type '%s' in scene, skipping",
                   componentName.c_str());
         continue;

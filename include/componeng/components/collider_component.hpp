@@ -7,6 +7,8 @@ namespace componeng::components {
 enum class ColliderType { Box, Sphere };
 
 struct ColliderComponent {
+  static constexpr const char* component_name = "ColliderComponent";
+
   ColliderType type;
   TransformComponent transform;
 };

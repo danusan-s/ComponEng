@@ -2,12 +2,15 @@
 #include <gtest/gtest.h>
 
 struct TestCompA {
+  static constexpr const char* component_name = "TestCompA";
   int value;
 };
 struct TestCompB {
+  static constexpr const char* component_name = "TestCompB";
   float x, y;
 };
 struct TestCompC {
+  static constexpr const char* component_name = "TestCompC";
   double data[4];
 };
 
@@ -68,16 +71,17 @@ TEST(ComponentRegistryTest, ThrowsOnUnregisteredType) {
   EXPECT_THROW(reg.getComponentID<TestCompA>(), std::runtime_error);
 }
 
-TEST(ComponentRegistryTest, StoresDestructorForNonTrivialTypes) {
-  struct NonTrivial {
-    NonTrivial() : ptr(new int(42)) {
-    }
-    ~NonTrivial() {
-      delete ptr;
-    }
-    int *ptr;
-  };
+struct NonTrivial {
+  static constexpr const char* component_name = "NonTrivial";
+  NonTrivial() : ptr(new int(42)) {
+  }
+  ~NonTrivial() {
+    delete ptr;
+  }
+  int *ptr;
+};
 
+TEST(ComponentRegistryTest, StoresDestructorForNonTrivialTypes) {
   componeng::ecs::ComponentRegistry reg;
   componeng::ecs::ComponentID id = reg.registerComponent<NonTrivial>();
   componeng::ecs::ComponentInfo &info = reg.getComponentInfo(id);

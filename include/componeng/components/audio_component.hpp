@@ -6,6 +6,8 @@
 namespace componeng::components {
 
 struct AudioComponent {
+  static constexpr const char* component_name = "AudioComponent";
+
   renderer::AudioID audioID;
   const char *audioName = nullptr; // Optional: store name for serialization
   bool playOnAwake = true;

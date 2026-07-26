@@ -91,6 +91,15 @@ void Engine::registerSystems() {
 
 void Engine::initObjects() {
   ecs::EntityID cameraEntity = m_world.createEntity();
+  m_world.addComponents(
+      cameraEntity,
+      components::TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
+                                     .rotation = Vec3(0.0f, 0.0f, 0.0f),
+                                     .scale = Vec3(1.0f)},
+      components::CameraComponent{.fov = 45.0f,
+                                  .aspectRatio = 16.0f / 9.0f,
+                                  .nearPlane = 0.1f,
+                                  .farPlane = 10000.0f});
 
   m_world.set_resource(resources::MainCamera{.entity = cameraEntity});
 }

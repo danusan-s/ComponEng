@@ -6,6 +6,8 @@
 namespace componeng::components {
 
 struct TransformComponent {
+  static constexpr const char* component_name = "TransformComponent";
+
   core::Vec3 position; // 12 bytes
   core::Vec3 rotation; // 12 bytes (Euler angles in radians)
   core::Vec3 scale;    // 12 bytes (default to (1, 1, 1) for no scaling)

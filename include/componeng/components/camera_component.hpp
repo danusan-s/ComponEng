@@ -5,6 +5,8 @@
 namespace componeng::components {
 
 struct CameraComponent {
+  static constexpr const char* component_name = "CameraComponent";
+
   float fov;                       // 4 bytes
   float aspectRatio;               // 4 bytes
   float nearPlane;                 // 4 bytes

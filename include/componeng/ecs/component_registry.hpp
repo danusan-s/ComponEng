@@ -4,6 +4,7 @@
 #include "entity.hpp"
 #include <array>
 #include <stdexcept>
+#include <string_view>
 #include <typeindex>
 #include <unordered_map>
 
@@ -34,6 +35,7 @@ struct ComponentInfo {
 class ComponentRegistry {
 private:
   std::unordered_map<std::type_index, ComponentID> m_typeToID;
+  std::unordered_map<std::string_view, ComponentID> m_nameToID;
   std::array<ComponentInfo, MAX_COMPONENTS> m_componentInfos;
   ComponentID m_nextComponentID = 0;
 
@@ -46,6 +48,12 @@ public:
     static_assert(std::is_move_constructible_v<T>,
                   "Component must be move-constructible");
 
+    constexpr const char *typeName = T::component_name;
+    static_assert(typeName != nullptr,
+                  "Component type is missing a component_name. "
+                  "Add 'static constexpr const char* component_name = \"...\";' "
+                  "to the component struct.");
+
     const std::type_index key = typeid(T);
     auto it = m_typeToID.find(key);
     if (it != m_typeToID.end())
@@ -54,9 +62,17 @@ public:
     if (m_nextComponentID >= MAX_COMPONENTS)
       throw std::runtime_error("ComponentRegistry: MAX_COMPONENTS exceeded");
 
+    auto nameIt = m_nameToID.find(typeName);
+    if (nameIt != m_nameToID.end()) {
+      throw std::runtime_error(
+          std::string("Duplicate component name '") + typeName +
+          "' — two different component types cannot share the same name");
+    }
+
     ComponentID id = m_nextComponentID++;
     m_typeToID[key] = id;
-    m_componentInfos[id].name = key.name();
+    m_componentInfos[id].name = typeName;
+    m_nameToID[typeName] = id;
     m_componentInfos[id].size = sizeof(T);
     m_componentInfos[id].alignment = alignof(T);
     // Store destructor for non-trivial types so archetype moves can clean up.
@@ -81,6 +97,13 @@ public:
     }
 
     return id;
+  }
+
+  ComponentID getComponentIDByName(const std::string_view &name) const {
+    auto it = m_nameToID.find(name);
+    if (it == m_nameToID.end())
+      throw std::runtime_error("ComponentRegistry: unknown component name");
+    return it->second;
   }
 
   template <typename T> ComponentID getComponentID() const {

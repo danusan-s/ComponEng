@@ -3,12 +3,15 @@
 #include <gtest/gtest.h>
 
 struct Pos {
+  static constexpr const char* component_name = "Pos";
   float x, y, z;
 };
 struct Vel {
+  static constexpr const char* component_name = "Vel";
   float vx, vy, vz;
 };
 struct Mass {
+  static constexpr const char* component_name = "Mass";
   float value;
 };
 

@@ -68,7 +68,7 @@ public:
         MeshComponent{.meshID = assetManager.getMeshID("cube"),
                       .meshName = "cube"});
 
-    const int count = 1000;
+    const int count = 10;
 
     for (int i = 0; i < count; ++i) {
       componeng::ecs::EntityID entity = world.createEntity();

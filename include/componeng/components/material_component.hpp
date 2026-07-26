@@ -6,6 +6,8 @@
 namespace componeng::components {
 
 struct MaterialComponent {
+  static constexpr const char* component_name = "MaterialComponent";
+
   core::Vec3 color;                  // 12 bytes
   renderer::TextureID textureID;     // 4 bytes
   renderer::ShaderID shaderID;       // 4 bytes

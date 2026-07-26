@@ -6,6 +6,8 @@
 namespace componeng::components {
 
 struct RigidBodyComponent {
+  static constexpr const char* component_name = "RigidBodyComponent";
+
   enum Type {
     Static,   // Immovable object, not affected by forces
     Dynamic,  // Affected by forces, can move and rotate
