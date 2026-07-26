@@ -111,6 +111,7 @@ set(TEST_SOURCES
     tests/test_archetype.cpp
     tests/test_query.cpp
     tests/test_collision.cpp
+    tests/test_serialization.cpp
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})

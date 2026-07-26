@@ -9,8 +9,8 @@ struct MaterialComponent {
   static constexpr const char *component_name = "MaterialComponent";
 
   core::Vec3 color;
-  std::string textureName;
-  std::string shaderName;
+  core::Name textureName;
+  core::Name shaderName;
 
   // Runtime data (not serialized)
   renderer::TextureID textureID = 0;
@@ -18,9 +18,9 @@ struct MaterialComponent {
 };
 
 #define MATERIAL_COMPONENT_FIELDS(F, ctx) \
-  F(Vec3, color, ctx) \
-  F(string, textureName, ctx) \
-  F(string, shaderName, ctx)
+  F(color, ctx) \
+  F(textureName, ctx) \
+  F(shaderName, ctx)
 
 SERIALIZABLE_COMPONENT(MaterialComponent, MATERIAL_COMPONENT_FIELDS)
 

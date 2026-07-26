@@ -22,8 +22,8 @@ using namespace componeng::ecs;
 using namespace componeng::renderer;
 using namespace componeng::utils;
 
-bool loadFromFile = true;
-bool saveToFile = !loadFromFile;
+bool loadFromFile = false;
+bool saveToFile = true;
 
 class Game : public IGame {
 public:
@@ -47,22 +47,21 @@ public:
     std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);
 
     EntityID soundEntity = world.createEntity();
-    world.addComponents(
-        soundEntity,
-        TransformComponent{.position = glm::vec3(0, 0, 0),
-                           .rotation = glm::vec3(0, 0, 0),
-                           .scale = glm::vec3(1, 1, 1)},
-        AudioComponent{.audioName = "boop",
-                       .playOnAwake = true,
-                       .loop = true,
-                       .volume = 0.8f,
-                       .is3D = true,
-                       .minDistance = 1.0f,
-                       .maxDistance = 300.0f},
-        MaterialComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f),
-                          .textureName = "white",
-                          .shaderName = "default"},
-        MeshComponent{.meshName = "cube"});
+    world.addComponents(soundEntity,
+                        TransformComponent{.position = glm::vec3(0, 0, 0),
+                                           .rotation = glm::vec3(0, 0, 0),
+                                           .scale = glm::vec3(1, 1, 1)},
+                        AudioComponent{.audioName = "boop",
+                                       .playOnAwake = true,
+                                       .loop = true,
+                                       .volume = 0.8f,
+                                       .is3D = true,
+                                       .minDistance = 1.0f,
+                                       .maxDistance = 300.0f},
+                        MaterialComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f),
+                                          .textureName = "white",
+                                          .shaderName = "default"},
+                        MeshComponent{.meshName = "cube"});
 
     const int count = 10;
 
@@ -71,8 +70,7 @@ public:
 
       float scale = randScale(generator);
       world.addComponents(
-          entity,
-          componeng::components::MeshComponent{.meshName = "cube"},
+          entity, componeng::components::MeshComponent{.meshName = "cube"},
           componeng::components::TransformComponent{
               .position = Vec3(randPosition(generator), randPosition(generator),
                                randPosition(generator)),
@@ -98,8 +96,7 @@ public:
 
       float scale = randScale(generator);
       world.addComponents(
-          entity,
-          MeshComponent{.meshName = "sphere"},
+          entity, MeshComponent{.meshName = "sphere"},
           TransformComponent{.position = Vec3(randPosition(generator),
                                               randPosition(generator),
                                               randPosition(generator)),

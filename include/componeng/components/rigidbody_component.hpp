@@ -14,17 +14,17 @@ struct RigidBodyComponent {
     Kinematic // Moves according to user velocities, not affected by forces
   };
 
-  Type type;
+  Type type = Static;
   core::Vec3 velocity;
-  float mass;
-  float restitution;
+  float mass = 1.0f;
+  float restitution = 0.5f;
 };
 
 #define RIGIDBODY_COMPONENT_FIELDS(F, ctx) \
-  F(enum, type, 0, ctx) \
-  F(Vec3, velocity, ctx) \
-  F(float, mass, 1.0f, ctx) \
-  F(float, restitution, 0.5f, ctx)
+  F(type, ctx) \
+  F(velocity, ctx) \
+  F(mass, ctx) \
+  F(restitution, ctx)
 
 SERIALIZABLE_COMPONENT(RigidBodyComponent, RIGIDBODY_COMPONENT_FIELDS)
 

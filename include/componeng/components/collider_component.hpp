@@ -9,13 +9,13 @@ enum class ColliderType { Box, Sphere };
 struct ColliderComponent {
   static constexpr const char* component_name = "ColliderComponent";
 
-  ColliderType type;
+  ColliderType type = ColliderType::Box;
   TransformComponent transform;
 };
 
 #define COLLIDER_COMPONENT_FIELDS(F, ctx) \
-  F(enum, type, 0, ctx) \
-  F(Nested, transform, TransformComponent, ctx)
+  F(type, ctx) \
+  F(transform, ctx)
 
 SERIALIZABLE_COMPONENT(ColliderComponent, COLLIDER_COMPONENT_FIELDS)
 

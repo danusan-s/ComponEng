@@ -159,6 +159,9 @@ public:
 
     std::size_t newRow = newArchetype.getRowForEntity(entity);
 
+    const ComponentInfo &info =
+        m_componentRegistry.getComponentInfo(componentID);
+
     if (oldArchetype) {
       std::size_t oldRow = record.row;
       for (ComponentID c = 0; c < MAX_COMPONENTS; ++c) {
@@ -174,10 +177,8 @@ public:
       }
     }
 
-    const ComponentInfo &info =
-        m_componentRegistry.getComponentInfo(componentID);
-    std::memcpy(newArchetype.getColumn(componentID).at(newRow), componentData,
-                info.size);
+    std::memcpy(newArchetype.getColumn(componentID).at(newRow),
+                componentData, info.size);
 
     record.signature = newSig;
     record.row = newRow;

@@ -7,19 +7,19 @@ namespace componeng::components {
 struct CameraComponent {
   static constexpr const char* component_name = "CameraComponent";
 
-  float fov;                       // 4 bytes
-  float aspectRatio;               // 4 bytes
-  float nearPlane;                 // 4 bytes
-  float farPlane;                  // 4 bytes
-  core::Mat4 viewProjectionMatrix; // 64 bytes
+  float fov = 60.0f;
+  float aspectRatio = 16.0f / 9.0f;
+  float nearPlane = 0.1f;
+  float farPlane = 1000.0f;
+  core::Mat4 viewProjectionMatrix;
 };
 
 #define CAMERA_COMPONENT_FIELDS(F, ctx) \
-  F(float, fov, 60.0f, ctx) \
-  F(float, aspectRatio, 16.0f / 9.0f, ctx) \
-  F(float, nearPlane, 0.1f, ctx) \
-  F(float, farPlane, 1000.0f, ctx) \
-  F(Mat4, viewProjectionMatrix, ctx)
+  F(fov, ctx) \
+  F(aspectRatio, ctx) \
+  F(nearPlane, ctx) \
+  F(farPlane, ctx) \
+  F(viewProjectionMatrix, ctx)
 
 SERIALIZABLE_COMPONENT(CameraComponent, CAMERA_COMPONENT_FIELDS)
 

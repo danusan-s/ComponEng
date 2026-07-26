@@ -8,7 +8,7 @@ namespace componeng::components {
 struct AudioComponent {
   static constexpr const char *component_name = "AudioComponent";
 
-  std::string audioName;
+  core::Name audioName;
   bool playOnAwake = true;
   bool loop = false;
   bool isPlaying = false;
@@ -23,14 +23,14 @@ struct AudioComponent {
 };
 
 #define AUDIO_COMPONENT_FIELDS(F, ctx) \
-  F(string, audioName, ctx) \
-  F(bool, playOnAwake, true, ctx) \
-  F(bool, loop, false, ctx) \
-  F(float, volume, 1.0f, ctx) \
-  F(float, pitch, 1.0f, ctx) \
-  F(bool, is3D, false, ctx) \
-  F(float, minDistance, 1.0f, ctx) \
-  F(float, maxDistance, 100.0f, ctx)
+  F(audioName, ctx) \
+  F(playOnAwake, ctx) \
+  F(loop, ctx) \
+  F(volume, ctx) \
+  F(pitch, ctx) \
+  F(is3D, ctx) \
+  F(minDistance, ctx) \
+  F(maxDistance, ctx)
 
 SERIALIZABLE_COMPONENT(AudioComponent, AUDIO_COMPONENT_FIELDS)
 

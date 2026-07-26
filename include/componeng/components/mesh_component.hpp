@@ -7,7 +7,7 @@ namespace componeng::components {
 struct MeshComponent {
   static constexpr const char *component_name = "MeshComponent";
 
-  std::string meshName;
+  core::Name meshName;
 
   // Runtime data (not serialized)
   renderer::MeshID meshID = 0;
@@ -15,7 +15,7 @@ struct MeshComponent {
 };
 
 #define MESH_COMPONENT_FIELDS(F, ctx) \
-  F(string, meshName, ctx)
+  F(meshName, ctx)
 
 SERIALIZABLE_COMPONENT(MeshComponent, MESH_COMPONENT_FIELDS)
 

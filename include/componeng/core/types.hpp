@@ -1,10 +1,39 @@
 #pragma once
 
+#include <cstring>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <string>
 
 namespace componeng::core {
+
+struct Name {
+  char value[64] = {};
+
+  Name() = default;
+  Name(const char *s) {
+    if (s) {
+      std::strncpy(value, s, sizeof(value) - 1);
+      value[sizeof(value) - 1] = '\0';
+    }
+  }
+  Name(const std::string &s) : Name(s.c_str()) {}
+
+  const char *c_str() const { return value; }
+  bool operator==(const Name &other) const {
+    return std::strcmp(value, other.value) == 0;
+  }
+  bool operator==(const char *s) const {
+    return s && std::strcmp(value, s) == 0;
+  }
+  bool operator!=(const Name &other) const { return !(*this == other); }
+  bool operator!=(const char *s) const { return !(*this == s); }
+  operator const char *() const { return value; }
+  operator std::string() const { return value; }
+  bool empty() const { return value[0] == '\0'; }
+  std::size_t size() const { return std::strlen(value); }
+};
 
 // Type aliases for cleaner code
 using Vec2 = glm::vec2;

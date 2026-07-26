@@ -151,15 +151,15 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
         if (mat.textureID == 0) {
           mat.textureID =
               state.world->get_resource<AssetManager>().getTextureID(
-                  mat.textureName.empty() ? "white" : mat.textureName);
+                  mat.textureName.empty() ? "white" : mat.textureName.c_str());
         }
         if (mat.shaderID == 0) {
           mat.shaderID = state.world->get_resource<AssetManager>().getShaderID(
-              mat.shaderName.empty() ? "default" : mat.shaderName);
+              mat.shaderName.empty() ? "default" : mat.shaderName.c_str());
         }
         if (m.meshID == 0) {
           m.meshID = state.world->get_resource<AssetManager>().getMeshID(
-              m.meshName.empty() ? "cube" : m.meshName);
+              m.meshName.empty() ? "cube" : m.meshName.c_str());
         }
         if (m.visible)
           populateBatch(t, m, mat, *m_batches.get());

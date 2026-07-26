@@ -115,7 +115,7 @@ public:
   size_t m_count;
 
   ComponentColumn(size_t componentSize, size_t alignment,
-                  void (*destructor)(void *) = nullptr)
+                   void (*destructor)(void *) = nullptr)
       : m_buffer(alignment), m_count(0), m_stride(componentSize),
         m_destructor(destructor) {
     if (m_stride % alignment != 0) {
@@ -166,6 +166,8 @@ public:
       if (m_destructor)
         m_destructor(at(row));
       std::memcpy(at(row), at(m_count - 1), m_stride);
+    } else if (m_destructor) {
+      m_destructor(at(row));
     }
     --m_count;
   }
