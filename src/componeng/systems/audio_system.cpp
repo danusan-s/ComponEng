@@ -5,6 +5,7 @@
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/resources/main_camera.hpp"
+#include <cmath>
 
 namespace componeng::systems {
 
@@ -22,6 +23,20 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
     audioEngine.setListenerPosition(camTransform.position.x,
                                     camTransform.position.y,
                                     camTransform.position.z);
+
+    float cosYaw = cos(core::radians(camTransform.rotation.y));
+    float sinYaw = sin(core::radians(camTransform.rotation.y));
+    float cosPitch = cos(core::radians(camTransform.rotation.x));
+    float sinPitch = sin(core::radians(camTransform.rotation.x));
+    core::Vec3 front;
+    front.x = cosYaw * cosPitch;
+    front.y = sinPitch;
+    front.z = sinYaw * cosPitch;
+    front = core::normalize(front);
+    core::Vec3 up = core::normalize(
+        core::cross(core::cross(front, core::Vec3(0.0f, 1.0f, 0.0f)), front));
+    audioEngine.setListenerOrientation(front.x, front.y, front.z, up.x, up.y,
+                                       up.z);
   }
 
   state.world

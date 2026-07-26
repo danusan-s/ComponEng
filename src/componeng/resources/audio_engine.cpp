@@ -35,6 +35,14 @@ void AudioEngine::setListenerPosition(float x, float y, float z) {
   ma_engine_listener_set_position(&m_audioEngine, 0, x, y, z);
 }
 
+void AudioEngine::setListenerOrientation(float forwardX, float forwardY,
+                                          float forwardZ, float upX,
+                                          float upY, float upZ) {
+  ma_engine_listener_set_direction(&m_audioEngine, 0, forwardX, forwardY,
+                                   forwardZ);
+  ma_engine_listener_set_world_up(&m_audioEngine, 0, upX, upY, upZ);
+}
+
 std::unique_ptr<ma_sound> AudioEngine::createSound(const char *filePath) {
   std::unique_ptr<ma_sound> sound = std::make_unique<ma_sound>();
   ma_result result =
