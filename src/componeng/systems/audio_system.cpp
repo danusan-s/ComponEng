@@ -8,15 +8,6 @@
 
 namespace componeng::systems {
 
-void AudioSystem::onCreate(const ecs::SystemState &state) {
-  state.world->query<components::AudioComponent>().each(
-      [&](components::AudioComponent &audio) {
-        audio.audioID =
-            state.world->get_resource<renderer::AssetManager>().getAudioID(
-                audio.audioName);
-      });
-}
-
 void AudioSystem::onUpdate(const ecs::SystemState &state) {
   auto &assetManager = state.world->get_resource<renderer::AssetManager>();
   auto &audioEngine = state.world->get_resource<resources::AudioEngine>();
@@ -37,6 +28,10 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
       ->query<components::AudioComponent, components::TransformComponent>()
       .each([&](components::AudioComponent &audio,
                 components::TransformComponent &transform) {
+        if (audio.audioID == 0) {
+          audio.audioID = assetManager.getAudioID(audio.audioName);
+        }
+
         if (!audio.playOnAwake || audio.isPlaying) {
           return;
         }

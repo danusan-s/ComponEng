@@ -14,38 +14,15 @@ struct CameraComponent {
   core::Mat4 viewProjectionMatrix; // 64 bytes
 };
 
-template <> struct ComponentSerializer<CameraComponent> {
-  static nlohmann::json serialize(const CameraComponent &component) {
-    nlohmann::json cameraJson;
+#define CAMERA_COMPONENT_FIELDS(F, ctx) \
+  F(float, fov, 60.0f, ctx) \
+  F(float, aspectRatio, 16.0f / 9.0f, ctx) \
+  F(float, nearPlane, 0.1f, ctx) \
+  F(float, farPlane, 1000.0f, ctx) \
+  F(Mat4, viewProjectionMatrix, ctx)
 
-    cameraJson["fov"] = component.fov;
-    cameraJson["aspectRatio"] = component.aspectRatio;
-    cameraJson["nearPlane"] = component.nearPlane;
-    cameraJson["farPlane"] = component.farPlane;
-    cameraJson["viewProjectionMatrix"] =
-        SerializeMat4(component.viewProjectionMatrix);
+SERIALIZABLE_COMPONENT(CameraComponent, CAMERA_COMPONENT_FIELDS)
 
-    return cameraJson;
-  }
-
-  static CameraComponent deserialize(const nlohmann::json &cameraJson) {
-    CameraComponent component;
-
-    component.fov = cameraJson.value("fov", 60.0f);
-    component.aspectRatio = cameraJson.value("aspectRatio", 16.0f / 9.0f);
-    component.nearPlane = cameraJson.value("nearPlane", 0.1f);
-    component.farPlane = cameraJson.value("farPlane", 1000.0f);
-
-    if (cameraJson.contains("viewProjectionMatrix")) {
-      const auto &matrixData = cameraJson["viewProjectionMatrix"];
-      if (matrixData.is_array() && matrixData.size() == 16) {
-        component.viewProjectionMatrix =
-            DeserializeMat4(matrixData.get<std::vector<float>>());
-      }
-    }
-
-    return component;
-  }
-};
+#undef CAMERA_COMPONENT_FIELDS
 
 } // namespace componeng::components

@@ -52,8 +52,7 @@ public:
         TransformComponent{.position = glm::vec3(0, 0, 0),
                            .rotation = glm::vec3(0, 0, 0),
                            .scale = glm::vec3(1, 1, 1)},
-        AudioComponent{.audioID = assetManager.getAudioID("boop"),
-                       .audioName = "boop",
+        AudioComponent{.audioName = "boop",
                        .playOnAwake = true,
                        .loop = true,
                        .volume = 0.8f,
@@ -61,12 +60,9 @@ public:
                        .minDistance = 1.0f,
                        .maxDistance = 300.0f},
         MaterialComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f),
-                          .textureID = assetManager.getTextureID("white"),
-                          .shaderID = assetManager.getShaderID("default"),
                           .textureName = "white",
                           .shaderName = "default"},
-        MeshComponent{.meshID = assetManager.getMeshID("cube"),
-                      .meshName = "cube"});
+        MeshComponent{.meshName = "cube"});
 
     const int count = 10;
 
@@ -76,8 +72,7 @@ public:
       float scale = randScale(generator);
       world.addComponents(
           entity,
-          componeng::components::MeshComponent{
-              .meshID = assetManager.getMeshID("cube"), .meshName = "cube"},
+          componeng::components::MeshComponent{.meshName = "cube"},
           componeng::components::TransformComponent{
               .position = Vec3(randPosition(generator), randPosition(generator),
                                randPosition(generator)),
@@ -89,8 +84,6 @@ public:
           MaterialComponent{.color =
                                 Vec4(randColor(generator), randColor(generator),
                                      randColor(generator), 1.0f),
-                            .textureID = assetManager.getTextureID("white"),
-                            .shaderID = assetManager.getShaderID("default"),
                             .textureName = "white",
                             .shaderName = "default"},
           ColliderComponent{.type = ColliderType::Box,
@@ -106,8 +99,7 @@ public:
       float scale = randScale(generator);
       world.addComponents(
           entity,
-          MeshComponent{.meshID = assetManager.getMeshID("sphere"),
-                        .meshName = "sphere"},
+          MeshComponent{.meshName = "sphere"},
           TransformComponent{.position = Vec3(randPosition(generator),
                                               randPosition(generator),
                                               randPosition(generator)),
@@ -121,8 +113,6 @@ public:
           MaterialComponent{.color =
                                 Vec4(randColor(generator), randColor(generator),
                                      randColor(generator), 1.0f),
-                            .textureID = assetManager.getTextureID("white"),
-                            .shaderID = assetManager.getShaderID("default"),
                             .textureName = "white",
                             .shaderName = "default"},
           ColliderComponent{.type = ColliderType::Sphere,
@@ -138,11 +128,8 @@ public:
         TransformComponent{.position = Vec3(0.0f, -1000.0f, 0.0f),
                            .rotation = Vec3(0.0f),
                            .scale = Vec3(1000.0f, 1.0f, 1000.0f)},
-        MeshComponent{.meshID = assetManager.getMeshID("cube"),
-                      .meshName = "cube"},
+        MeshComponent{.meshName = "cube"},
         MaterialComponent{.color = Vec4(0.5f, 0.5f, 0.5f, 1.0f),
-                          .textureID = assetManager.getTextureID("white"),
-                          .shaderID = assetManager.getShaderID("default"),
                           .textureName = "white",
                           .shaderName = "default"},
         RigidBodyComponent{.type = RigidBodyComponent::Static,

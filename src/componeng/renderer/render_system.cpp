@@ -148,18 +148,18 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
               components::MaterialComponent>()
       .each([&](components::TransformComponent &t, components::MeshComponent &m,
                 components::MaterialComponent &mat) {
-        if (mat.textureID == renderer::TextureID()) {
+        if (mat.textureID == 0) {
           mat.textureID =
               state.world->get_resource<AssetManager>().getTextureID(
-                  mat.textureName ? mat.textureName : "white");
+                  mat.textureName.empty() ? "white" : mat.textureName);
         }
-        if (mat.shaderID == renderer::ShaderID()) {
+        if (mat.shaderID == 0) {
           mat.shaderID = state.world->get_resource<AssetManager>().getShaderID(
-              mat.shaderName ? mat.shaderName : "default");
+              mat.shaderName.empty() ? "default" : mat.shaderName);
         }
-        if (m.meshID == renderer::MeshID()) {
+        if (m.meshID == 0) {
           m.meshID = state.world->get_resource<AssetManager>().getMeshID(
-              m.meshName ? m.meshName : "cube");
+              m.meshName.empty() ? "cube" : m.meshName);
         }
         if (m.visible)
           populateBatch(t, m, mat, *m_batches.get());

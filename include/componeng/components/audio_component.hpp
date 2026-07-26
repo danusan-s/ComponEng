@@ -6,10 +6,9 @@
 namespace componeng::components {
 
 struct AudioComponent {
-  static constexpr const char* component_name = "AudioComponent";
+  static constexpr const char *component_name = "AudioComponent";
 
-  renderer::AudioID audioID;
-  const char *audioName = nullptr; // Optional: store name for serialization
+  std::string audioName;
   bool playOnAwake = true;
   bool loop = false;
   bool isPlaying = false;
@@ -18,46 +17,23 @@ struct AudioComponent {
   bool is3D = false;
   float minDistance = 1.0f;
   float maxDistance = 100.0f;
+
+  // Runtime data (not serialized)
+  renderer::AudioID audioID = 0;
 };
 
-template <> struct ComponentSerializer<AudioComponent> {
-  static nlohmann::json serialize(const AudioComponent &component) {
-    nlohmann::json audioJson;
+#define AUDIO_COMPONENT_FIELDS(F, ctx) \
+  F(string, audioName, ctx) \
+  F(bool, playOnAwake, true, ctx) \
+  F(bool, loop, false, ctx) \
+  F(float, volume, 1.0f, ctx) \
+  F(float, pitch, 1.0f, ctx) \
+  F(bool, is3D, false, ctx) \
+  F(float, minDistance, 1.0f, ctx) \
+  F(float, maxDistance, 100.0f, ctx)
 
-    audioJson["audioName"] =
-        component.audioName ? std::string(component.audioName) : "";
-    audioJson["playOnAwake"] = component.playOnAwake;
-    audioJson["loop"] = component.loop;
-    audioJson["volume"] = component.volume;
-    audioJson["pitch"] = component.pitch;
-    audioJson["is3D"] = component.is3D;
-    audioJson["minDistance"] = component.minDistance;
-    audioJson["maxDistance"] = component.maxDistance;
+SERIALIZABLE_COMPONENT(AudioComponent, AUDIO_COMPONENT_FIELDS)
 
-    return audioJson;
-  }
-
-  static AudioComponent deserialize(const nlohmann::json &audioJson) {
-    AudioComponent component;
-
-    component.audioID =
-        renderer::AudioID(); // Will be set later based on audioName
-    std::string audioName = audioJson.value("audioName", std::string());
-    LOG_INFO("Deserializing AudioComponent with audioName: %s",
-             audioName.c_str());
-    if (!audioName.empty()) {
-      component.audioName = strdup(audioName.c_str());
-    }
-    component.playOnAwake = audioJson.value("playOnAwake", true);
-    component.loop = audioJson.value("loop", false);
-    component.volume = audioJson.value("volume", 1.0f);
-    component.pitch = audioJson.value("pitch", 1.0f);
-    component.is3D = audioJson.value("is3D", false);
-    component.minDistance = audioJson.value("minDistance", 1.0f);
-    component.maxDistance = audioJson.value("maxDistance", 100.0f);
-
-    return component;
-  }
-};
+#undef AUDIO_COMPONENT_FIELDS
 
 } // namespace componeng::components

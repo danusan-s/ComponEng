@@ -13,33 +13,12 @@ struct ColliderComponent {
   TransformComponent transform;
 };
 
-template <> struct ComponentSerializer<ColliderComponent> {
-  static nlohmann::json serialize(const ColliderComponent &component) {
-    nlohmann::json colliderJson;
+#define COLLIDER_COMPONENT_FIELDS(F, ctx) \
+  F(enum, type, 0, ctx) \
+  F(Nested, transform, TransformComponent, ctx)
 
-    colliderJson["type"] = static_cast<int>(component.type);
+SERIALIZABLE_COMPONENT(ColliderComponent, COLLIDER_COMPONENT_FIELDS)
 
-    colliderJson["transform"] =
-        ComponentSerializer<TransformComponent>::serialize(component.transform);
-
-    return colliderJson;
-  }
-
-  static ColliderComponent deserialize(const nlohmann::json &colliderJson) {
-    ColliderComponent component;
-
-    int typeInt = colliderJson.value("type", 0);
-    component.type = static_cast<ColliderType>(typeInt);
-
-    if (colliderJson.contains("transform")) {
-      const auto &transformComp =
-          ComponentSerializer<TransformComponent>::deserialize(
-              colliderJson["transform"]);
-      component.transform = transformComp;
-    }
-
-    return component;
-  }
-};
+#undef COLLIDER_COMPONENT_FIELDS
 
 } // namespace componeng::components

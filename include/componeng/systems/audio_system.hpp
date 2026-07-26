@@ -6,7 +6,6 @@ namespace componeng::systems {
 
 class AudioSystem : public ecs::ISystem {
 public:
-  void onCreate(const ecs::SystemState &state) override;
   void onUpdate(const ecs::SystemState &state) override;
 };
 

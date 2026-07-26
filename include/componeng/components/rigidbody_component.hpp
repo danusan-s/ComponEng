@@ -20,38 +20,14 @@ struct RigidBodyComponent {
   float restitution;
 };
 
-template <> struct ComponentSerializer<RigidBodyComponent> {
-  static nlohmann::json serialize(const RigidBodyComponent &component) {
-    nlohmann::json rigidBodyJson;
+#define RIGIDBODY_COMPONENT_FIELDS(F, ctx) \
+  F(enum, type, 0, ctx) \
+  F(Vec3, velocity, ctx) \
+  F(float, mass, 1.0f, ctx) \
+  F(float, restitution, 0.5f, ctx)
 
-    rigidBodyJson["type"] = static_cast<int>(component.type);
-    rigidBodyJson["velocity"] = {component.velocity.x, component.velocity.y,
-                                 component.velocity.z};
-    rigidBodyJson["mass"] = component.mass;
-    rigidBodyJson["restitution"] = component.restitution;
+SERIALIZABLE_COMPONENT(RigidBodyComponent, RIGIDBODY_COMPONENT_FIELDS)
 
-    return rigidBodyJson;
-  }
-
-  static RigidBodyComponent deserialize(const nlohmann::json &rigidBodyJson) {
-    RigidBodyComponent component;
-
-    int typeInt = rigidBodyJson.value("type", 0);
-    component.type = static_cast<RigidBodyComponent::Type>(typeInt);
-
-    if (rigidBodyJson.contains("velocity") &&
-        rigidBodyJson["velocity"].is_array() &&
-        rigidBodyJson["velocity"].size() == 3) {
-      component.velocity.x = rigidBodyJson["velocity"][0];
-      component.velocity.y = rigidBodyJson["velocity"][1];
-      component.velocity.z = rigidBodyJson["velocity"][2];
-    }
-
-    component.mass = rigidBodyJson.value("mass", 1.0f);
-    component.restitution = rigidBodyJson.value("restitution", 0.5f);
-
-    return component;
-  }
-};
+#undef RIGIDBODY_COMPONENT_FIELDS
 
 } // namespace componeng::components

@@ -5,38 +5,20 @@
 namespace componeng::components {
 
 struct MeshComponent {
-  static constexpr const char* component_name = "MeshComponent";
+  static constexpr const char *component_name = "MeshComponent";
 
-  renderer::MeshID meshID;        // 4 bytes
-  const char *meshName = nullptr; // Optional: store name for serialization
-  bool visible = true;            // 1 byte
+  std::string meshName;
+
+  // Runtime data (not serialized)
+  renderer::MeshID meshID = 0;
+  bool visible = true;
 };
 
-template <> struct ComponentSerializer<MeshComponent> {
-  static nlohmann::json serialize(const MeshComponent &component) {
-    nlohmann::json meshJson;
+#define MESH_COMPONENT_FIELDS(F, ctx) \
+  F(string, meshName, ctx)
 
-    meshJson["meshName"] =
-        component.meshName ? std::string(component.meshName) : "";
-    meshJson["visible"] = component.visible;
+SERIALIZABLE_COMPONENT(MeshComponent, MESH_COMPONENT_FIELDS)
 
-    return meshJson;
-  }
-
-  static MeshComponent deserialize(const nlohmann::json &meshJson) {
-    MeshComponent component;
-
-    component.meshID =
-        renderer::MeshID(); // Will be set later based on meshName
-    component.visible = meshJson.value("visible", true);
-
-    std::string meshName = meshJson.value("meshName", std::string());
-    if (!meshName.empty()) {
-      component.meshName = strdup(meshName.c_str());
-    }
-
-    return component;
-  }
-};
+#undef MESH_COMPONENT_FIELDS
 
 } // namespace componeng::components
