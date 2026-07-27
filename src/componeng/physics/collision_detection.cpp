@@ -131,14 +131,14 @@ bool testSphereBox(const components::TransformComponent &a,
 }
 
 bool testCollision(const components::ColliderComponent &colliderA,
-                   const components::TransformComponent &transformA,
+                   const components::TransformComponent &localTransformA,
                    const components::ColliderComponent &colliderB,
-                   const components::TransformComponent &transformB,
+                   const components::TransformComponent &localTransformB,
                    CollisionInfo &info) {
   const components::TransformComponent worldTransformA =
-      getWorldTransform(colliderA.transform, transformA);
+      getWorldTransform(colliderA.transform, localTransformA);
   const components::TransformComponent worldTransformB =
-      getWorldTransform(colliderB.transform, transformB);
+      getWorldTransform(colliderB.transform, localTransformB);
 
   if (colliderA.type == components::ColliderType::Box &&
       colliderB.type == components::ColliderType::Box) {

@@ -3,6 +3,7 @@
 
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
+#include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset_manager.hpp"
@@ -49,11 +50,61 @@ public:
     EntityID floor = world.createEntity();
     world.addComponents(
         floor, MeshComponent{.meshName = "cube"},
-        TransformComponent{.position = Vec3(0, -0.25f, 0),
-                           .scale = Vec3(kFloorSize, 0.5f, kFloorSize)},
+        TransformComponent{.position = Vec3(0, -0.1f, 0),
+                           .scale = Vec3(kFloorSize, 0.2f, kFloorSize)},
         MaterialComponent{.color = kFloorColor,
                           .textureName = "white",
-                          .shaderName = "default"});
+                          .shaderName = "default"},
+        RigidBodyComponent{.type = RigidBodyComponent::Type::Static,
+                           .velocity = Vec3(0, 0, 0),
+                           .mass = 0.0f,
+                           .restitution = 0.0f},
+        ColliderComponent{.type = ColliderType::Box});
+
+    // Create 4 invisible walls around the floor to prevent players from falling
+    EntityID wall1 = world.createEntity();
+    world.addComponents(
+        wall1, MeshComponent{.meshName = "cube"},
+        TransformComponent{.position = Vec3(0, 1.0f, -kFloorSize / 2.0f),
+                           .scale = Vec3(kFloorSize, 2.0f, 0.01f)},
+        RigidBodyComponent{.type = RigidBodyComponent::Type::Static,
+                           .velocity = Vec3(0, 0, 0),
+                           .mass = 0.0f,
+                           .restitution = 0.0f},
+        ColliderComponent{.type = ColliderType::Box});
+
+    EntityID wall2 = world.createEntity();
+    world.addComponents(
+        wall2, MeshComponent{.meshName = "cube"},
+        TransformComponent{.position = Vec3(0, 1.0f, kFloorSize / 2.0f),
+                           .scale = Vec3(kFloorSize, 2.0f, 0.01f)},
+        RigidBodyComponent{.type = RigidBodyComponent::Type::Static,
+                           .velocity = Vec3(0, 0, 0),
+                           .mass = 0.0f,
+                           .restitution = 0.0f},
+        ColliderComponent{.type = ColliderType::Box});
+
+    EntityID wall3 = world.createEntity();
+    world.addComponents(
+        wall3, MeshComponent{.meshName = "cube"},
+        TransformComponent{.position = Vec3(-kFloorSize / 2.0f, 1.0f, 0),
+                           .scale = Vec3(0.01f, 2.0f, kFloorSize)},
+        RigidBodyComponent{.type = RigidBodyComponent::Type::Static,
+                           .velocity = Vec3(0, 0, 0),
+                           .mass = 0.0f,
+                           .restitution = 0.0f},
+        ColliderComponent{.type = ColliderType::Box});
+
+    EntityID wall4 = world.createEntity();
+    world.addComponents(
+        wall4, MeshComponent{.meshName = "cube"},
+        TransformComponent{.position = Vec3(kFloorSize / 2.0f, 1.0f, 0),
+                           .scale = Vec3(0.01f, 2.0f, kFloorSize)},
+        RigidBodyComponent{.type = RigidBodyComponent::Type::Static,
+                           .velocity = Vec3(0, 0, 0),
+                           .mass = 0.0f,
+                           .restitution = 0.0f},
+        ColliderComponent{.type = ColliderType::Box});
 
     for (int i = 0; i < kOrbCount; ++i) {
       spawnOrb(world);

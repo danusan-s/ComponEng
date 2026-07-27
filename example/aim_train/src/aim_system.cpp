@@ -116,7 +116,7 @@ void AimSystem::onUpdate(const ecs::SystemState &state) {
       assetManager.getAudio(assetManager.getAudioID("gunshot"));
 
   audioEngine.playSoundFromFile(shotSoundPath, rayOrigin.x, rayOrigin.y,
-                                rayOrigin.z, 0.8f, 1.0f, false, 1.0f, 100.0f);
+                                rayOrigin.z, 0.3f, 1.0f, false, 1.0f, 100.0f);
 
   if (hitEntity != ecs::INVALID_ENTITY) {
     core::Vec3 hitPos = rayOrigin + rayDir * closestT;
