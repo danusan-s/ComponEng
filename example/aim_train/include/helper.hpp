@@ -17,7 +17,7 @@ constexpr float kOrbScaleMin = 0.3f;
 constexpr float kOrbScaleMax = 0.8f;
 
 static inline void spawnOrb(ecs::World &world) {
-  static std::default_random_engine gen;
+  static std::mt19937 gen(std::random_device{}());
   static std::uniform_real_distribution<float> distScale(kOrbScaleMin,
                                                          kOrbScaleMax);
   static std::uniform_real_distribution<float> distY(kSpawnYMin, kSpawnYMax);
