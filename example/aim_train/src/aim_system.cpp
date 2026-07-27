@@ -4,14 +4,11 @@
 #include <GLFW/glfw3.h>
 #include <cmath>
 #include <limits>
-#include <random>
 #include <vector>
 
 #include <imgui/imgui.h>
 
 #include "componeng/components/collider_component.hpp"
-#include "componeng/components/material_component.hpp"
-#include "componeng/components/mesh_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/ecs/world.hpp"
@@ -43,7 +40,7 @@ static void drawCrosshair() {
               thickness);
 }
 
-core::Vec3 cameraFront(core::Vec3 rotation) {
+static core::Vec3 cameraFront(core::Vec3 rotation) {
   float pitch = core::radians(rotation.x);
   float yaw = core::radians(rotation.y);
   core::Vec3 front;
@@ -71,48 +68,18 @@ bool raySphereIntersect(core::Vec3 origin, core::Vec3 dir, core::Vec3 center,
 
 void AimSystem::onUpdate(const ecs::SystemState &state) {
   auto &input = state.world->get_resource<resources::InputState>();
-  auto &actions = state.world->get_resource<resources::ActionState>();
   auto &mainCam = state.world->get_resource<resources::MainCamera>();
   auto &camTransform =
       state.world->getComponent<components::TransformComponent>(mainCam.entity);
 
-  camTransform.rotation.y += input.getMouseDeltaX() * m_sensitivity;
-  camTransform.rotation.x -= input.getMouseDeltaY() * m_sensitivity;
-
-  constexpr float PITCH_LIMIT = 89.0f;
-  if (camTransform.rotation.x > PITCH_LIMIT)
-    camTransform.rotation.x = PITCH_LIMIT;
-  if (camTransform.rotation.x < -PITCH_LIMIT)
-    camTransform.rotation.x = -PITCH_LIMIT;
-
-  float speed = 10.0f * state.deltaTime;
-  if (actions.down(resources::Action::Sprint))
-    speed *= 2.0f;
-
-  core::Vec3 look = cameraFront(camTransform.rotation);
-  core::Vec3 right =
-      core::normalize(core::cross(look, core::Vec3(0.0f, 1.0f, 0.0f)));
-  core::Vec3 front =
-      core::normalize(core::cross(core::Vec3(0.0f, 1.0f, 0.0f), right));
-
-  if (actions.down(resources::Action::MoveForward))
-    camTransform.position += front * speed;
-  if (actions.down(resources::Action::MoveBackward))
-    camTransform.position -= front * speed;
-  if (actions.down(resources::Action::MoveLeft))
-    camTransform.position -= right * speed;
-  if (actions.down(resources::Action::MoveRight))
-    camTransform.position += right * speed;
-
   drawCrosshair();
   core::DebugUI::addValue("Score", static_cast<float>(m_score));
-  ImGui::InputFloat("Sensitivity", &m_sensitivity, 0.01f, 0.1f, "%.3f");
 
   if (!input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
     return;
 
   core::Vec3 rayOrigin = camTransform.position;
-  core::Vec3 rayDir = look;
+  core::Vec3 rayDir = cameraFront(camTransform.rotation);
 
   struct Target {
     ecs::EntityID id;
@@ -142,14 +109,19 @@ void AimSystem::onUpdate(const ecs::SystemState &state) {
       hitEntity = target.id;
     }
   }
+  auto &assetManager = state.world->get_resource<renderer::AssetManager>();
+  auto &audioEngine = state.world->get_resource<resources::AudioEngine>();
+  auto hitSoundPath = assetManager.getAudio(assetManager.getAudioID("boop"));
+  auto shotSoundPath =
+      assetManager.getAudio(assetManager.getAudioID("gunshot"));
+
+  audioEngine.playSoundFromFile(shotSoundPath, rayOrigin.x, rayOrigin.y,
+                                rayOrigin.z, 0.8f, 1.0f, false, 1.0f, 100.0f);
 
   if (hitEntity != ecs::INVALID_ENTITY) {
     core::Vec3 hitPos = rayOrigin + rayDir * closestT;
-    auto &assetManager = state.world->get_resource<renderer::AssetManager>();
-    auto &audioEngine = state.world->get_resource<resources::AudioEngine>();
-    auto soundPath = assetManager.getAudio(assetManager.getAudioID("boop"));
-    audioEngine.playSoundFromFile(soundPath, hitPos.x, hitPos.y, hitPos.z, 0.8f,
-                                  1.0f, false, 1.0f, 100.0f);
+    audioEngine.playSoundFromFile(hitSoundPath, hitPos.x, hitPos.y, hitPos.z,
+                                  0.8f, 1.0f, false, 1.0f, 100.0f);
     state.world->destroyEntity(hitEntity);
     spawnOrb(*state.world);
     ++m_score;

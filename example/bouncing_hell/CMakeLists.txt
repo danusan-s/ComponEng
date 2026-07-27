@@ -1,5 +1,5 @@
 file(GLOB BOUNCING_HELL_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
 )
 
 add_executable(ComponEx ${BOUNCING_HELL_SOURCES})

@@ -11,6 +11,7 @@
 
 #include "aim_system.hpp"
 #include "helper.hpp"
+#include "player_controller.hpp"
 
 using namespace componeng::core;
 using namespace componeng::components;
@@ -30,11 +31,14 @@ constexpr Vec3 kOrbColor = Vec3(0.0f, 1.0f, 1.0f);
 class AimTrain : public IGame {
 public:
   void init(World &world) override {
+    world.registerSystem<aim_train::PlayerController>(SystemGroup::Simulation);
     world.registerSystem<aim_train::AimSystem>(SystemGroup::Simulation);
 
     auto &assetManager = world.get_resource<AssetManager>();
     assetManager.loadAudio(Utils::getAssetPath("assets/audio/boop.wav").c_str(),
                            "boop");
+    assetManager.loadAudio(Utils::getAssetPath("assets/audio/gun.wav").c_str(),
+                           "gunshot");
 
     auto &mainCam = world.get_resource<MainCamera>();
     auto &t = world.getComponent<TransformComponent>(mainCam.entity);
