@@ -1,6 +1,7 @@
 #include "aim_system.hpp"
 
 #include "helper.hpp"
+#include "orb_component.hpp"
 #include <GLFW/glfw3.h>
 #include <cmath>
 #include <limits>
@@ -75,6 +76,15 @@ void AimSystem::onUpdate(const ecs::SystemState &state) {
   drawCrosshair();
   core::DebugUI::addValue("Score", static_cast<float>(m_score));
 
+  float dt = state.deltaTime;
+  state.world->query<components::TransformComponent, OrbComponent>().each(
+      [dt](components::TransformComponent &t, OrbComponent &o) {
+        o.phase += o.speed * dt;
+        t.position.x = cos(o.phase) * o.radius;
+        t.position.z = sin(o.phase) * o.radius;
+        t.position.y = o.centerY;
+      });
+
   if (!input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
     return;
 
@@ -89,11 +99,12 @@ void AimSystem::onUpdate(const ecs::SystemState &state) {
   std::vector<Target> targets;
 
   auto q = state.world->query<components::TransformComponent,
-                              components::ColliderComponent>();
+                              components::ColliderComponent, OrbComponent>();
   q.eachWithEntity([&](ecs::EntityID entity, components::TransformComponent &t,
-                       components::ColliderComponent &c) {
+                       components::ColliderComponent &c, OrbComponent &) {
     if (c.type == components::ColliderType::Sphere) {
-      targets.push_back({entity, t.position, t.scale.x});
+      targets.push_back({entity, t.position + c.transform.position,
+                         t.scale.x * c.transform.scale.x});
     }
   });
 

@@ -12,6 +12,7 @@
 
 #include "aim_system.hpp"
 #include "helper.hpp"
+#include "orb_component.hpp"
 #include "player_controller.hpp"
 
 using namespace componeng::core;
@@ -32,6 +33,7 @@ constexpr Vec3 kOrbColor = Vec3(0.0f, 1.0f, 1.0f);
 class AimTrain : public IGame {
 public:
   void init(World &world) override {
+    world.registerComponent<aim_train::OrbComponent>();
     world.registerSystem<aim_train::PlayerController>(SystemGroup::Simulation);
     world.registerSystem<aim_train::AimSystem>(SystemGroup::Simulation);
 
