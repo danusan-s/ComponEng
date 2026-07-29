@@ -63,7 +63,7 @@ public:
                                           .shaderName = "default"},
                         MeshComponent{.meshName = "cube"});
 
-    const int count = 2000;
+    const int count = 500;
 
     for (int i = 0; i < count; ++i) {
       componeng::ecs::EntityID entity = world.createEntity();
