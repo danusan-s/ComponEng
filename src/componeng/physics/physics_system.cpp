@@ -32,6 +32,9 @@ static double g_accumulatedTime = 0.0f;
 
 static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
                              const CollisionInfo &info) {
+  if (a.collider->isTrigger || b.collider->isTrigger)
+    return;
+
   float inverseMassA = 0.0f;
   float inverseMassB = 0.0f;
   float restitutionA = 0.0f;

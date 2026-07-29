@@ -7,15 +7,17 @@ namespace componeng::components {
 enum class ColliderType { Box, Sphere };
 
 struct ColliderComponent {
-  static constexpr const char* component_name = "ColliderComponent";
+  static constexpr const char *component_name = "ColliderComponent";
 
   ColliderType type = ColliderType::Box;
   TransformComponent transform;
+  bool isTrigger = false;
 };
 
-#define COLLIDER_COMPONENT_FIELDS(F, ctx) \
-  F(type, ctx) \
-  F(transform, ctx)
+#define COLLIDER_COMPONENT_FIELDS(F, ctx)                                      \
+  F(type, ctx)                                                                 \
+  F(transform, ctx)                                                            \
+  F(isTrigger, ctx)
 
 SERIALIZABLE_COMPONENT(ColliderComponent, COLLIDER_COMPONENT_FIELDS)
 
