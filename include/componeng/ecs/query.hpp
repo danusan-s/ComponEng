@@ -85,14 +85,10 @@ private:
   ComponentRegistry &registry;
   QueryDesc desc;
 
+public:
   bool matches(const Archetype &archetype) {
     return (archetype.m_signature & desc.required) == desc.required &&
            (archetype.m_signature & desc.excluded).none();
-  }
-
-  template <typename... Excl> Query<Req...> &exclude() {
-    desc.excluded = registry.makeSignature<Excl...>();
-    return *this;
   }
 
   template <typename Fn, size_t... I>
@@ -121,11 +117,15 @@ private:
     m_dirty = false;
   }
 
-public:
   Query(std::array<Archetype, MAX_ARCHETYPES> &archetypes,
         ComponentRegistry &registry)
       : m_archetypes(archetypes), registry(registry) {
     desc.required = registry.makeSignature<Req...>();
+  }
+
+  template <typename... Excl> Query<Req...> &exclude() {
+    desc.excluded = registry.makeSignature<Excl...>();
+    return *this;
   }
 
   template <typename Fn> void each(Fn fn) {
@@ -162,8 +162,6 @@ public:
 
     for (size_t a = 0; a < m_matchingArchetypes.size(); ++a) {
       Archetype *archetype = m_matchingArchetypes[a];
-      if (!matches(archetype))
-        continue;
 
       size_t n = archetype->getEntityCount();
       if (n == 0)
