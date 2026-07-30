@@ -177,8 +177,8 @@ public:
       }
     }
 
-    std::memcpy(newArchetype.getColumn(componentID).at(newRow),
-                componentData, info.size);
+    std::memcpy(newArchetype.getColumn(componentID).at(newRow), componentData,
+                info.size);
 
     record.signature = newSig;
     record.row = newRow;
@@ -256,6 +256,10 @@ public:
   std::shared_ptr<T>
   registerSystem(SystemGroup group = SystemGroup::Simulation) {
     return m_systemManager.registerSystem<T>(group);
+  }
+
+  template <typename T, typename... Ts> void addSystemDependencies() {
+    m_systemManager.addSystemDependencies<T, Ts...>();
   }
 };
 

@@ -49,10 +49,8 @@ public:
     return system;
   }
 
-  template <typename... Ts> void addSystemDependencies(SystemID systemID) {
-    if (systemID >= m_systems.size()) {
-      throw std::runtime_error("Invalid system ID for adding dependencies.");
-    }
+  template <typename T, typename... Ts> void addSystemDependencies() {
+    SystemID systemID = m_typeToIndex[typeid(T)];
     std::vector<SystemID> deps;
     (
         [&]() {
@@ -159,11 +157,10 @@ public:
     return m_systemGroups[groupIndex].addSystem<T>();
   }
 
-  template <typename T, typename... Ts>
-  void addSystemDependencies(SystemID systemID) {
+  template <typename T, typename... Ts> void addSystemDependencies() {
     for (SystemGroupManager &group : m_systemGroups) {
       if (group.isRegistered<T>()) {
-        group.addSystemDependencies<Ts...>(systemID);
+        group.addSystemDependencies<T, Ts...>();
         return;
       }
     }
