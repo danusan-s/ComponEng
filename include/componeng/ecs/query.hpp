@@ -25,9 +25,10 @@ private:
 
 public:
   QueryIterator(std::vector<Archetype *> &archetypes,
-                ComponentRegistry &registry)
-      : m_archetypes(archetypes), m_archetypeIndex(0), m_rowIndex(0),
-        m_registry(registry) {
+                ComponentRegistry &registry, size_t archetypeIndex = 0,
+                size_t rowIndex = 0)
+      : m_archetypes(archetypes), m_archetypeIndex(archetypeIndex),
+        m_rowIndex(rowIndex), m_registry(registry) {
   }
 
   QueryIterator &operator++() {
@@ -188,8 +189,41 @@ public:
       f.wait();
   }
 
-  QueryIterator<Req...> iterable() {
-    return QueryIterator<Req...>(archetypes);
+  QueryIterator<Req...> begin() {
+    std::vector<Archetype *> matchingArchetypes;
+    for (Archetype &archetype : archetypes) {
+      if (!matches(archetype))
+        continue;
+
+      ComponentColumn *reqCols[] = {
+          &archetype.getColumn(registry.getComponentID<Req>())...};
+
+      if (archetype.getEntityCount() == 0)
+        continue;
+
+      matchingArchetypes.push_back(&archetype);
+    }
+
+    return QueryIterator<Req...>(archetypes, registry);
+  }
+
+  QueryIterator<Req...> end() {
+    std::vector<Archetype *> matchingArchetypes;
+    for (Archetype &archetype : archetypes) {
+      if (!matches(archetype))
+        continue;
+
+      ComponentColumn *reqCols[] = {
+          &archetype.getColumn(registry.getComponentID<Req>())...};
+
+      if (archetype.getEntityCount() == 0)
+        continue;
+
+      matchingArchetypes.push_back(&archetype);
+    }
+
+    return QueryIterator<Req...>(archetypes, registry,
+                                 matchingArchetypes.size(), 0);
   }
 };
 
