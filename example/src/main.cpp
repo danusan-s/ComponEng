@@ -41,7 +41,6 @@ public:
     std::default_random_engine generator;
     std::uniform_real_distribution<float> randPosition(-500.0f, 500.0f);
     std::uniform_real_distribution<float> randScale(1.0f, 5.0f);
-    std::uniform_real_distribution<float> randGravity(-10.0f, -1.0f);
     std::uniform_real_distribution<float> randColor(0.0f, 1.0f);
     std::uniform_real_distribution<float> randMass(0.5f, 5.0f);
     std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);

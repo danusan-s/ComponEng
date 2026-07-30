@@ -3,11 +3,11 @@
 #include "componeng/components/collider_component.hpp"
 #include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
-#include "componeng/core/debug_ui.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/events/collision_event.hpp"
 #include "componeng/physics/collision_detection.hpp"
+#include "componeng/resources/physics_config.hpp"
 #include <algorithm>
 #include <vector>
 
@@ -101,7 +101,11 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
 
 void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
   g_accumulatedTime += state.deltaTime;
-  constexpr float fixedTimeStep = 1 / 60.0f;
+
+  const auto &physicsConfig =
+      state.world->get_resource<resources::PhysicsConfig>();
+  const float fixedTimeStep = physicsConfig.fixedTimeStep;
+  core::Vec3 g_gravity = physicsConfig.gravity;
 
   while (g_accumulatedTime >= fixedTimeStep) {
     g_accumulatedTime -= fixedTimeStep;

@@ -3,6 +3,7 @@
 #include "componeng/resources/action_state.hpp"
 #include "componeng/resources/input_state.hpp"
 #include "componeng/resources/main_camera.hpp"
+#include "componeng/resources/physics_config.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <fstream>
@@ -12,6 +13,7 @@ namespace componeng::ecs {
 void World::init() {
   set_resource(resources::InputState());
   set_resource(resources::ActionState());
+  set_resource(resources::PhysicsConfig());
   time = 0.0f;
 }
 

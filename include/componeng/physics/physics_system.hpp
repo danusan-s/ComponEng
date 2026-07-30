@@ -1,5 +1,5 @@
 #pragma once
-#include "componeng/core/types.hpp"
+
 #include "componeng/ecs/system.hpp"
 
 namespace componeng::physics {
@@ -14,7 +14,6 @@ namespace componeng::physics {
  */
 class PhysicsSystem : public ecs::ISystem {
 public:
-  core::Vec3 g_gravity = core::Vec3(0.0f, -9.81f, 0.0f);
   void onUpdate(const ecs::SystemState &state) override;
 };
 
