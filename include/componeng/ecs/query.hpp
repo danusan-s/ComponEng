@@ -78,14 +78,10 @@ public:
  * @tparam Req... Component types that an entity must have to match.
  */
 template <typename... Req> class Query {
-public:
-  Query(std::array<Archetype, MAX_ARCHETYPES> &archetypes,
-        ComponentRegistry &registry)
-      : archetypes(archetypes), registry(registry) {
-    desc.required = registry.makeSignature<Req...>();
-  }
-
-  std::array<Archetype, MAX_ARCHETYPES> &archetypes;
+private:
+  std::array<Archetype, MAX_ARCHETYPES> &m_archetypes;
+  std::vector<Archetype *> m_matchingArchetypes;
+  bool m_dirty = true;
   ComponentRegistry &registry;
   QueryDesc desc;
 
@@ -105,20 +101,6 @@ public:
     fn(reqCols[I]->template get<Req>(i)...);
   }
 
-  template <typename Fn> void each(Fn fn) {
-    for (Archetype &archetype : archetypes) {
-      if (!matches(archetype))
-        continue;
-
-      ComponentColumn *reqCols[] = {
-          &archetype.getColumn(registry.getComponentID<Req>())...};
-
-      size_t n = archetype.getEntityCount();
-      for (size_t i = 0; i < n; ++i)
-        invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
-    }
-  }
-
   template <typename Fn, size_t... I>
   void invokeCallbackWithEntity(Fn &fn, EntityID entity,
                                 ComponentColumn **reqCols, size_t i,
@@ -126,30 +108,64 @@ public:
     fn(entity, reqCols[I]->template get<Req>(i)...);
   }
 
-  template <typename Fn> void eachWithEntity(Fn fn) {
-    for (Archetype &archetype : archetypes) {
-      if (!matches(archetype))
-        continue;
+  void updateMatchingArchetypes() {
+    if (!m_dirty)
+      return;
+
+    m_matchingArchetypes.clear();
+    for (Archetype &archetype : m_archetypes) {
+      if (matches(archetype)) {
+        m_matchingArchetypes.push_back(&archetype);
+      }
+    }
+    m_dirty = false;
+  }
+
+public:
+  Query(std::array<Archetype, MAX_ARCHETYPES> &archetypes,
+        ComponentRegistry &registry)
+      : m_archetypes(archetypes), registry(registry) {
+    desc.required = registry.makeSignature<Req...>();
+  }
+
+  template <typename Fn> void each(Fn fn) {
+    updateMatchingArchetypes();
+
+    for (Archetype *archetype : m_matchingArchetypes) {
 
       ComponentColumn *reqCols[] = {
-          &archetype.getColumn(registry.getComponentID<Req>())...};
+          &archetype->getColumn(registry.getComponentID<Req>())...};
 
-      size_t n = archetype.getEntityCount();
+      size_t n = archetype->getEntityCount();
       for (size_t i = 0; i < n; ++i)
-        invokeCallbackWithEntity(fn, archetype.getEntityForRow(i), reqCols, i,
+        invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
+    }
+  }
+
+  template <typename Fn> void eachWithEntity(Fn fn) {
+    updateMatchingArchetypes();
+
+    for (Archetype *archetype : m_matchingArchetypes) {
+      ComponentColumn *reqCols[] = {
+          &archetype->getColumn(registry.getComponentID<Req>())...};
+
+      size_t n = archetype->getEntityCount();
+      for (size_t i = 0; i < n; ++i)
+        invokeCallbackWithEntity(fn, archetype->getEntityForRow(i), reqCols, i,
                                  std::index_sequence_for<Req...>{});
     }
   }
 
   template <typename Fn> void eachParallel(ThreadPool &pool, Fn fn) {
     std::vector<std::future<void>> futures;
+    updateMatchingArchetypes();
 
-    for (size_t a = 0; a < archetypes.size(); ++a) {
-      Archetype &archetype = archetypes[a];
+    for (size_t a = 0; a < m_matchingArchetypes.size(); ++a) {
+      Archetype *archetype = m_matchingArchetypes[a];
       if (!matches(archetype))
         continue;
 
-      size_t n = archetype.getEntityCount();
+      size_t n = archetype->getEntityCount();
       if (n == 0)
         continue;
 
@@ -159,7 +175,7 @@ public:
       // time it takes to just run the loop in the current thread.
       if (n < 50) {
         ComponentColumn *reqCols[] = {
-            &archetype.getColumn(registry.getComponentID<Req>())...};
+            &archetype->getColumn(registry.getComponentID<Req>())...};
         for (size_t i = 0; i < n; ++i) {
           invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
         }
@@ -174,9 +190,9 @@ public:
         size_t end = (c == numChunks - 1) ? n : start + chunkSize;
 
         futures.push_back(pool.submit([this, a, start, end, fn]() {
-          Archetype &archetype = archetypes[a];
+          Archetype *archetype = m_matchingArchetypes[a];
           ComponentColumn *reqCols[] = {
-              &archetype.getColumn(registry.getComponentID<Req>())...};
+              &archetype->getColumn(registry.getComponentID<Req>())...};
 
           for (size_t i = start; i < end; ++i) {
             invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
@@ -190,40 +206,14 @@ public:
   }
 
   QueryIterator<Req...> begin() {
-    std::vector<Archetype *> matchingArchetypes;
-    for (Archetype &archetype : archetypes) {
-      if (!matches(archetype))
-        continue;
-
-      ComponentColumn *reqCols[] = {
-          &archetype.getColumn(registry.getComponentID<Req>())...};
-
-      if (archetype.getEntityCount() == 0)
-        continue;
-
-      matchingArchetypes.push_back(&archetype);
-    }
-
-    return QueryIterator<Req...>(archetypes, registry);
+    updateMatchingArchetypes();
+    return QueryIterator<Req...>(m_matchingArchetypes, registry);
   }
 
   QueryIterator<Req...> end() {
-    std::vector<Archetype *> matchingArchetypes;
-    for (Archetype &archetype : archetypes) {
-      if (!matches(archetype))
-        continue;
-
-      ComponentColumn *reqCols[] = {
-          &archetype.getColumn(registry.getComponentID<Req>())...};
-
-      if (archetype.getEntityCount() == 0)
-        continue;
-
-      matchingArchetypes.push_back(&archetype);
-    }
-
-    return QueryIterator<Req...>(archetypes, registry,
-                                 matchingArchetypes.size(), 0);
+    updateMatchingArchetypes();
+    return QueryIterator<Req...>(m_matchingArchetypes, registry,
+                                 m_matchingArchetypes.size(), 0);
   }
 };
 
