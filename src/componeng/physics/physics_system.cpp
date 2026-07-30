@@ -13,8 +13,6 @@
 
 namespace componeng::physics {
 
-constexpr core::Vec3 g_gravity = core::Vec3(0.0f, -9.81f, 0.0f);
-
 struct EntityPhysicsData {
   ecs::EntityID entity;
   components::TransformComponent *transform;
