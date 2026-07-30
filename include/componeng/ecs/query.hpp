@@ -15,13 +15,64 @@ struct QueryDesc {
   Signature excluded;
 };
 
+template <typename... Req> class QueryIterator {
+private:
+  std::vector<Archetype *> &m_archetypes;
+  size_t m_archetypeIndex;
+  size_t m_rowIndex;
+
+  ComponentRegistry &m_registry;
+
+public:
+  QueryIterator(std::vector<Archetype *> &archetypes,
+                ComponentRegistry &registry)
+      : m_archetypes(archetypes), m_archetypeIndex(0), m_rowIndex(0),
+        m_registry(registry) {
+  }
+
+  QueryIterator &operator++() {
+    if (m_archetypeIndex >= m_archetypes.size())
+      return *this;
+
+    ++m_rowIndex;
+    if (m_rowIndex >= m_archetypes[m_archetypeIndex]->getEntityCount()) {
+      ++m_archetypeIndex;
+      m_rowIndex = 0;
+    }
+    return *this;
+  }
+
+  QueryIterator operator++(int) {
+    QueryIterator tmp = *this;
+    ++(*this);
+    return tmp;
+  }
+
+  bool operator==(const QueryIterator &other) const {
+    return m_archetypeIndex == other.m_archetypeIndex &&
+           m_rowIndex == other.m_rowIndex;
+  }
+
+  bool operator!=(const QueryIterator &other) const {
+    return !(*this == other);
+  }
+
+  std::tuple<Req &...> operator*() {
+    Archetype *archetype = m_archetypes[m_archetypeIndex];
+    return std::forward_as_tuple(
+        archetype->get<Req>(m_registry.getComponentID<Req>(), m_rowIndex)...);
+  }
+};
+
 /**
- * @brief Typed query over entities matching a set of required component types.
+ * @brief Typed query over entities matching a set of required component
+ * types.
  *
- * Iterates all archetypes whose Signature contains every requested component
- * and invokes a user-provided callback for each matching entity.
- * Also supports exclude() to filter out entities with specific components,
- * and eachParallel() to distribute work across the engine's ThreadPool.
+ * Iterates all archetypes whose Signature contains every requested
+ * component and invokes a user-provided callback for each matching
+ * entity. Also supports exclude() to filter out entities with specific
+ * components, and eachParallel() to distribute work across the engine's
+ * ThreadPool.
  *
  * @tparam Req... Component types that an entity must have to match.
  */
@@ -101,10 +152,10 @@ public:
       if (n == 0)
         continue;
 
-      // If less than 50 running non parallel is faster as there is a overhead
-      // when we create task and then the pool unlocks and runs it. For small
-      // number of entities, that overhead is more than the time it takes to
-      // just run the loop in the current thread.
+      // If less than 50 running non parallel is faster as there is a
+      // overhead when we create task and then the pool unlocks and runs
+      // it. For small number of entities, that overhead is more than the
+      // time it takes to just run the loop in the current thread.
       if (n < 50) {
         ComponentColumn *reqCols[] = {
             &archetype.getColumn(registry.getComponentID<Req>())...};
@@ -135,6 +186,10 @@ public:
 
     for (auto &f : futures)
       f.wait();
+  }
+
+  QueryIterator<Req...> iterable() {
+    return QueryIterator<Req...>(archetypes);
   }
 };
 
