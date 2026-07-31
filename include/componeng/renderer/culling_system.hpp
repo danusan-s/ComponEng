@@ -1,0 +1,17 @@
+#pragma once
+
+#include "componeng/ecs/system.hpp"
+
+namespace componeng::renderer {
+
+/**
+ * @brief Presentation-phase system that frustum culling
+ */
+class CullingSystem : public ecs::ISystem {
+public:
+  void onUpdate(const ecs::SystemState &state) override;
+
+private:
+};
+
+} // namespace componeng::renderer

@@ -9,7 +9,7 @@ namespace componeng::renderer {
  * @brief Presentation-phase system that renders all entities with MeshComponent
  * and MaterialComponent.
  *
- * Performs frustum culling, builds draw batches, and issues draw calls
+ * Performs builds draw batches, and issues draw calls
  * using instanced rendering through the render device abstraction.
  */
 class RenderSystem : public ecs::ISystem {

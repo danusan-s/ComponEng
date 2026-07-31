@@ -11,6 +11,7 @@
 #include "componeng/ecs/entity.hpp"
 #include "componeng/physics/physics_system.hpp"
 #include "componeng/renderer/asset_manager.hpp"
+#include "componeng/renderer/culling_system.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
 #include "componeng/renderer/render_system.hpp"
 #include "componeng/resources/audio_engine.hpp"
@@ -20,6 +21,7 @@
 #include "componeng/systems/input_system.hpp"
 #include "componeng/utils/logger.hpp"
 #include "componeng/utils/utils.hpp"
+#include <iterator>
 
 namespace componeng::core {
 
@@ -84,8 +86,11 @@ void Engine::registerSystems() {
   m_world.registerSystem<physics::PhysicsSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<systems::CameraSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<systems::AudioSystem>(ecs::SystemGroup::Simulation);
+  m_world.registerSystem<renderer::CullingSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<renderer::RenderSystem>(
       ecs::SystemGroup::Presentation);
+  m_world
+      .addSystemDependencies<renderer::RenderSystem, renderer::CullingSystem>();
 }
 
 void Engine::ensureDefaultCamera() {
