@@ -132,13 +132,11 @@ void deserialize_field(const nlohmann::json &j, const char *name, T &obj,
   template <> struct ComponentSerializer<Type> {                               \
     static nlohmann::json serialize(const Type &component) {                   \
       nlohmann::json j;                                                        \
-      Fields(SERIALIZE_FIELD, component)                                       \
-      return j;                                                                \
+      Fields(SERIALIZE_FIELD, component) return j;                             \
     }                                                                          \
     static Type deserialize(const nlohmann::json &j) {                         \
       Type component;                                                          \
-      Fields(DESERIALIZE_FIELD, component)                                     \
-      return component;                                                        \
+      Fields(DESERIALIZE_FIELD, component) return component;                   \
     }                                                                          \
   };
 

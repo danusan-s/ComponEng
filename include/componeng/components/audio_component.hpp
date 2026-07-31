@@ -22,14 +22,14 @@ struct AudioComponent {
   renderer::AudioID audioID = 0;
 };
 
-#define AUDIO_COMPONENT_FIELDS(F, ctx) \
-  F(audioName, ctx) \
-  F(playOnAwake, ctx) \
-  F(loop, ctx) \
-  F(volume, ctx) \
-  F(pitch, ctx) \
-  F(is3D, ctx) \
-  F(minDistance, ctx) \
+#define AUDIO_COMPONENT_FIELDS(F, ctx)                                         \
+  F(audioName, ctx)                                                            \
+  F(playOnAwake, ctx)                                                          \
+  F(loop, ctx)                                                                 \
+  F(volume, ctx)                                                               \
+  F(pitch, ctx)                                                                \
+  F(is3D, ctx)                                                                 \
+  F(minDistance, ctx)                                                          \
   F(maxDistance, ctx)
 
 SERIALIZABLE_COMPONENT(AudioComponent, AUDIO_COMPONENT_FIELDS)

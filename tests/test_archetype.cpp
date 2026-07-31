@@ -2,11 +2,11 @@
 #include <gtest/gtest.h>
 
 struct Pos {
-  static constexpr const char* component_name = "Pos";
+  static constexpr const char *component_name = "Pos";
   float x, y, z;
 };
 struct Vel {
-  static constexpr const char* component_name = "Vel";
+  static constexpr const char *component_name = "Vel";
   float vx, vy, vz;
 };
 

@@ -2,15 +2,15 @@
 #include <gtest/gtest.h>
 
 struct TestCompA {
-  static constexpr const char* component_name = "TestCompA";
+  static constexpr const char *component_name = "TestCompA";
   int value;
 };
 struct TestCompB {
-  static constexpr const char* component_name = "TestCompB";
+  static constexpr const char *component_name = "TestCompB";
   float x, y;
 };
 struct TestCompC {
-  static constexpr const char* component_name = "TestCompC";
+  static constexpr const char *component_name = "TestCompC";
   double data[4];
 };
 
@@ -72,7 +72,7 @@ TEST(ComponentRegistryTest, ThrowsOnUnregisteredType) {
 }
 
 struct NonTrivial {
-  static constexpr const char* component_name = "NonTrivial";
+  static constexpr const char *component_name = "NonTrivial";
   NonTrivial() : ptr(new int(42)) {
   }
   ~NonTrivial() {

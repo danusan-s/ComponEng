@@ -24,7 +24,7 @@ public:
 
   void setListenerPosition(float x, float y, float z);
   void setListenerOrientation(float forwardX, float forwardY, float forwardZ,
-                               float upX, float upY, float upZ);
+                              float upX, float upY, float upZ);
 
   std::unique_ptr<ma_sound> createSound(const char *filePath);
   void setSoundPosition(ma_sound *sound, float x, float y, float z);

@@ -14,8 +14,7 @@ struct MeshComponent {
   bool visible = true;
 };
 
-#define MESH_COMPONENT_FIELDS(F, ctx) \
-  F(meshName, ctx)
+#define MESH_COMPONENT_FIELDS(F, ctx) F(meshName, ctx)
 
 SERIALIZABLE_COMPONENT(MeshComponent, MESH_COMPONENT_FIELDS)
 

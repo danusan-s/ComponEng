@@ -49,10 +49,11 @@ public:
                   "Component must be move-constructible");
 
     constexpr const char *typeName = T::component_name;
-    static_assert(typeName != nullptr,
-                  "Component type is missing a component_name. "
-                  "Add 'static constexpr const char* component_name = \"...\";' "
-                  "to the component struct.");
+    static_assert(
+        typeName != nullptr,
+        "Component type is missing a component_name. "
+        "Add 'static constexpr const char* component_name = \"...\";' "
+        "to the component struct.");
 
     const std::type_index key = typeid(T);
     auto it = m_typeToID.find(key);

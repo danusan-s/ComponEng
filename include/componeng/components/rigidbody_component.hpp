@@ -6,7 +6,7 @@
 namespace componeng::components {
 
 struct RigidBodyComponent {
-  static constexpr const char* component_name = "RigidBodyComponent";
+  static constexpr const char *component_name = "RigidBodyComponent";
 
   enum Type {
     Static,   // Immovable object, not affected by forces
@@ -20,10 +20,10 @@ struct RigidBodyComponent {
   float restitution = 0.5f;
 };
 
-#define RIGIDBODY_COMPONENT_FIELDS(F, ctx) \
-  F(type, ctx) \
-  F(velocity, ctx) \
-  F(mass, ctx) \
+#define RIGIDBODY_COMPONENT_FIELDS(F, ctx)                                     \
+  F(type, ctx)                                                                 \
+  F(velocity, ctx)                                                             \
+  F(mass, ctx)                                                                 \
   F(restitution, ctx)
 
 SERIALIZABLE_COMPONENT(RigidBodyComponent, RIGIDBODY_COMPONENT_FIELDS)

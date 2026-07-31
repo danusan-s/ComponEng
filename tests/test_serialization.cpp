@@ -5,8 +5,8 @@
 #include "componeng/components/mesh_component.hpp"
 #include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
-#include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/archetype.hpp"
+#include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "gtest/gtest.h"
 #include <cstring>
@@ -15,8 +15,7 @@ using namespace componeng::components;
 using namespace componeng::core;
 using namespace componeng::ecs;
 
-template <typename T>
-ComponentID reg(ComponentRegistry &r) {
+template <typename T> ComponentID reg(ComponentRegistry &r) {
   return r.registerComponent<T>();
 }
 
@@ -85,7 +84,8 @@ TEST(SerializationTest, ArchetypeMigrationPreservesLongStrings) {
   static_cast<MeshComponent *>(slot1)->meshName =
       "very_long_mesh_name_that_exceeds_sso_for_testing_purposes";
 
-  // Migrate to same-signature archetype using memcpy (safe for trivially-copyable Name)
+  // Migrate to same-signature archetype using memcpy (safe for
+  // trivially-copyable Name)
   Signature sig2 = sig1;
   Archetype arch2;
   arch2.init(sig2, reg);
@@ -117,8 +117,8 @@ TEST(SerializationTest, MultipleEntityMigrations) {
     arch1.addEntity(i + 10);
     void *slot = arch1.getColumn(meshCID).at(i);
     new (slot) MeshComponent();
-    static_cast<MeshComponent *>(slot)->meshName =
-        Name(("entity_" + std::to_string(i) + "_with_a_long_name_to_test").c_str());
+    static_cast<MeshComponent *>(slot)->meshName = Name(
+        ("entity_" + std::to_string(i) + "_with_a_long_name_to_test").c_str());
   }
 
   // Migrate using memcpy + removeEntity (the archetype swap pattern)

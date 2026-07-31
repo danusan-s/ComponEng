@@ -53,7 +53,8 @@ void DebugUI::addVec3(const std::string &label, Vec3 v) {
   ImGui::Text("%s: (%.2f, %.2f, %.2f)", label.c_str(), v.x, v.y, v.z);
 }
 
-void DebugUI::addSlider(const std::string &label, float *v, float min, float max) {
+void DebugUI::addSlider(const std::string &label, float *v, float min,
+                        float max) {
   ImGui::SliderFloat(label.c_str(), v, min, max);
 }
 

@@ -17,9 +17,9 @@ struct MaterialComponent {
   renderer::ShaderID shaderID = 0;
 };
 
-#define MATERIAL_COMPONENT_FIELDS(F, ctx) \
-  F(color, ctx) \
-  F(textureName, ctx) \
+#define MATERIAL_COMPONENT_FIELDS(F, ctx)                                      \
+  F(color, ctx)                                                                \
+  F(textureName, ctx)                                                          \
   F(shaderName, ctx)
 
 SERIALIZABLE_COMPONENT(MaterialComponent, MATERIAL_COMPONENT_FIELDS)

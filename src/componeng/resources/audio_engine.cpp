@@ -36,8 +36,8 @@ void AudioEngine::setListenerPosition(float x, float y, float z) {
 }
 
 void AudioEngine::setListenerOrientation(float forwardX, float forwardY,
-                                          float forwardZ, float upX,
-                                          float upY, float upZ) {
+                                         float forwardZ, float upX, float upY,
+                                         float upZ) {
   ma_engine_listener_set_direction(&m_audioEngine, 0, forwardX, forwardY,
                                    forwardZ);
   ma_engine_listener_set_world_up(&m_audioEngine, 0, upX, upY, upZ);
