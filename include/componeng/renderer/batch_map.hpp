@@ -3,7 +3,6 @@
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/renderer/api/irender_device.hpp"
-#include "componeng/renderer/asset_manager.hpp"
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -11,9 +10,9 @@
 namespace componeng::renderer {
 
 struct DrawKey {
-  MeshID meshID;
-  TextureID textureID;
-  ShaderID shaderID;
+  core::HandleID meshID;
+  core::HandleID textureID;
+  core::HandleID shaderID;
 
   bool operator==(const DrawKey &other) const {
     return shaderID == other.shaderID && textureID == other.textureID &&

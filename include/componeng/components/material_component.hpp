@@ -13,8 +13,8 @@ struct MaterialComponent {
   core::Name shaderName;
 
   // Runtime data (not serialized)
-  renderer::TextureID textureID = 0;
-  renderer::ShaderID shaderID = 0;
+  core::HandleID textureID = 0;
+  core::HandleID shaderID = 0;
 };
 
 #define MATERIAL_COMPONENT_FIELDS(F, ctx)                                      \

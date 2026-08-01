@@ -3,6 +3,7 @@
 #include "componeng/components/audio_component.hpp"
 #include "componeng/components/camera_component.hpp"
 #include "componeng/components/collider_component.hpp"
+#include "componeng/components/light_component.hpp"
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
 #include "componeng/components/rigidbody_component.hpp"
@@ -21,7 +22,6 @@
 #include "componeng/systems/input_system.hpp"
 #include "componeng/utils/logger.hpp"
 #include "componeng/utils/utils.hpp"
-#include <iterator>
 
 namespace componeng::core {
 
@@ -77,7 +77,7 @@ void Engine::registerComponents() {
       components::TransformComponent, components::MeshComponent,
       components::MaterialComponent, components::CameraComponent,
       components::RigidBodyComponent, components::ColliderComponent,
-      components::AudioComponent>();
+      components::AudioComponent, components::DirectionalLightComponent>();
 }
 
 void Engine::registerSystems() {

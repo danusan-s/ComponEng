@@ -16,8 +16,7 @@
 
 namespace componeng::renderer {
 
-static constexpr core::Vec3 DEFAULT_LIGHT_POS =
-    core::Vec3(1000.0f, 1000.0f, 1000.0f);
+static constexpr core::Vec3 DEFAULT_LIGHT_DIR = core::Vec3(-0.2f, 1.0f, -0.3f);
 static constexpr core::Vec3 DEFAULT_LIGHT_COLOR = core::Vec3(1.0f, 1.0f, 1.0f);
 
 static core::Mat4
@@ -82,6 +81,15 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
           populateBatch(t, m, mat, *m_batches.get());
       });
 
+  core::Vec3 lightDir = DEFAULT_LIGHT_DIR;
+  core::Vec3 lightColor = DEFAULT_LIGHT_COLOR;
+
+  state.world->query<components::DirectionalLightComponent>().each(
+      [&](components::DirectionalLightComponent &l) {
+        lightDir = l.direction;
+        lightColor = l.color;
+      });
+
   const auto &batches = m_batches->getMap();
   for (const auto &pair : batches) {
     const DrawKey &key = pair.first;
@@ -94,10 +102,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
     shader.use();
     shader.setMatrix4("viewProj", viewProj);
-    shader.setVector3f("lightPos", DEFAULT_LIGHT_POS.x, DEFAULT_LIGHT_POS.y,
-                       DEFAULT_LIGHT_POS.z);
-    shader.setVector3f("lightColor", DEFAULT_LIGHT_COLOR.x,
-                       DEFAULT_LIGHT_COLOR.y, DEFAULT_LIGHT_COLOR.z);
+    shader.setVector3f("lightDir", lightDir);
+    shader.setVector3f("lightColor", lightColor);
     shader.setVector3f("cameraPos", cameraPos.x, cameraPos.y, cameraPos.z);
     shader.setFloat("time", state.world->time);
 

@@ -50,6 +50,8 @@ struct Name {
   }
 };
 
+using HandleID = uint32_t;
+
 // Type aliases for cleaner code
 using Vec2 = glm::vec2;
 using Vec3 = glm::vec3;

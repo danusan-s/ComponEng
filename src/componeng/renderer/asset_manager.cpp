@@ -13,32 +13,40 @@ namespace componeng::renderer {
 void AssetManager::loadShader(const char *vShaderFile, const char *fShaderFile,
                               const char *gShaderFile, std::string name) {
   LOG_INFO("Loading Shader: %s", name.c_str());
-  ShaderID id = m_nextShaderID++;
+  core::HandleID id = m_nextShaderID++;
   m_shaders[name] = id;
   m_shaderResources[id] =
       loadShaderFromFile(vShaderFile, fShaderFile, gShaderFile);
 }
 
-const Shader &AssetManager::getShader(ShaderID id) const {
+const Shader &AssetManager::getShader(core::HandleID id) const {
   return *m_shaderResources.at(id);
 }
 
-ShaderID AssetManager::getShaderID(std::string name) const {
+core::HandleID AssetManager::getShaderID(std::string name) const {
+  if (m_shaders.find(name) == m_shaders.end()) {
+    LOG_ERROR("Shader not found: %s", name.c_str());
+    throw std::runtime_error("Shader not found");
+  }
   return m_shaders.at(name);
 }
 
 void AssetManager::loadTexture(const char *file, bool alpha, std::string name) {
   LOG_INFO("Loading Texture: %s", name.c_str());
-  TextureID id = m_nextTextureID++;
+  core::HandleID id = m_nextTextureID++;
   m_textures[name] = id;
   m_textureResources[id] = loadTextureFromFile(file, alpha);
 }
 
-const Texture2D &AssetManager::getTexture(TextureID id) const {
+const Texture2D &AssetManager::getTexture(core::HandleID id) const {
   return *m_textureResources.at(id);
 }
 
-TextureID AssetManager::getTextureID(std::string name) const {
+core::HandleID AssetManager::getTextureID(std::string name) const {
+  if (m_textures.find(name) == m_textures.end()) {
+    LOG_ERROR("Texture not found: %s", name.c_str());
+    throw std::runtime_error("Texture not found");
+  }
   return m_textures.at(name);
 }
 
@@ -49,23 +57,27 @@ bool AssetManager::textureExists(std::string name) const {
 void AssetManager::addMesh(std::string name, std::unique_ptr<Mesh> mesh) {
   LOG_INFO("Adding Mesh: %s", name.c_str());
   mesh->uploadToGPU();
-  MeshID id = m_nextMeshID++;
+  core::HandleID id = m_nextMeshID++;
   m_meshes[name] = id;
   m_meshResources[id] = std::move(mesh);
 }
 
 void AssetManager::loadMesh(const char *file, std::string name) {
   LOG_INFO("Loading Model: %s", name.c_str());
-  MeshID id = m_nextMeshID++;
+  core::HandleID id = m_nextMeshID++;
   m_meshes[name] = id;
   m_meshResources[id] = loadMeshFromFile(file);
 }
 
-const Mesh &AssetManager::getMesh(MeshID id) const {
+const Mesh &AssetManager::getMesh(core::HandleID id) const {
   return *m_meshResources.at(id);
 }
 
-MeshID AssetManager::getMeshID(std::string name) const {
+core::HandleID AssetManager::getMeshID(std::string name) const {
+  if (m_meshes.find(name) == m_meshes.end()) {
+    LOG_ERROR("Mesh not found: %s", name.c_str());
+    throw std::runtime_error("Mesh not found");
+  }
   return m_meshes.at(name);
 }
 
@@ -133,17 +145,17 @@ std::unique_ptr<Mesh> AssetManager::loadMeshFromFile(const char *file) {
 void AssetManager::loadAudio(const char *file, std::string name) {
   LOG_INFO("Loading Audio: %s", name.c_str());
 
-  AudioID id = m_nextAudioID++;
+  core::HandleID id = m_nextAudioID++;
   m_audios[name] = id;
   m_audioPaths[id] = file;
   LOG_INFO("Audio loaded successfully: %s (ID: %u)", name.c_str(), id);
 }
 
-AudioID AssetManager::getAudioID(std::string name) const {
+core::HandleID AssetManager::getAudioID(std::string name) const {
   return m_audios.at(name);
 }
 
-const char *AssetManager::getAudio(AudioID id) const {
+const char *AssetManager::getAudio(core::HandleID id) const {
   return m_audioPaths.at(id).c_str();
 }
 

@@ -19,7 +19,7 @@ struct AudioComponent {
   float maxDistance = 100.0f;
 
   // Runtime data (not serialized)
-  renderer::AudioID audioID = 0;
+  core::HandleID audioID = 0;
 };
 
 #define AUDIO_COMPONENT_FIELDS(F, ctx)                                         \

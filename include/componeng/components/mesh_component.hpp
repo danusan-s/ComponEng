@@ -10,7 +10,7 @@ struct MeshComponent {
   core::Name meshName;
 
   // Runtime data (not serialized)
-  renderer::MeshID meshID = 0;
+  core::HandleID meshID = 0;
   bool visible = true;
 };
 

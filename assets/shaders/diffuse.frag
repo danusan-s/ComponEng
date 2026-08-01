@@ -7,7 +7,7 @@ in vec2 TexCoords;
 
 uniform sampler2D Tex;
 
-uniform vec3 lightPos;
+uniform vec3 lightDir;
 uniform vec3 lightColor;
 
 out vec4 FragColor;
@@ -16,7 +16,6 @@ void main()
 {
     // Normalize inputs
     vec3 normal   = normalize(Normal);
-    vec3 lightDir = normalize(lightPos - FragPos);
     // vec3 viewDir  = normalize(viewPos - FragPos);
 
     // Lambert diffuse term
