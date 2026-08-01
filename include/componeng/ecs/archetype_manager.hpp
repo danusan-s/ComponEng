@@ -2,6 +2,7 @@
 
 #include "componeng/ecs/archetype.hpp"
 #include "componeng/ecs/entity.hpp"
+
 #include <stdexcept>
 
 namespace componeng::ecs {

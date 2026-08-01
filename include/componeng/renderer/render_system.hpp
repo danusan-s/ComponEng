@@ -1,6 +1,8 @@
 #pragma once
+
 #include "componeng/ecs/system.hpp"
 #include "componeng/renderer/batch_map.hpp"
+
 #include <memory>
 
 namespace componeng::renderer {

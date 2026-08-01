@@ -14,6 +14,7 @@
 #include "componeng/resources/input_state.hpp"
 #include "componeng/resources/resource_manager.hpp"
 #include "componeng/utils/logger.hpp"
+
 #include <memory>
 
 namespace componeng::ecs {

@@ -2,6 +2,7 @@
 
 #include "componeng/ecs/system.hpp"
 #include "componeng/utils/logger.hpp"
+
 #include <array>
 #include <assert.h>
 #include <memory>

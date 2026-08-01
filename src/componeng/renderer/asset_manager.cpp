@@ -1,6 +1,7 @@
 #include "componeng/renderer/asset_manager.hpp"
 
 #include "componeng/utils/logger.hpp"
+
 #include <fstream>
 #include <sstream>
 #include <string>

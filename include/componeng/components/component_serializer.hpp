@@ -3,8 +3,9 @@
 #include "componeng/core/types.hpp"
 #include "componeng/utils/logger.hpp"
 #include "json.hpp"
-#include <array>
 #include <glm/glm.hpp>
+
+#include <array>
 #include <stdexcept>
 #include <string>
 #include <type_traits>

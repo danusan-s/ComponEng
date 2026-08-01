@@ -1,17 +1,17 @@
+#include "componeng/renderer/render_system.hpp"
+
 #include "componeng/components/camera_component.hpp"
+#include "componeng/components/light_component.hpp"
+#include "componeng/components/material_component.hpp"
+#include "componeng/components/mesh_component.hpp"
+#include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/api/irender_device.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-
-#include "componeng/components/light_component.hpp"
-#include "componeng/components/material_component.hpp"
-#include "componeng/components/mesh_component.hpp"
-#include "componeng/components/transform_component.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
-#include "componeng/renderer/render_system.hpp"
 #include "componeng/resources/main_camera.hpp"
 
 namespace componeng::renderer {

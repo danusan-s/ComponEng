@@ -1,15 +1,15 @@
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <unordered_map>
-
 #include "componeng/core/types.hpp"
 #include "componeng/renderer/mesh.hpp"
 #include "componeng/renderer/shader.hpp"
 #include "componeng/renderer/texture.hpp"
 #include "componeng/resources/audio_engine.hpp"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <unordered_map>
 
 namespace componeng::renderer {
 

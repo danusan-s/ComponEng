@@ -1,4 +1,5 @@
 #include "componeng/renderer/opengl/gl_buffer.hpp"
+
 #include "componeng/utils/logger.hpp"
 
 namespace componeng::renderer::opengl {

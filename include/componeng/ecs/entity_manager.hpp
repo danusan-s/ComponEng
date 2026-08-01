@@ -1,6 +1,7 @@
 #pragma once
 
 #include "componeng/ecs/entity.hpp"
+
 #include <array>
 #include <assert.h>
 #include <queue>

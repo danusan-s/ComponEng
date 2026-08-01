@@ -1,8 +1,8 @@
 #define MINIAUDIO_IMPLEMENTATION
 
 #include "componeng/resources/audio_engine.hpp"
-#include "componeng/utils/logger.hpp"
 
+#include "componeng/utils/logger.hpp"
 #include <miniaudio.h>
 
 namespace componeng::resources {

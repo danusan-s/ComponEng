@@ -86,7 +86,8 @@ void Engine::registerSystems() {
   m_world.registerSystem<physics::PhysicsSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<systems::CameraSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<systems::AudioSystem>(ecs::SystemGroup::Simulation);
-  m_world.registerSystem<renderer::CullingSystem>(ecs::SystemGroup::Simulation);
+  m_world.registerSystem<renderer::CullingSystem>(
+      ecs::SystemGroup::Presentation);
   m_world.registerSystem<renderer::RenderSystem>(
       ecs::SystemGroup::Presentation);
   m_world

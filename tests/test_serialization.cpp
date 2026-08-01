@@ -9,6 +9,7 @@
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "gtest/gtest.h"
+
 #include <cstring>
 
 using namespace componeng::components;

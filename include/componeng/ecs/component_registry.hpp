@@ -2,6 +2,7 @@
 
 #include "componeng/components/component_serializer.hpp"
 #include "entity.hpp"
+
 #include <array>
 #include <stdexcept>
 #include <string_view>

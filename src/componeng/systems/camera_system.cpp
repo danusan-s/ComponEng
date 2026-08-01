@@ -1,4 +1,5 @@
 #include "componeng/systems/camera_system.hpp"
+
 #include "componeng/components/camera_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
@@ -6,6 +7,7 @@
 #include "componeng/ecs/world.hpp"
 #include "componeng/resources/main_camera.hpp"
 #include <GLFW/glfw3.h>
+
 #include <cmath>
 
 namespace componeng::systems {

@@ -1,9 +1,10 @@
 #pragma once
 
-#include <cstring>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#include <cstring>
 #include <string>
 
 namespace componeng::core {

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <memory>
 #include <miniaudio.h>
+
+#include <memory>
 #include <vector>
 
 namespace componeng::resources {

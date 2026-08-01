@@ -1,4 +1,5 @@
 #pragma once
+
 #include "componeng/ecs/system.hpp"
 
 namespace componeng::systems {
