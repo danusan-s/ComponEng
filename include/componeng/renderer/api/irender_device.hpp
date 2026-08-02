@@ -1,5 +1,7 @@
 #pragma once
 
+#include "componeng/core/types.hpp"
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -39,6 +41,15 @@ inline VertexLayout defaultMeshLayout() {
   layout.stride = 32;
   return layout;
 }
+
+/**
+ * @brief Per-instance data layout shared between CPU-side batching and GPU
+ *        instance attribute setup. Currently just the model matrix, matching
+ *        vertex attribute locations 3-6 in the shader.
+ */
+struct InstanceData {
+  core::Mat4 modelMatrix;
+};
 
 /**
  * @brief API-agnostic buffer interface.
@@ -187,7 +198,7 @@ public:
 
   /**
    * Configure instance vertex attributes on the currently bound mesh.
-   *  The instanceBuffer holds per-instance model matrices + color data.
+   *  The instanceBuffer holds per-instance model matrices (InstanceData).
    *  This is an OpenGL-specific concept; Vulkan implementations should be
    *  no-ops since instance attributes are configured at pipeline creation.
    */

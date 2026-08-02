@@ -13,6 +13,7 @@
 #include "componeng/physics/physics_system.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/culling_system.hpp"
+#include "componeng/renderer/material.hpp"
 #include "componeng/renderer/opengl/gl_render_device.hpp"
 #include "componeng/renderer/render_system.hpp"
 #include "componeng/resources/audio_engine.hpp"
@@ -59,6 +60,11 @@ void Engine::init() {
   assetManager.loadTexture(
       utils::Utils::getAssetPath("assets/textures/white.png").c_str(), false,
       "white");
+
+  assetManager.registerMaterial("default_diffuse", "default", "white");
+  renderer::Material &mat =
+      assetManager.getMaterial(assetManager.getMaterialID("default_diffuse"));
+  mat.setUniform("color", core::Vec3(1.0f, 1.0f, 1.0f));
 
   assetManager.loadMesh(
       utils::Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");

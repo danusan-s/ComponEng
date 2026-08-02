@@ -9,19 +9,15 @@ namespace componeng::components {
 struct MaterialComponent {
   static constexpr const char *component_name = "MaterialComponent";
 
-  core::Vec3 color;
-  core::Name textureName;
-  core::Name shaderName;
+  core::Name materialName;
 
   // Runtime data (not serialized)
+  core::HandleID materialID = 0;
   core::HandleID textureID = 0;
   core::HandleID shaderID = 0;
 };
 
-#define MATERIAL_COMPONENT_FIELDS(F, ctx)                                      \
-  F(color, ctx)                                                                \
-  F(textureName, ctx)                                                          \
-  F(shaderName, ctx)
+#define MATERIAL_COMPONENT_FIELDS(F, ctx) F(materialName, ctx)
 
 SERIALIZABLE_COMPONENT(MaterialComponent, MATERIAL_COMPONENT_FIELDS)
 

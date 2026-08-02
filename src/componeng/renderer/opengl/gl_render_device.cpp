@@ -78,27 +78,20 @@ void GLRenderDevice::setupInstanceAttributes(api::IBuffer &instanceBuffer) {
 
   glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
 
-  struct InstanceData {
-    float modelMatrix[16];
-    float color[3];
-  };
+  constexpr size_t instanceSize = sizeof(api::InstanceData);
 
   for (int i = 0; i < 4; ++i) {
-    glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
+    glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, instanceSize,
                           reinterpret_cast<void *>(sizeof(float) * 4 * i));
     glEnableVertexAttribArray(3 + i);
     glVertexAttribDivisor(3 + i, 1);
   }
-  glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(InstanceData),
-                        reinterpret_cast<void *>(sizeof(float) * 16));
-  glEnableVertexAttribArray(7);
-  glVertexAttribDivisor(7, 1);
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void GLRenderDevice::unbindInstanceAttributes() {
-  for (int i = 3; i <= 7; ++i) {
+  for (int i = 3; i <= 6; ++i) {
     glDisableVertexAttribArray(i);
   }
 }

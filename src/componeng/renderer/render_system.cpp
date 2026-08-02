@@ -11,8 +11,9 @@
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/api/irender_device.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/renderer/opengl/gl_render_device.hpp"
+#include "componeng/renderer/material.hpp"
 #include "componeng/resources/main_camera.hpp"
+#include "componeng/utils/logger.hpp"
 
 namespace componeng::renderer {
 
@@ -31,11 +32,33 @@ getModelMatrix(const components::TransformComponent &transform) {
 }
 
 static void populateBatch(const components::TransformComponent &t,
-                          const components::MeshComponent &m,
-                          const components::MaterialComponent &mat,
+                          core::HandleID meshID, core::HandleID materialID,
                           BatchMap &batches) {
-  DrawKey key{m.meshID, mat.textureID, mat.shaderID};
-  batches.add(key, {getModelMatrix(t), mat.color});
+  DrawKey key{meshID, materialID};
+  batches.add(key, {getModelMatrix(t)});
+}
+
+static void setShaderUniforms(const Shader &shader, const Material &material) {
+  // Set material uniforms
+  for (const auto &[name, value] : material.getUniforms()) {
+    const char *iname = name;
+    std::visit(
+        [&shader, iname](auto &&arg) {
+          using T = std::decay_t<decltype(arg)>;
+          if constexpr (std::is_same_v<T, float>) {
+            shader.setFloat(iname, arg);
+          } else if constexpr (std::is_same_v<T, core::Vec2>) {
+            shader.setVector2f(iname, arg);
+          } else if constexpr (std::is_same_v<T, core::Vec3>) {
+            shader.setVector3f(iname, arg);
+          } else if constexpr (std::is_same_v<T, core::Vec4>) {
+            shader.setVector4f(iname, arg);
+          } else if constexpr (std::is_same_v<T, core::Mat4>) {
+            shader.setMatrix4(iname, arg);
+          }
+        },
+        value);
+  }
 }
 
 void RenderSystem::onCreate(const ecs::SystemState &state) {
@@ -64,21 +87,25 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
               components::MaterialComponent>()
       .each([&](components::TransformComponent &t, components::MeshComponent &m,
                 components::MaterialComponent &mat) {
-        if (mat.textureID == 0) {
-          mat.textureID =
-              state.world->get_resource<AssetManager>().getTextureID(
-                  mat.textureName.empty() ? "white" : mat.textureName.c_str());
+        if (mat.materialID == 0) {
+          mat.materialID =
+              state.world->get_resource<AssetManager>().getMaterialID(
+                  mat.materialName.empty() ? "default_diffuse"
+                                           : mat.materialName.c_str());
         }
-        if (mat.shaderID == 0) {
-          mat.shaderID = state.world->get_resource<AssetManager>().getShaderID(
-              mat.shaderName.empty() ? "default" : mat.shaderName.c_str());
+        if (mat.textureID == 0 || mat.shaderID == 0) {
+          const AssetManager &assetManager =
+              state.world->get_resource<AssetManager>();
+          Material &material = assetManager.getMaterial(mat.materialID);
+          mat.textureID = material.getTextureID();
+          mat.shaderID = material.getShaderID();
         }
         if (m.meshID == 0) {
           m.meshID = state.world->get_resource<AssetManager>().getMeshID(
               m.meshName.empty() ? "cube" : m.meshName.c_str());
         }
         if (m.visible)
-          populateBatch(t, m, mat, *m_batches.get());
+          populateBatch(t, m.meshID, mat.materialID, *m_batches.get());
       });
 
   core::Vec3 lightDir = DEFAULT_LIGHT_DIR;
@@ -96,8 +123,10 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     const BatchData &data = pair.second;
 
     const auto &assetManager = state.world->get_resource<AssetManager>();
-    const Shader &shader = assetManager.getShader(key.shaderID);
-    const Texture2D &texture = assetManager.getTexture(key.textureID);
+    auto &material = assetManager.getMaterial(key.materialID);
+    const Shader &shader = assetManager.getShader(material.getShaderID());
+    const Texture2D &texture = assetManager.getTexture(material.getTextureID());
+
     const Mesh &model = assetManager.getMesh(key.meshID);
 
     shader.use();
@@ -106,6 +135,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     shader.setVector3f("lightColor", lightColor);
     shader.setVector3f("cameraPos", cameraPos.x, cameraPos.y, cameraPos.z);
     shader.setFloat("time", state.world->time);
+
+    setShaderUniforms(shader, material);
 
     texture.bind();
     model.getImpl().bind();

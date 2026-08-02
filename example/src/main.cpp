@@ -55,12 +55,10 @@ public:
                                        .is3D = true,
                                        .minDistance = 1.0f,
                                        .maxDistance = 300.0f},
-                        MaterialComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f),
-                                          .textureName = "white",
-                                          .shaderName = "default"},
+                        MaterialComponent{.materialName = "default_diffuse"},
                         MeshComponent{.meshName = "cube"});
 
-    const int count = 500;
+    const int count = 100;
 
     for (int i = 0; i < count; ++i) {
       componeng::ecs::EntityID entity = world.createEntity();
@@ -76,11 +74,7 @@ public:
           RigidBodyComponent{.type = RigidBodyComponent::Dynamic,
                              .mass = randMass(generator),
                              .restitution = 1.0f},
-          MaterialComponent{.color =
-                                Vec4(randColor(generator), randColor(generator),
-                                     randColor(generator), 1.0f),
-                            .textureName = "white",
-                            .shaderName = "default"},
+          MaterialComponent{.materialName = "default_diffuse"},
           ColliderComponent{.type = ColliderType::Box,
                             .transform =
                                 TransformComponent{.position = Vec3(0.0f),
@@ -104,11 +98,7 @@ public:
                                  Vec3(0.0f, randVelocity(generator), 0.0f),
                              .mass = randMass(generator),
                              .restitution = 1.0f},
-          MaterialComponent{.color =
-                                Vec4(randColor(generator), randColor(generator),
-                                     randColor(generator), 1.0f),
-                            .textureName = "white",
-                            .shaderName = "default"},
+          MaterialComponent{.materialName = "default_diffuse"},
           ColliderComponent{.type = ColliderType::Sphere,
                             .transform =
                                 TransformComponent{.position = Vec3(0.0f),
@@ -123,9 +113,7 @@ public:
                            .rotation = Vec3(0.0f),
                            .scale = Vec3(1000.0f, 1.0f, 1000.0f)},
         MeshComponent{.meshName = "cube"},
-        MaterialComponent{.color = Vec4(0.5f, 0.5f, 0.5f, 1.0f),
-                          .textureName = "white",
-                          .shaderName = "default"},
+        MaterialComponent{.materialName = "default_diffuse"},
         RigidBodyComponent{.type = RigidBodyComponent::Static,
                            .restitution = 1.0f},
         ColliderComponent{.type = ColliderType::Box,
@@ -133,6 +121,11 @@ public:
                               TransformComponent{.position = Vec3(0.0f),
                                                  .rotation = Vec3(0.0f),
                                                  .scale = Vec3(1.0f)}});
+
+    world.get_resource<AssetManager>()
+        .getMaterial(
+            world.get_resource<AssetManager>().getMaterialID("default_diffuse"))
+        .setUniform("color", Vec3(0.5f, 0.5f, 0.5f));
   }
 
   void shutdown(World &world) override {

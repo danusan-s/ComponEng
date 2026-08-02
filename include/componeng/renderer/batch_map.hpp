@@ -12,28 +12,23 @@ namespace componeng::renderer {
 
 struct DrawKey {
   core::HandleID meshID;
-  core::HandleID textureID;
-  core::HandleID shaderID;
+  core::HandleID materialID;
 
   bool operator==(const DrawKey &other) const {
-    return shaderID == other.shaderID && textureID == other.textureID &&
-           meshID == other.meshID;
+    return materialID == other.materialID && meshID == other.meshID;
   }
 };
 
+// hash combine algo so it works on both 32 and 64 bit platforms
 struct DrawKeyHash {
   std::size_t operator()(const DrawKey &k) const {
-    uint64_t h = (uint64_t)k.shaderID;
-    h = h * 16777619u ^ k.textureID;
-    h = h * 16777619u ^ k.meshID;
-    return (size_t)h;
+    std::size_t h = std::hash<uint32_t>{}(k.meshID);
+    h ^= std::hash<uint32_t>{}(k.materialID) + 0x9e3779b9 + (h << 6) + (h >> 2);
+    return h;
   }
 };
 
-struct InstanceData {
-  core::Mat4 modelMatrix;
-  core::Vec3 color;
-};
+using InstanceData = api::InstanceData;
 
 struct BatchData {
   std::unique_ptr<api::IBuffer> instanceBuffer;
@@ -48,7 +43,7 @@ class BatchMap {
 public:
   BatchMap(api::IRenderDevice &device) : device(device) {
   }
-  void add(const DrawKey &key, InstanceData value) {
+  void add(const DrawKey &key, InstanceData &&value) {
     auto it = map_.find(key);
 
     if (it == map_.end()) {
