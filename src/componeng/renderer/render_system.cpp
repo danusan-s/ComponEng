@@ -12,30 +12,13 @@
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/batching/render_queue.hpp"
 #include "componeng/resources/main_camera.hpp"
 
 namespace componeng::renderer {
 
 static constexpr core::Vec3 DEFAULT_LIGHT_DIR = core::Vec3(-0.2f, 1.0f, -0.3f);
 static constexpr core::Vec3 DEFAULT_LIGHT_COLOR = core::Vec3(1.0f, 1.0f, 1.0f);
-
-static core::Mat4
-getModelMatrix(const components::TransformComponent &transform) {
-  core::Mat4 model = core::Mat4(1.0f);
-  model = translate(model, transform.position);
-  model = rotate(model, transform.rotation.x, core::Vec3(1.0f, 0.0f, 0.0f));
-  model = rotate(model, transform.rotation.y, core::Vec3(0.0f, 1.0f, 0.0f));
-  model = rotate(model, transform.rotation.z, core::Vec3(0.0f, 0.0f, 1.0f));
-  model = scale(model, transform.scale);
-  return model;
-}
-
-static void populateBatch(const components::TransformComponent &t,
-                          core::HandleID meshID, core::HandleID materialID,
-                          BatchMap &batches) {
-  DrawKey key{meshID, materialID};
-  batches.add(key, {getModelMatrix(t)});
-}
 
 static void setShaderUniforms(const Shader &shader, const Material &material) {
   // Set material uniforms
@@ -60,11 +43,6 @@ static void setShaderUniforms(const Shader &shader, const Material &material) {
   }
 }
 
-void RenderSystem::onCreate(const ecs::SystemState &state) {
-  api::IRenderDevice &renderDevice = state.world->getRenderDevice();
-  m_batches = std::make_unique<BatchMap>(renderDevice);
-}
-
 void RenderSystem::onUpdate(const ecs::SystemState &state) {
   api::IRenderDevice &renderDevice = state.world->getRenderDevice();
   renderDevice.clear(0.0f, 0.0f, 0.0f, 1.0f);
@@ -81,32 +59,6 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
   int drawCalls = 0;
 
-  state.world
-      ->query<components::TransformComponent, components::MeshComponent,
-              components::MaterialComponent>()
-      .each([&](components::TransformComponent &t, components::MeshComponent &m,
-                components::MaterialComponent &mat) {
-        if (mat.materialID == 0) {
-          mat.materialID =
-              state.world->get_resource<AssetManager>().getMaterialID(
-                  mat.materialName.empty() ? "default_diffuse"
-                                           : mat.materialName.c_str());
-        }
-        if (mat.textureID == 0 || mat.shaderID == 0) {
-          const AssetManager &assetManager =
-              state.world->get_resource<AssetManager>();
-          Material &material = assetManager.getMaterial(mat.materialID);
-          mat.textureID = material.getTextureID();
-          mat.shaderID = material.getShaderID();
-        }
-        if (m.meshID == 0) {
-          m.meshID = state.world->get_resource<AssetManager>().getMeshID(
-              m.meshName.empty() ? "cube" : m.meshName.c_str());
-        }
-        if (m.visible)
-          populateBatch(t, m.meshID, mat.materialID, *m_batches.get());
-      });
-
   core::Vec3 lightDir = DEFAULT_LIGHT_DIR;
   core::Vec3 lightColor = DEFAULT_LIGHT_COLOR;
 
@@ -116,7 +68,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
         lightColor = l.color;
       });
 
-  const auto &batches = m_batches->getMap();
+  const auto &batches = state.world->get_resource<RenderQueue>().batches;
   for (const auto &pair : batches) {
     const DrawKey &key = pair.first;
     const BatchData &data = pair.second;
@@ -159,14 +111,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     instancesRendered += pair.second.instanceDatas.size();
   }
 
-  m_batches->clear();
-
   core::DebugUI::addValue("Instances Rendered", instancesRendered);
   core::DebugUI::addValue("Draw Calls", drawCalls);
-}
-
-void RenderSystem::onDestroy(const ecs::SystemState &state) {
-  m_batches.reset();
 }
 
 } // namespace componeng::renderer

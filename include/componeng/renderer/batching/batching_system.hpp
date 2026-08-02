@@ -1,6 +1,9 @@
 #pragma once
 
 #include "componeng/ecs/system.hpp"
+#include "componeng/renderer/batching/batch_map.hpp"
+
+#include <memory>
 
 namespace componeng::renderer {
 
@@ -11,9 +14,14 @@ namespace componeng::renderer {
  * Performs builds draw batches, and issues draw calls
  * using instanced rendering through the render device abstraction.
  */
-class RenderSystem : public ecs::ISystem {
+class BatchingSystem : public ecs::ISystem {
 public:
+  void onCreate(const ecs::SystemState &state) override;
   void onUpdate(const ecs::SystemState &state) override;
+  void onDestroy(const ecs::SystemState &state) override;
+
+private:
+  std::unique_ptr<BatchMap> m_batches;
 };
 
 } // namespace componeng::renderer

@@ -64,7 +64,7 @@ public:
     }
   }
 
-  auto &getMap() const {
+  auto &getMap() {
     return map_;
   }
 };

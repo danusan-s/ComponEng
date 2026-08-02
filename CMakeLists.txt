@@ -18,6 +18,7 @@ file(GLOB ENGINE_SOURCES
     "src/componeng/renderer/*.cpp"
     "src/componeng/renderer/asset/*.cpp"
     "src/componeng/renderer/backend/opengl/*.cpp"
+    "src/componeng/renderer/batching/*.cpp"
     "src/componeng/renderer/culling/*.cpp"
     "src/componeng/resources/*.cpp"
     "src/componeng/systems/*.cpp"

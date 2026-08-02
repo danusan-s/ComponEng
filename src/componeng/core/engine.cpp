@@ -11,10 +11,11 @@
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/physics/physics_system.hpp"
-#include "componeng/renderer/asset_manager.hpp"
-#include "componeng/renderer/culling/culling_system.hpp"
 #include "componeng/renderer/asset/material.hpp"
+#include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
+#include "componeng/renderer/batching/batching_system.hpp"
+#include "componeng/renderer/culling/culling_system.hpp"
 #include "componeng/renderer/render_system.hpp"
 #include "componeng/resources/audio_engine.hpp"
 #include "componeng/resources/main_camera.hpp"
@@ -94,10 +95,14 @@ void Engine::registerSystems() {
   m_world.registerSystem<systems::AudioSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<renderer::CullingSystem>(
       ecs::SystemGroup::Presentation);
+  m_world.registerSystem<renderer::BatchingSystem>(
+      ecs::SystemGroup::Presentation);
+  m_world.addSystemDependencies<renderer::BatchingSystem,
+                                renderer::CullingSystem>();
   m_world.registerSystem<renderer::RenderSystem>(
       ecs::SystemGroup::Presentation);
-  m_world
-      .addSystemDependencies<renderer::RenderSystem, renderer::CullingSystem>();
+  m_world.addSystemDependencies<renderer::RenderSystem,
+                                renderer::BatchingSystem>();
 }
 
 void Engine::ensureDefaultCamera() {
