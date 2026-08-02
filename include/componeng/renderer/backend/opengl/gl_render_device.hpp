@@ -1,10 +1,10 @@
 #pragma once
 
-#include "componeng/renderer/api/irender_device.hpp"
-#include "componeng/renderer/opengl/gl_buffer.hpp"
-#include "componeng/renderer/opengl/gl_mesh.hpp"
-#include "componeng/renderer/opengl/gl_shader.hpp"
-#include "componeng/renderer/opengl/gl_texture.hpp"
+#include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/backend/opengl/gl_buffer.hpp"
+#include "componeng/renderer/backend/opengl/gl_mesh.hpp"
+#include "componeng/renderer/backend/opengl/gl_shader.hpp"
+#include "componeng/renderer/backend/opengl/gl_texture.hpp"
 #include "glad/glad.h"
 
 namespace componeng::renderer::opengl {

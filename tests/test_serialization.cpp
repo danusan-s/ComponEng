@@ -42,16 +42,12 @@ TEST(SerializationTest, RoundTripLongStringMesh) {
 
 TEST(SerializationTest, RoundTripMaterialComponent) {
   MaterialComponent orig;
-  orig.color = glm::vec3(0.5f, 0.7f, 0.3f);
-  orig.textureName = "brick_wall_texture_1024x1024.png";
-  orig.shaderName = "pbr";
+  orig.materialName = "brick_wall_material";
 
   auto json = ComponentSerializer<MaterialComponent>::serialize(orig);
   auto restored = ComponentSerializer<MaterialComponent>::deserialize(json);
 
-  EXPECT_EQ(orig.color, restored.color);
-  EXPECT_EQ(orig.textureName, restored.textureName);
-  EXPECT_EQ(orig.shaderName, restored.shaderName);
+  EXPECT_EQ(orig.materialName, restored.materialName);
 }
 
 TEST(SerializationTest, RoundTripAudioComponent) {

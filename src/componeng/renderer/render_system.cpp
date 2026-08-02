@@ -9,11 +9,10 @@
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
-#include "componeng/renderer/api/irender_device.hpp"
+#include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/renderer/material.hpp"
+#include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/resources/main_camera.hpp"
-#include "componeng/utils/logger.hpp"
 
 namespace componeng::renderer {
 

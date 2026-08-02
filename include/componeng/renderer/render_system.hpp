@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/ecs/system.hpp"
-#include "componeng/renderer/batch_map.hpp"
+#include "componeng/renderer/batching/batch_map.hpp"
 
 #include <memory>
 

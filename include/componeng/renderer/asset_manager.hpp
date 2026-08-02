@@ -1,10 +1,10 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/renderer/material.hpp"
-#include "componeng/renderer/mesh.hpp"
-#include "componeng/renderer/shader.hpp"
-#include "componeng/renderer/texture.hpp"
+#include "componeng/renderer/asset/material.hpp"
+#include "componeng/renderer/asset/mesh.hpp"
+#include "componeng/renderer/asset/shader.hpp"
+#include "componeng/renderer/asset/texture.hpp"
 #include "componeng/resources/audio_engine.hpp"
 
 #include <memory>

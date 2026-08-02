@@ -1,4 +1,4 @@
-#include "componeng/renderer/opengl/gl_texture.hpp"
+#include "componeng/renderer/backend/opengl/gl_texture.hpp"
 
 namespace componeng::renderer::opengl {
 

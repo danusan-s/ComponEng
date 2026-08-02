@@ -1,6 +1,6 @@
-#include "componeng/renderer/mesh.hpp"
+#include "componeng/renderer/asset/mesh.hpp"
 
-#include "componeng/renderer/opengl/gl_render_device.hpp"
+#include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <array>

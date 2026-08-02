@@ -1,4 +1,4 @@
-#include "componeng/renderer/opengl/gl_buffer.hpp"
+#include "componeng/renderer/backend/opengl/gl_buffer.hpp"
 
 #include "componeng/utils/logger.hpp"
 

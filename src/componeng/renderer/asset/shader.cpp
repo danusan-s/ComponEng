@@ -1,6 +1,6 @@
-#include "componeng/renderer/shader.hpp"
+#include "componeng/renderer/asset/shader.hpp"
 
-#include "componeng/renderer/opengl/gl_render_device.hpp"
+#include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 
 namespace componeng::renderer {
 
