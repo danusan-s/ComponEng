@@ -141,7 +141,9 @@ void Window::init(int width, int height, const char *title) {
   glfwSetFramebufferSizeCallback(m_handle, framebufferSizeCallback);
   glfwSetInputMode(m_handle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-  setViewport(width, height);
+  int framebufferWidth, framebufferHeight;
+  glfwGetFramebufferSize(m_handle, &framebufferWidth, &framebufferHeight);
+  setViewport(framebufferWidth, framebufferHeight);
 }
 
 void Window::setViewport(int w, int h) {

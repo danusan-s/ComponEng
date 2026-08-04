@@ -3,6 +3,10 @@ project(ComponEng)
 
 set(CMAKE_CXX_STANDARD 17)
 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+endif()
+
 # Renderer backend selection: "opengl" or "vulkan"
 set(RENDERER_BACKEND "opengl" CACHE STRING "Renderer backend to use (opengl or vulkan)")
 set_property(CACHE RENDERER_BACKEND PROPERTY STRINGS "opengl" "vulkan")
@@ -44,7 +48,15 @@ target_include_directories(ComponEng
 # GLM experimental
 target_compile_definitions(ComponEng PUBLIC GLM_ENABLE_EXPERIMENTAL)
 
-target_compile_options(ComponEng PRIVATE -O3 -march=native)
+target_compile_options(ComponEng PUBLIC
+    $<$<CONFIG:Debug>:-g>
+    $<$<CONFIG:Debug>:-fsanitize=address>
+    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:Release>:-march=native>
+)
+target_link_options(ComponEng PUBLIC
+    $<$<CONFIG:Debug>:-fsanitize=address>
+)
 
 # Link dependencies
 target_link_libraries(ComponEng

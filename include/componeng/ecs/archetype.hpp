@@ -3,8 +3,10 @@
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <stdexcept>
 #include <vector>
 
 namespace componeng::ecs {
@@ -24,7 +26,8 @@ private:
   size_t m_alignment;
 
 public:
-  explicit AlignedBuffer(size_t alignment) : m_alignment(alignment) {
+  explicit AlignedBuffer(size_t alignment)
+      : m_alignment(std::max(alignment, sizeof(void *))) {
   }
 
   ~AlignedBuffer() {
@@ -60,8 +63,14 @@ public:
     if (newCapacity <= m_capacity)
       return;
     size_t allocSize = newCapacity;
+    if (allocSize % m_alignment != 0) {
+      allocSize = (allocSize / m_alignment + 1) * m_alignment;
+    }
     std::byte *newData =
         static_cast<std::byte *>(std::aligned_alloc(m_alignment, allocSize));
+    if (!newData) {
+      throw std::bad_alloc();
+    }
     if (m_data) {
       std::memcpy(newData, m_data, m_size);
       std::free(m_data);
