@@ -51,6 +51,11 @@ public:
     core::HandleID shaderID = getShaderID(shaderName);
     core::HandleID textureID = getTextureID(textureName);
     auto material = std::make_unique<T>(shaderID, textureID);
+
+    const Shader &shader = getShader(shaderID);
+    material->setVertexLayout(shader.reflectInstanceLayout());
+    material->setKnownUniforms(shader.reflectActiveUniformNames());
+
     m_materialResources.push_back(std::move(material));
     core::HandleID id = m_materialResources.size();
     m_materials[name] = id;

@@ -27,8 +27,7 @@ getModelMatrix(const components::TransformComponent &transform) {
 }
 
 void BatchingSystem::onCreate(const ecs::SystemState &state) {
-  api::IRenderDevice &renderDevice = state.world->getRenderDevice();
-  m_batches = std::make_unique<BatchMap>(renderDevice);
+  m_batches = std::make_unique<BatchMap>();
   state.world->set_resource(RenderQueue());
 }
 

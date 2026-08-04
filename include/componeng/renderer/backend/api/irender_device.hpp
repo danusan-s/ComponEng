@@ -17,6 +17,10 @@ struct VertexAttribute {
   uint32_t offset;
   uint32_t componentCount;
   bool normalized;
+  // >= 0 if this slot holds one row of a mat4-typed value (see
+  // IShader::reflectInstanceLayout); componentCount is then that row's width
+  // and `name` is the mat4 value's own name, shared across its 4 rows.
+  int matrixRow = -1;
 };
 
 /**
@@ -26,6 +30,13 @@ struct VertexLayout {
   std::vector<VertexAttribute> attributes;
   uint32_t stride;
 };
+
+/**
+ * @brief GL attribute locations 0-2 are always reserved for mesh
+ *        position/normal/uv (see defaultMeshLayout); per-instance material
+ *        attributes are bound starting from this location.
+ */
+constexpr uint32_t kFirstInstanceAttribLocation = 3;
 
 /**
  * @brief Default mesh vertex layout: position (3), normal (3), uv (2).
@@ -98,6 +109,20 @@ public:
   virtual void setVector4f(const char *name, float x, float y, float z,
                            float w) const = 0;
   virtual void setMatrix4(const char *name, const float *matrix) const = 0;
+
+  /**
+   * Reflect the linked program's active per-instance vertex attributes
+   * (locations >= kFirstInstanceAttribLocation) into a VertexLayout. A
+   * mat4-typed attribute is reported by GL as a single active attribute
+   * spanning 4 locations; it is auto-expanded into 4 row entries here so
+   * callers only ever address it by its one shader-declared name.
+   */
+  virtual VertexLayout reflectInstanceLayout() const = 0;
+
+  /** Reflect the linked program's active uniform names (for validating
+   *  setUniform() calls against the shader that will actually consume them).
+   */
+  virtual std::vector<std::string> reflectActiveUniformNames() const = 0;
 };
 
 /**

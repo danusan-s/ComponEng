@@ -8,19 +8,9 @@ namespace componeng::renderer {
 
 class DiffuseMaterial : public IMaterial {
 public:
-  DiffuseMaterial(core::HandleID shaderID, core::HandleID textureID)
-      : IMaterial(shaderID, textureID) {
-    api::VertexLayout layout;
-    layout.attributes = {
-        {"modelMatrix[0]", 0, 4, false},
-        {"modelMatrix[1]", 16, 4, false},
-        {"modelMatrix[2]", 32, 4, false},
-        {"modelMatrix[3]", 48, 4, false},
-        {"color", 64, 4, false},
-    };
-    layout.stride = 80; // 4x4 matrix (64 bytes) + vec4 color (16 bytes)
-    setVertexLayout(layout);
-  }
+  // Vertex layout is not declared here — AssetManager::registerMaterial
+  // reflects it straight off the compiled shader's active attributes.
+  using IMaterial::IMaterial;
 
   core::UniformMap buildInstanceData(ecs::World &world,
                                      ecs::EntityID entity) const override {
@@ -36,9 +26,9 @@ public:
     modelMatrix =
         rotate(modelMatrix, transform.rotation.z, core::Vec3(0.0f, 0.0f, 1.0f));
     modelMatrix = scale(modelMatrix, transform.scale);
-    instanceData["modelMatrix"] = modelMatrix;
 
-    instanceData["color"] =
+    instanceData["instanceModel"] = modelMatrix;
+    instanceData["instanceColor"] =
         world.hasComponent<components::ColorComponent>(entity)
             ? world.getComponent<components::ColorComponent>(entity).color
             : core::Vec4(1.0f);

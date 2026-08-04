@@ -55,4 +55,12 @@ void Shader::setMatrix4(const char *name, const core::Mat4 &matrix) const {
   m_impl->setMatrix4(name, &matrix[0][0]);
 }
 
+api::VertexLayout Shader::reflectInstanceLayout() const {
+  return m_impl->reflectInstanceLayout();
+}
+
+std::vector<std::string> Shader::reflectActiveUniformNames() const {
+  return m_impl->reflectActiveUniformNames();
+}
+
 } // namespace componeng::renderer

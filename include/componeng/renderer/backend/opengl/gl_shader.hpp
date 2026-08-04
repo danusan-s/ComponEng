@@ -25,6 +25,9 @@ public:
                    float w) const override;
   void setMatrix4(const char *name, const float *matrix) const override;
 
+  api::VertexLayout reflectInstanceLayout() const override;
+  std::vector<std::string> reflectActiveUniformNames() const override;
+
   GLuint handle() const {
     return m_id;
   }

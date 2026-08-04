@@ -1,13 +1,13 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/ecs/archetype.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/utils/logger.hpp"
 
-#include <cstdlib>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace componeng::renderer {
 
@@ -26,11 +26,26 @@ public:
   }
 
   void setUniform(const char *name, core::UniformMap::mapped_type value) {
+    if (!m_knownUniforms.empty() &&
+        m_knownUniforms.find(core::Name(name)) == m_knownUniforms.end()) {
+      LOG_ERROR("setUniform: '%s' is not an active uniform in this "
+                "material's shader",
+                name);
+    }
     m_uniforms[name] = value;
   }
 
   core::UniformMap getUniforms() const {
     return m_uniforms;
+  }
+
+  /** Called by AssetManager::registerMaterial right after construction, from
+   *  the shader's reflected active uniforms; makes setUniform() typo-safe. */
+  void setKnownUniforms(const std::vector<std::string> &names) {
+    m_knownUniforms.clear();
+    for (const auto &n : names) {
+      m_knownUniforms.insert(core::Name(n));
+    }
   }
 
   void setVertexLayout(const api::VertexLayout &layout) {
@@ -57,26 +72,19 @@ public:
     auto *base = reinterpret_cast<uint8_t *>(instanceDataFloats.data());
 
     for (const auto &attr : layout.attributes) {
-      // Attributes like "modelMatrix[1]" address one row of a Mat4 uniform
-      // stored under the base name ("modelMatrix"); split on '[' to find it.
-      std::string baseName = attr.name;
-      int row = -1;
-      size_t bracketPos = attr.name.find('[');
-      if (bracketPos != std::string::npos) {
-        baseName = attr.name.substr(0, bracketPos);
-        row = std::atoi(attr.name.c_str() + bracketPos + 1);
-      }
-
-      auto it = instanceData.find(baseName.c_str());
+      auto it = instanceData.find(attr.name.c_str());
       if (it == instanceData.end()) {
         continue;
       }
       const auto &value = it->second;
 
-      if (row >= 0) {
+      // attr.matrixRow >= 0 means this slot is one row of a mat4-typed
+      // value shared by name across its 4 rows (see reflectInstanceLayout).
+      if (attr.matrixRow >= 0) {
         if (std::holds_alternative<core::Mat4>(value)) {
           const core::Mat4 &mat4 = std::get<core::Mat4>(value);
-          std::memcpy(base + attr.offset, glm::value_ptr(mat4) + row * 4,
+          std::memcpy(base + attr.offset,
+                      glm::value_ptr(mat4) + attr.matrixRow * 4,
                       sizeof(float) * 4);
         }
         continue;
@@ -111,6 +119,7 @@ private:
   core::HandleID m_textureID;
   api::VertexLayout m_vertexLayout;
   core::UniformMap m_uniforms;
+  std::unordered_set<core::Name> m_knownUniforms;
 };
 
 } // namespace componeng::renderer

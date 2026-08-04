@@ -30,11 +30,9 @@ struct DrawKeyHash {
 
 class BatchMap {
   std::unordered_map<DrawKey, std::vector<ecs::EntityID>, DrawKeyHash> map_;
-  api::IRenderDevice &device;
 
 public:
-  BatchMap(api::IRenderDevice &device) : device(device) {
-  }
+  BatchMap() = default;
 
   void add(const DrawKey &key, ecs::EntityID value) {
     auto it = map_.find(key);

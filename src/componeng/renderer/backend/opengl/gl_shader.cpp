@@ -2,6 +2,7 @@
 
 #include "componeng/utils/logger.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -135,6 +136,95 @@ void GLShader::setVector4f(const char *name, float x, float y, float z,
 
 void GLShader::setMatrix4(const char *name, const float *matrix) const {
   glUniformMatrix4fv(glGetUniformLocation(m_id, name), 1, false, matrix);
+}
+
+api::VertexLayout GLShader::reflectInstanceLayout() const {
+  GLint activeAttribs = 0;
+  glGetProgramiv(m_id, GL_ACTIVE_ATTRIBUTES, &activeAttribs);
+
+  GLint maxNameLen = 0;
+  glGetProgramiv(m_id, GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxNameLen);
+  std::vector<char> nameBuf(maxNameLen > 0 ? maxNameLen : 1);
+
+  struct RawAttrib {
+    std::string name;
+    GLenum type;
+    GLint location;
+  };
+  std::vector<RawAttrib> raw;
+
+  for (GLint i = 0; i < activeAttribs; ++i) {
+    GLsizei length = 0;
+    GLint size = 0;
+    GLenum type = 0;
+    glGetActiveAttrib(m_id, i, static_cast<GLsizei>(nameBuf.size()), &length,
+                      &size, &type, nameBuf.data());
+    GLint location = glGetAttribLocation(m_id, nameBuf.data());
+    if (location < static_cast<GLint>(api::kFirstInstanceAttribLocation)) {
+      continue; // Mesh attribute (position/normal/uv), not instance data.
+    }
+    raw.push_back({std::string(nameBuf.data(), length), type, location});
+  }
+
+  std::sort(raw.begin(), raw.end(),
+           [](const RawAttrib &a, const RawAttrib &b) {
+             return a.location < b.location;
+           });
+
+  api::VertexLayout layout;
+  uint32_t offset = 0;
+  for (const auto &attrib : raw) {
+    switch (attrib.type) {
+    case GL_FLOAT:
+      layout.attributes.push_back({attrib.name, offset, 1, false, -1});
+      offset += sizeof(float);
+      break;
+    case GL_FLOAT_VEC2:
+      layout.attributes.push_back({attrib.name, offset, 2, false, -1});
+      offset += sizeof(float) * 2;
+      break;
+    case GL_FLOAT_VEC3:
+      layout.attributes.push_back({attrib.name, offset, 3, false, -1});
+      offset += sizeof(float) * 3;
+      break;
+    case GL_FLOAT_VEC4:
+      layout.attributes.push_back({attrib.name, offset, 4, false, -1});
+      offset += sizeof(float) * 4;
+      break;
+    case GL_FLOAT_MAT4:
+      for (int row = 0; row < 4; ++row) {
+        layout.attributes.push_back({attrib.name, offset, 4, false, row});
+        offset += sizeof(float) * 4;
+      }
+      break;
+    default:
+      LOG_ERROR("Unsupported instance attribute type for '%s'",
+                attrib.name.c_str());
+      break;
+    }
+  }
+  layout.stride = offset;
+  return layout;
+}
+
+std::vector<std::string> GLShader::reflectActiveUniformNames() const {
+  GLint activeUniforms = 0;
+  glGetProgramiv(m_id, GL_ACTIVE_UNIFORMS, &activeUniforms);
+
+  GLint maxNameLen = 0;
+  glGetProgramiv(m_id, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLen);
+  std::vector<char> nameBuf(maxNameLen > 0 ? maxNameLen : 1);
+
+  std::vector<std::string> names;
+  for (GLint i = 0; i < activeUniforms; ++i) {
+    GLsizei length = 0;
+    GLint size = 0;
+    GLenum type = 0;
+    glGetActiveUniform(m_id, i, static_cast<GLsizei>(nameBuf.size()), &length,
+                       &size, &type, nameBuf.data());
+    names.emplace_back(nameBuf.data(), length);
+  }
+  return names;
 }
 
 void GLShader::checkCompileErrors(GLuint object, const std::string &type) {

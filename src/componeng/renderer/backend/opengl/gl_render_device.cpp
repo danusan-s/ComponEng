@@ -82,11 +82,12 @@ void GLRenderDevice::setupInstanceAttributes(api::IBuffer &instanceBuffer,
 
   for (int i = 0; i < layout.attributes.size(); ++i) {
     const auto &attr = layout.attributes[i];
-    glVertexAttribPointer(3 + i, attr.componentCount, GL_FLOAT, attr.normalized,
-                          layout.stride,
+    GLuint location = api::kFirstInstanceAttribLocation + i;
+    glVertexAttribPointer(location, attr.componentCount, GL_FLOAT,
+                          attr.normalized, layout.stride,
                           reinterpret_cast<const void *>(attr.offset));
-    glEnableVertexAttribArray(3 + i);
-    glVertexAttribDivisor(3 + i, 1); // Advance per instance
+    glEnableVertexAttribArray(location);
+    glVertexAttribDivisor(location, 1); // Advance per instance
   }
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -94,7 +95,7 @@ void GLRenderDevice::setupInstanceAttributes(api::IBuffer &instanceBuffer,
 
 void GLRenderDevice::unbindInstanceAttributes(const api::VertexLayout &layout) {
   for (int i = 0; i < layout.attributes.size(); ++i) {
-    glDisableVertexAttribArray(3 + i);
+    glDisableVertexAttribArray(api::kFirstInstanceAttribLocation + i);
   }
 }
 
