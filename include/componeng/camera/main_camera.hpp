@@ -2,10 +2,10 @@
 
 #include "componeng/ecs/entity.hpp"
 
-namespace componeng::resources {
+namespace componeng::camera {
 
 struct MainCamera {
   ecs::EntityID entity;
 };
 
-} // namespace componeng::resources
+} // namespace componeng::camera

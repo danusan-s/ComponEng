@@ -1,13 +1,13 @@
 #include "collision_sounds.hpp"
-#include "componeng/components/audio_component.hpp"
-#include "componeng/components/collider_component.hpp"
+#include "componeng/audio/audio_component.hpp"
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
-#include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/engine.hpp"
 #include "componeng/core/game.hpp"
 #include "componeng/ecs/world.hpp"
+#include "componeng/physics/collider_component.hpp"
+#include "componeng/physics/rigidbody_component.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/utils/utils.hpp"
 #include "player_controller.hpp"
@@ -16,6 +16,8 @@
 
 using namespace componeng::core;
 using namespace componeng::components;
+using namespace componeng::audio;
+using namespace componeng::physics;
 using namespace componeng::ecs;
 using namespace componeng::renderer;
 using namespace componeng::utils;
@@ -63,7 +65,7 @@ public:
                         ColorComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f)},
                         MeshComponent{.meshName = "cube"});
 
-    const int count = 0;
+    const int count = 100;
 
     for (int i = 0; i < count; ++i) {
       componeng::ecs::EntityID entity = world.createEntity();

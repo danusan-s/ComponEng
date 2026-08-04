@@ -3,7 +3,7 @@
 #include "componeng/components/component_serializer.hpp"
 #include "componeng/core/types.hpp"
 
-namespace componeng::components {
+namespace componeng::camera {
 
 struct CameraComponent {
   static constexpr const char *component_name = "CameraComponent";
@@ -15,6 +15,10 @@ struct CameraComponent {
   core::Mat4 viewProjectionMatrix;
 };
 
+} // namespace componeng::camera
+
+namespace componeng::components {
+
 #define CAMERA_COMPONENT_FIELDS(F, ctx)                                        \
   F(fov, ctx)                                                                  \
   F(aspectRatio, ctx)                                                          \
@@ -22,7 +26,7 @@ struct CameraComponent {
   F(farPlane, ctx)                                                             \
   F(viewProjectionMatrix, ctx)
 
-SERIALIZABLE_COMPONENT(CameraComponent, CAMERA_COMPONENT_FIELDS)
+SERIALIZABLE_COMPONENT(camera::CameraComponent, CAMERA_COMPONENT_FIELDS)
 
 #undef CAMERA_COMPONENT_FIELDS
 

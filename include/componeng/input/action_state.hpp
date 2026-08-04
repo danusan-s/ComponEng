@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-namespace componeng::resources {
+namespace componeng::input {
 
 enum class Action {
   MoveForward,
@@ -41,4 +41,4 @@ struct ActionState {
   }
 };
 
-} // namespace componeng::resources
+} // namespace componeng::input

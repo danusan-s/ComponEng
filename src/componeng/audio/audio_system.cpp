@@ -1,22 +1,21 @@
-#include "componeng/systems/audio_system.hpp"
+#include "componeng/audio/audio_system.hpp"
 
-#include "componeng/components/audio_component.hpp"
+#include "componeng/audio/audio_component.hpp"
+#include "componeng/camera/main_camera.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/resources/main_camera.hpp"
 
 #include <cmath>
 
-namespace componeng::systems {
+namespace componeng::audio {
 
 void AudioSystem::onUpdate(const ecs::SystemState &state) {
   auto &assetManager = state.world->get_resource<renderer::AssetManager>();
-  auto &audioEngine = state.world->get_resource<resources::AudioEngine>();
+  auto &audioEngine = state.world->get_resource<AudioEngine>();
 
-  auto &mainCamera =
-      state.world->get_resource<componeng::resources::MainCamera>();
+  auto &mainCamera = state.world->get_resource<camera::MainCamera>();
   if (state.world->hasComponent<componeng::components::TransformComponent>(
           mainCamera.entity)) {
     auto &camTransform =
@@ -41,10 +40,8 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
                                        up.z);
   }
 
-  state.world
-      ->query<components::AudioComponent, components::TransformComponent>()
-      .each([&](components::AudioComponent &audio,
-                components::TransformComponent &transform) {
+  state.world->query<AudioComponent, components::TransformComponent>().each(
+      [&](AudioComponent &audio, components::TransformComponent &transform) {
         if (audio.audioID == 0) {
           audio.audioID = assetManager.getAudioID(audio.audioName);
         }
@@ -77,4 +74,4 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
   audioEngine.cleanupFinishedSounds();
 }
 
-} // namespace componeng::systems
+} // namespace componeng::audio

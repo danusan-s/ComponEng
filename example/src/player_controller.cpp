@@ -1,10 +1,10 @@
 #include "player_controller.hpp"
 
+#include "componeng/camera/main_camera.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/ecs/world.hpp"
-#include "componeng/resources/action_state.hpp"
-#include "componeng/resources/input_state.hpp"
-#include "componeng/resources/main_camera.hpp"
+#include "componeng/input/action_state.hpp"
+#include "componeng/input/input_state.hpp"
 #include "componeng/utils/logger.hpp"
 
 using namespace componeng;
@@ -31,33 +31,33 @@ static void getCameraVectors(const components::TransformComponent &transform,
 }
 
 static void processKeyboardInput(components::TransformComponent &transform,
-                                 resources::ActionState &actions,
-                                 float deltaTime, float speed) {
+                                 input::ActionState &actions, float deltaTime,
+                                 float speed) {
   float velocity = speed * deltaTime;
   core::Vec3 front, right, up;
   getCameraVectors(transform, front, right, up);
 
-  if (actions.down(resources::Action::Sprint))
+  if (actions.down(input::Action::Sprint))
     velocity *= 2.0f;
 
-  if (actions.down(resources::Action::MoveForward))
+  if (actions.down(input::Action::MoveForward))
     transform.position = transform.position + front * velocity;
-  if (actions.down(resources::Action::MoveBackward))
+  if (actions.down(input::Action::MoveBackward))
     transform.position = transform.position - front * velocity;
-  if (actions.down(resources::Action::MoveLeft))
+  if (actions.down(input::Action::MoveLeft))
     transform.position = transform.position - right * velocity;
-  if (actions.down(resources::Action::MoveRight))
+  if (actions.down(input::Action::MoveRight))
     transform.position = transform.position + right * velocity;
-  if (actions.down(resources::Action::Jump))
+  if (actions.down(input::Action::Jump))
     transform.position =
         transform.position + core::Vec3(0.0f, 1.0f, 0.0f) * velocity;
-  if (actions.down(resources::Action::Crouch))
+  if (actions.down(input::Action::Crouch))
     transform.position =
         transform.position - core::Vec3(0.0f, 1.0f, 0.0f) * velocity;
 }
 
 static void processMouseInput(components::TransformComponent &transform,
-                              resources::InputState &input, float sensitivity) {
+                              input::InputState &input, float sensitivity) {
   transform.rotation.y += input.getMouseDeltaX() * sensitivity;
   transform.rotation.x -= input.getMouseDeltaY() * sensitivity;
 
@@ -68,14 +68,14 @@ static void processMouseInput(components::TransformComponent &transform,
 }
 
 void PlayerController::onUpdate(const componeng::ecs::SystemState &state) {
-  componeng::resources::InputState &input =
-      state.world->get_resource<resources::InputState>();
+  componeng::input::InputState &input =
+      state.world->get_resource<input::InputState>();
 
-  componeng::resources::ActionState &actions =
-      state.world->get_resource<resources::ActionState>();
+  componeng::input::ActionState &actions =
+      state.world->get_resource<input::ActionState>();
 
   ecs::EntityID mainCameraEntity =
-      state.world->get_resource<resources::MainCamera>().entity;
+      state.world->get_resource<camera::MainCamera>().entity;
 
   components::TransformComponent &transform =
       state.world->getComponent<components::TransformComponent>(

@@ -4,7 +4,7 @@
 #include "componeng/core/types.hpp"
 #include "json.hpp"
 
-namespace componeng::components {
+namespace componeng::physics {
 
 struct RigidBodyComponent {
   static constexpr const char *component_name = "RigidBodyComponent";
@@ -21,13 +21,17 @@ struct RigidBodyComponent {
   float restitution = 0.5f;
 };
 
+} // namespace componeng::physics
+
+namespace componeng::components {
+
 #define RIGIDBODY_COMPONENT_FIELDS(F, ctx)                                     \
   F(type, ctx)                                                                 \
   F(velocity, ctx)                                                             \
   F(mass, ctx)                                                                 \
   F(restitution, ctx)
 
-SERIALIZABLE_COMPONENT(RigidBodyComponent, RIGIDBODY_COMPONENT_FIELDS)
+SERIALIZABLE_COMPONENT(physics::RigidBodyComponent, RIGIDBODY_COMPONENT_FIELDS)
 
 #undef RIGIDBODY_COMPONENT_FIELDS
 

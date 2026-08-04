@@ -1,13 +1,13 @@
 #include "componeng/physics/physics_system.hpp"
 
-#include "componeng/components/collider_component.hpp"
-#include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/events/collision_event.hpp"
+#include "componeng/physics/collider_component.hpp"
 #include "componeng/physics/collision_detection.hpp"
-#include "componeng/resources/physics_config.hpp"
+#include "componeng/physics/physics_config.hpp"
+#include "componeng/physics/rigidbody_component.hpp"
 
 #include <algorithm>
 #include <vector>
@@ -17,8 +17,8 @@ namespace componeng::physics {
 struct EntityPhysicsData {
   ecs::EntityID entity;
   components::TransformComponent *transform;
-  components::RigidBodyComponent *rigidbody;
-  components::ColliderComponent *collider;
+  RigidBodyComponent *rigidbody;
+  ColliderComponent *collider;
 };
 
 struct CollisionPair {
@@ -39,18 +39,16 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
   float restitutionA = 0.0f;
   float restitutionB = 0.0f;
 
-  if (a.rigidbody &&
-      a.rigidbody->type != components::RigidBodyComponent::Static) {
-    if (a.rigidbody->type == components::RigidBodyComponent::Dynamic) {
+  if (a.rigidbody && a.rigidbody->type != RigidBodyComponent::Static) {
+    if (a.rigidbody->type == RigidBodyComponent::Dynamic) {
       inverseMassA =
           a.rigidbody->mass != 0.0f ? 1.0f / a.rigidbody->mass : 0.0f;
     }
     restitutionA = a.rigidbody->restitution;
   }
 
-  if (b.rigidbody &&
-      b.rigidbody->type != components::RigidBodyComponent::Static) {
-    if (b.rigidbody->type == components::RigidBodyComponent::Dynamic) {
+  if (b.rigidbody && b.rigidbody->type != RigidBodyComponent::Static) {
+    if (b.rigidbody->type == RigidBodyComponent::Dynamic) {
       inverseMassB =
           b.rigidbody->mass != 0.0f ? 1.0f / b.rigidbody->mass : 0.0f;
     }
@@ -75,12 +73,10 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
 
   core::Vec3 impulse = j * info.normal;
 
-  if (a.rigidbody &&
-      a.rigidbody->type == components::RigidBodyComponent::Dynamic) {
+  if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Dynamic) {
     a.rigidbody->velocity -= impulse * inverseMassA;
   }
-  if (b.rigidbody &&
-      b.rigidbody->type == components::RigidBodyComponent::Dynamic) {
+  if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Dynamic) {
     b.rigidbody->velocity += impulse * inverseMassB;
   }
 
@@ -90,12 +86,10 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
                               percent / (inverseMassA + inverseMassB);
   core::Vec3 correction = correctionMagnitude * info.normal;
 
-  if (a.rigidbody &&
-      a.rigidbody->type == components::RigidBodyComponent::Dynamic) {
+  if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Dynamic) {
     a.transform->position -= correction * inverseMassA;
   }
-  if (b.rigidbody &&
-      b.rigidbody->type == components::RigidBodyComponent::Dynamic) {
+  if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Dynamic) {
     b.transform->position += correction * inverseMassB;
   }
 }
@@ -103,8 +97,7 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
 void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
   g_accumulatedTime += state.deltaTime;
 
-  const auto &physicsConfig =
-      state.world->get_resource<resources::PhysicsConfig>();
+  const auto &physicsConfig = state.world->get_resource<PhysicsConfig>();
   const float fixedTimeStep = physicsConfig.fixedTimeStep;
   core::Vec3 g_gravity = physicsConfig.gravity;
 
@@ -112,14 +105,12 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
     g_accumulatedTime -= fixedTimeStep;
 
     ecs::ThreadPool &pool = state.world->threadPool();
-    state.world
-        ->query<components::TransformComponent,
-                components::RigidBodyComponent>()
+    state.world->query<components::TransformComponent, RigidBodyComponent>()
         .eachParallel(pool, [&](components::TransformComponent &transform,
-                                components::RigidBodyComponent &rigidbody) {
-          if (rigidbody.type == components::RigidBodyComponent::Static)
+                                RigidBodyComponent &rigidbody) {
+          if (rigidbody.type == RigidBodyComponent::Static)
             return;
-          if (rigidbody.type == components::RigidBodyComponent::Dynamic) {
+          if (rigidbody.type == RigidBodyComponent::Dynamic) {
             rigidbody.velocity += g_gravity * fixedTimeStep;
           }
           transform.position += rigidbody.velocity * fixedTimeStep;
@@ -128,21 +119,19 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
     std::vector<EntityPhysicsData> colliders;
 
     state.world
-        ->query<components::TransformComponent, components::RigidBodyComponent,
-                components::ColliderComponent>()
-        .eachWithEntity([&](ecs::EntityID entity,
-                            components::TransformComponent &transform,
-                            components::RigidBodyComponent &rigidbody,
-                            components::ColliderComponent &collider) {
-          colliders.push_back({entity, &transform, &rigidbody, &collider});
-        });
+        ->query<components::TransformComponent, RigidBodyComponent,
+                ColliderComponent>()
+        .eachWithEntity(
+            [&](ecs::EntityID entity, components::TransformComponent &transform,
+                RigidBodyComponent &rigidbody, ColliderComponent &collider) {
+              colliders.push_back({entity, &transform, &rigidbody, &collider});
+            });
 
-    state.world
-        ->query<components::TransformComponent, components::ColliderComponent>()
-        .exclude<components::RigidBodyComponent>()
+    state.world->query<components::TransformComponent, ColliderComponent>()
+        .exclude<RigidBodyComponent>()
         .eachWithEntity([&](ecs::EntityID entity,
                             components::TransformComponent &transform,
-                            components::ColliderComponent &collider) {
+                            ColliderComponent &collider) {
           colliders.push_back({entity, &transform, nullptr, &collider});
         });
 

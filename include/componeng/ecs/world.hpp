@@ -6,13 +6,13 @@
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/entity_manager.hpp"
 #include "componeng/ecs/query.hpp"
+#include "componeng/ecs/resource_manager.hpp"
 #include "componeng/ecs/system_manager.hpp"
 #include "componeng/ecs/thread_pool.hpp"
 #include "componeng/events/event_bus.hpp"
+#include "componeng/input/action_state.hpp"
+#include "componeng/input/input_state.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
-#include "componeng/resources/action_state.hpp"
-#include "componeng/resources/input_state.hpp"
-#include "componeng/resources/resource_manager.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <memory>
@@ -35,7 +35,7 @@ private:
   ArchetypeManager m_archetypeManager;
   ThreadPool m_threadPool;
   events::EventBus m_eventBus;
-  resources::ResourceManager m_resourceManager;
+  ResourceManager m_resourceManager;
 
   void *m_windowHandle = nullptr;
   renderer::api::IRenderDevice *m_renderDevice = nullptr;
@@ -55,8 +55,8 @@ public:
   void *getWindowHandle() const;
 
   void swapInputBuffers() {
-    auto &inputState = get_resource<resources::InputState>();
-    auto &actionState = get_resource<resources::ActionState>();
+    auto &inputState = get_resource<input::InputState>();
+    auto &actionState = get_resource<input::ActionState>();
     inputState.previous_state = inputState.current_state;
     actionState.swapBuffers();
   }

@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <utility>
 
-namespace componeng::resources {
+namespace componeng::ecs {
 
 struct IResource {
   virtual ~IResource() = default;
@@ -40,4 +40,4 @@ private:
   std::unordered_map<std::type_index, std::unique_ptr<IResource>> m_resources;
 };
 
-} // namespace componeng::resources
+} // namespace componeng::ecs

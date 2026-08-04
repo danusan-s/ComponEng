@@ -1,9 +1,9 @@
 #pragma once
 
 #include "componeng/components/component_serializer.hpp"
-#include "componeng/renderer/asset_manager.hpp"
+#include "componeng/core/types.hpp"
 
-namespace componeng::components {
+namespace componeng::audio {
 
 struct AudioComponent {
   static constexpr const char *component_name = "AudioComponent";
@@ -22,6 +22,10 @@ struct AudioComponent {
   core::HandleID audioID = 0;
 };
 
+} // namespace componeng::audio
+
+namespace componeng::components {
+
 #define AUDIO_COMPONENT_FIELDS(F, ctx)                                         \
   F(audioName, ctx)                                                            \
   F(playOnAwake, ctx)                                                          \
@@ -32,7 +36,7 @@ struct AudioComponent {
   F(minDistance, ctx)                                                          \
   F(maxDistance, ctx)
 
-SERIALIZABLE_COMPONENT(AudioComponent, AUDIO_COMPONENT_FIELDS)
+SERIALIZABLE_COMPONENT(audio::AudioComponent, AUDIO_COMPONENT_FIELDS)
 
 #undef AUDIO_COMPONENT_FIELDS
 

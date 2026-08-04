@@ -131,9 +131,9 @@ bool testSphereBox(const components::TransformComponent &a,
   return res;
 }
 
-bool testCollision(const components::ColliderComponent &colliderA,
+bool testCollision(const ColliderComponent &colliderA,
                    const components::TransformComponent &localTransformA,
-                   const components::ColliderComponent &colliderB,
+                   const ColliderComponent &colliderB,
                    const components::TransformComponent &localTransformB,
                    CollisionInfo &info) {
   const components::TransformComponent worldTransformA =
@@ -141,22 +141,22 @@ bool testCollision(const components::ColliderComponent &colliderA,
   const components::TransformComponent worldTransformB =
       getWorldTransform(colliderB.transform, localTransformB);
 
-  if (colliderA.type == components::ColliderType::Box &&
-      colliderB.type == components::ColliderType::Box) {
+  if (colliderA.type == ColliderType::Box &&
+      colliderB.type == ColliderType::Box) {
     return testBoxBox(worldTransformA, worldTransformB, info);
   }
 
-  if (colliderA.type == components::ColliderType::Sphere &&
-      colliderB.type == components::ColliderType::Sphere) {
+  if (colliderA.type == ColliderType::Sphere &&
+      colliderB.type == ColliderType::Sphere) {
     return testSphereSphere(worldTransformA, worldTransformB, info);
   }
 
-  if (colliderA.type == components::ColliderType::Box &&
-      colliderB.type == components::ColliderType::Sphere) {
+  if (colliderA.type == ColliderType::Box &&
+      colliderB.type == ColliderType::Sphere) {
     return testBoxSphere(worldTransformA, worldTransformB, info);
   }
-  if (colliderA.type == components::ColliderType::Sphere &&
-      colliderB.type == components::ColliderType::Box) {
+  if (colliderA.type == ColliderType::Sphere &&
+      colliderB.type == ColliderType::Box) {
     return testSphereBox(worldTransformA, worldTransformB, info);
   }
 

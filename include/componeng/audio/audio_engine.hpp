@@ -6,7 +6,7 @@
 #include <memory>
 #include <unordered_map>
 
-namespace componeng::resources {
+namespace componeng::audio {
 
 class AudioEngine {
 public:
@@ -47,4 +47,4 @@ private:
   std::unordered_map<core::HandleID, std::unique_ptr<ma_sound>> m_activeSounds;
 };
 
-} // namespace componeng::resources
+} // namespace componeng::audio

@@ -1,16 +1,16 @@
-#include "componeng/systems/camera_system.hpp"
+#include "componeng/camera/camera_system.hpp"
 
-#include "componeng/components/camera_component.hpp"
+#include "componeng/camera/camera_component.hpp"
+#include "componeng/camera/main_camera.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/world.hpp"
-#include "componeng/resources/main_camera.hpp"
 #include <GLFW/glfw3.h>
 
 #include <cmath>
 
-namespace componeng::systems {
+namespace componeng::camera {
 
 static void updateCameraVectors(const components::TransformComponent &transform,
                                 core::Vec3 &front, core::Vec3 &right,
@@ -31,14 +31,14 @@ static void updateCameraVectors(const components::TransformComponent &transform,
 
 void CameraSystem::onUpdate(const ecs::SystemState &state) {
   ecs::EntityID mainCameraEntity =
-      state.world->get_resource<resources::MainCamera>().entity;
+      state.world->get_resource<MainCamera>().entity;
 
   components::TransformComponent &transform =
       state.world->getComponent<components::TransformComponent>(
           mainCameraEntity);
 
-  components::CameraComponent &camera =
-      state.world->getComponent<components::CameraComponent>(mainCameraEntity);
+  CameraComponent &camera =
+      state.world->getComponent<CameraComponent>(mainCameraEntity);
 
   core::Vec3 front, right, up;
   updateCameraVectors(transform, front, right, up);
@@ -55,4 +55,4 @@ void CameraSystem::onUpdate(const ecs::SystemState &state) {
   core::DebugUI::addVec3("Camera Position", transform.position);
 }
 
-} // namespace componeng::systems
+} // namespace componeng::camera

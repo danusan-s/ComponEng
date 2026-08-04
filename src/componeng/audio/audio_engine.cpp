@@ -1,12 +1,12 @@
 #include "componeng/core/types.hpp"
 #define MINIAUDIO_IMPLEMENTATION
 
-#include "componeng/resources/audio_engine.hpp"
+#include "componeng/audio/audio_engine.hpp"
 
 #include "componeng/utils/logger.hpp"
 #include <miniaudio.h>
 
-namespace componeng::resources {
+namespace componeng::audio {
 
 AudioEngine::AudioEngine() {
 }
@@ -110,4 +110,4 @@ void AudioEngine::cleanupFinishedSounds() {
   }
 }
 
-} // namespace componeng::resources
+} // namespace componeng::audio

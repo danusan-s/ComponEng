@@ -1,6 +1,7 @@
 #include "componeng/renderer/batching/batching_system.hpp"
 
-#include "componeng/components/camera_component.hpp"
+#include "componeng/camera/camera_component.hpp"
+#include "componeng/camera/main_camera.hpp"
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
 #include "componeng/components/transform_component.hpp"
@@ -11,7 +12,6 @@
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
-#include "componeng/resources/main_camera.hpp"
 
 namespace componeng::renderer {
 
@@ -33,13 +33,13 @@ void BatchingSystem::onCreate(const ecs::SystemState &state) {
 
 void BatchingSystem::onUpdate(const ecs::SystemState &state) {
   ecs::EntityID mainCameraID =
-      state.world->get_resource<resources::MainCamera>().entity;
+      state.world->get_resource<camera::MainCamera>().entity;
 
   core::Vec3 &cameraPos =
       state.world->getComponent<components::TransformComponent>(mainCameraID)
           .position;
   core::Mat4 &viewProj =
-      state.world->getComponent<components::CameraComponent>(mainCameraID)
+      state.world->getComponent<camera::CameraComponent>(mainCameraID)
           .viewProjectionMatrix;
   const AssetManager &assetManager = state.world->get_resource<AssetManager>();
 

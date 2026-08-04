@@ -1,8 +1,8 @@
 #include "componeng/core/window.hpp"
 
 #include "componeng/core/engine.hpp"
-#include "componeng/core/raw_input_state.hpp"
-#include "componeng/resources/input_state.hpp"
+#include "componeng/input/input_state.hpp"
+#include "componeng/input/raw_input_state.hpp"
 #include "componeng/utils/logger.hpp"
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
@@ -42,7 +42,7 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
     } else {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
       g_mouseLocked = true;
-      auto &state = engine->m_world.get_resource<resources::InputState>();
+      auto &state = engine->m_world.get_resource<input::InputState>();
       state.previous_state.mouseX = state.current_state.mouseX;
       state.previous_state.mouseY = state.current_state.mouseY;
     }
@@ -51,8 +51,8 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
   if (!g_mouseLocked)
     return;
 
-  RawInputState &inputState =
-      engine->m_world.get_resource<resources::InputState>().current_state;
+  input::RawInputState &inputState =
+      engine->m_world.get_resource<input::InputState>().current_state;
 
   if (key >= 0 && key < 1024) {
     if (action == GLFW_PRESS) {
@@ -72,8 +72,8 @@ static void mouseButtonCallback(GLFWwindow *window, int button, int action,
   if (!engine)
     return;
 
-  RawInputState &inputState =
-      engine->m_world.get_resource<resources::InputState>().current_state;
+  input::RawInputState &inputState =
+      engine->m_world.get_resource<input::InputState>().current_state;
 
   if (!g_mouseLocked)
     return;
@@ -92,8 +92,8 @@ static void cursorPosCallback(GLFWwindow *window, double xposIn,
   if (!engine)
     return;
 
-  RawInputState &inputState =
-      engine->m_world.get_resource<resources::InputState>().current_state;
+  input::RawInputState &inputState =
+      engine->m_world.get_resource<input::InputState>().current_state;
 
   float xpos = static_cast<float>(xposIn);
   float ypos = static_cast<float>(yposIn);

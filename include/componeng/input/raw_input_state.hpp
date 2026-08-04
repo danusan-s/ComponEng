@@ -1,6 +1,6 @@
 #pragma once
 
-namespace componeng::core {
+namespace componeng::input {
 
 /**
  * @brief Snapshot of current input state (keyboard and mouse).
@@ -15,4 +15,4 @@ struct RawInputState {
   float mouseY = 0.0f;
 };
 
-} // namespace componeng::core
+} // namespace componeng::input

@@ -1,11 +1,11 @@
 #include "collision_sounds.hpp"
 
+#include "componeng/audio/audio_engine.hpp"
+#include "componeng/camera/main_camera.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/events/collision_event.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/resources/audio_engine.hpp"
-#include "componeng/resources/main_camera.hpp"
 #include "componeng/utils/logger.hpp"
 
 void CollisionSounds::onUpdate(const componeng::ecs::SystemState &state) {
@@ -14,12 +14,11 @@ void CollisionSounds::onUpdate(const componeng::ecs::SystemState &state) {
   auto &assetManager =
       state.world->get_resource<componeng::renderer::AssetManager>();
   auto &audioEngine =
-      state.world->get_resource<componeng::resources::AudioEngine>();
+      state.world->get_resource<componeng::audio::AudioEngine>();
 
   auto soundPath = assetManager.getAudio(assetManager.getAudioID("boop"));
 
-  auto &mainCamera =
-      state.world->get_resource<componeng::resources::MainCamera>();
+  auto &mainCamera = state.world->get_resource<componeng::camera::MainCamera>();
   if (state.world->hasComponent<componeng::components::TransformComponent>(
           mainCamera.entity)) {
     auto &camTransform =

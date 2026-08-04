@@ -1,6 +1,7 @@
 #include "componeng/renderer/render_system.hpp"
 
-#include "componeng/components/camera_component.hpp"
+#include "componeng/camera/camera_component.hpp"
+#include "componeng/camera/main_camera.hpp"
 #include "componeng/components/light_component.hpp"
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
@@ -13,7 +14,6 @@
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
-#include "componeng/resources/main_camera.hpp"
 
 namespace componeng::renderer {
 
@@ -48,13 +48,13 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   renderDevice.clear(0.0f, 0.0f, 0.0f, 1.0f);
 
   ecs::EntityID mainCameraID =
-      state.world->get_resource<resources::MainCamera>().entity;
+      state.world->get_resource<camera::MainCamera>().entity;
 
   core::Vec3 &cameraPos =
       state.world->getComponent<components::TransformComponent>(mainCameraID)
           .position;
   core::Mat4 &viewProj =
-      state.world->getComponent<components::CameraComponent>(mainCameraID)
+      state.world->getComponent<camera::CameraComponent>(mainCameraID)
           .viewProjectionMatrix;
 
   int drawCalls = 0;

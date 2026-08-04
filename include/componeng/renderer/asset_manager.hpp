@@ -1,11 +1,11 @@
 #pragma once
 
+#include "componeng/audio/audio_engine.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset/mesh.hpp"
 #include "componeng/renderer/asset/shader.hpp"
 #include "componeng/renderer/asset/texture.hpp"
-#include "componeng/resources/audio_engine.hpp"
 
 #include <memory>
 #include <string>
@@ -33,7 +33,7 @@ public:
   AssetManager(AssetManager &&) = default;
   AssetManager &operator=(AssetManager &&) = default;
 
-  resources::AudioEngine *m_audioEngine = nullptr;
+  audio::AudioEngine *m_audioEngine = nullptr;
 
   void loadShader(const char *vShaderFile, const char *fShaderFile,
                   const char *gShaderFile, std::string name);

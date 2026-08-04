@@ -1,16 +1,21 @@
 #include "componeng/core/engine.hpp"
 
-#include "componeng/components/audio_component.hpp"
-#include "componeng/components/camera_component.hpp"
-#include "componeng/components/collider_component.hpp"
+#include "componeng/audio/audio_component.hpp"
+#include "componeng/audio/audio_engine.hpp"
+#include "componeng/audio/audio_system.hpp"
+#include "componeng/camera/camera_component.hpp"
+#include "componeng/camera/camera_system.hpp"
+#include "componeng/camera/main_camera.hpp"
 #include "componeng/components/light_component.hpp"
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
-#include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/ecs/entity.hpp"
+#include "componeng/input/input_system.hpp"
+#include "componeng/physics/collider_component.hpp"
 #include "componeng/physics/physics_system.hpp"
+#include "componeng/physics/rigidbody_component.hpp"
 #include "componeng/renderer/asset/diffuse.hpp"
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset_manager.hpp"
@@ -18,11 +23,6 @@
 #include "componeng/renderer/batching/batching_system.hpp"
 #include "componeng/renderer/culling/culling_system.hpp"
 #include "componeng/renderer/render_system.hpp"
-#include "componeng/resources/audio_engine.hpp"
-#include "componeng/resources/main_camera.hpp"
-#include "componeng/systems/audio_system.hpp"
-#include "componeng/systems/camera_system.hpp"
-#include "componeng/systems/input_system.hpp"
 #include "componeng/utils/logger.hpp"
 #include "componeng/utils/utils.hpp"
 
@@ -43,8 +43,8 @@ void Engine::init() {
 
   DebugUI::init();
 
-  m_world.set_resource<resources::AudioEngine>(resources::AudioEngine());
-  auto &audioEngine = m_world.get_resource<resources::AudioEngine>();
+  m_world.set_resource<audio::AudioEngine>(audio::AudioEngine());
+  auto &audioEngine = m_world.get_resource<audio::AudioEngine>();
   audioEngine.init();
 
   LOG_INFO("Initialized audio engine");
@@ -82,17 +82,16 @@ void Engine::registerComponents() {
   m_world.registerComponents<
       components::TransformComponent, components::MeshComponent,
       components::MaterialComponent, components::ColorComponent,
-      components::CameraComponent, components::RigidBodyComponent,
-      components::ColliderComponent, components::AudioComponent,
+      camera::CameraComponent, physics::RigidBodyComponent,
+      physics::ColliderComponent, audio::AudioComponent,
       components::DirectionalLightComponent>();
 }
 
 void Engine::registerSystems() {
-  m_world.registerSystem<systems::InputSystem>(
-      ecs::SystemGroup::Initialization);
+  m_world.registerSystem<input::InputSystem>(ecs::SystemGroup::Initialization);
   m_world.registerSystem<physics::PhysicsSystem>(ecs::SystemGroup::Simulation);
-  m_world.registerSystem<systems::CameraSystem>(ecs::SystemGroup::Simulation);
-  m_world.registerSystem<systems::AudioSystem>(ecs::SystemGroup::Simulation);
+  m_world.registerSystem<camera::CameraSystem>(ecs::SystemGroup::Simulation);
+  m_world.registerSystem<audio::AudioSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<renderer::CullingSystem>(
       ecs::SystemGroup::Presentation);
   m_world.registerSystem<renderer::BatchingSystem>(
@@ -106,7 +105,7 @@ void Engine::registerSystems() {
 }
 
 void Engine::ensureDefaultCamera() {
-  if (m_world.has_resource<resources::MainCamera>()) {
+  if (m_world.has_resource<camera::MainCamera>()) {
     return;
   }
 
@@ -116,12 +115,12 @@ void Engine::ensureDefaultCamera() {
       components::TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
                                      .rotation = Vec3(0.0f, 0.0f, 0.0f),
                                      .scale = Vec3(1.0f)},
-      components::CameraComponent{.fov = 45.0f,
-                                  .aspectRatio = 16.0f / 9.0f,
-                                  .nearPlane = 0.1f,
-                                  .farPlane = 10000.0f});
+      camera::CameraComponent{.fov = 45.0f,
+                              .aspectRatio = 16.0f / 9.0f,
+                              .nearPlane = 0.1f,
+                              .farPlane = 10000.0f});
 
-  m_world.set_resource(resources::MainCamera{.entity = cameraEntity});
+  m_world.set_resource(camera::MainCamera{.entity = cameraEntity});
 }
 
 void Engine::run(IGame &game) {
@@ -175,7 +174,7 @@ void Engine::run(IGame &game) {
 void Engine::shutdown() {
   DebugUI::shutdown();
   auto &assetManager = m_world.get_resource<renderer::AssetManager>();
-  auto &audioEngine = m_world.get_resource<resources::AudioEngine>();
+  auto &audioEngine = m_world.get_resource<audio::AudioEngine>();
   assetManager.clear();
   audioEngine.shutdown();
   m_window.shutdown();

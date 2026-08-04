@@ -1,9 +1,6 @@
-#include "componeng/components/audio_component.hpp"
-#include "componeng/components/camera_component.hpp"
-#include "componeng/components/collider_component.hpp"
+#include "componeng/audio/audio_component.hpp"
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
-#include "componeng/components/rigidbody_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/ecs/archetype.hpp"
 #include "componeng/ecs/component_registry.hpp"
@@ -12,6 +9,7 @@
 
 #include <cstring>
 
+using namespace componeng::audio;
 using namespace componeng::components;
 using namespace componeng::core;
 using namespace componeng::ecs;

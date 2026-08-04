@@ -1,8 +1,8 @@
 #pragma once
 
-#include "componeng/components/collider_component.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/core/types.hpp"
+#include "componeng/physics/collider_component.hpp"
 
 namespace componeng::physics {
 
@@ -65,9 +65,9 @@ bool testSphereBox(const components::TransformComponent &sphere,
  * Supports Box-Box, Sphere-Sphere, and Box-Sphere pairs.
  * Returns false for unsupported combinations.
  */
-bool testCollision(const components::ColliderComponent &colliderA,
+bool testCollision(const ColliderComponent &colliderA,
                    const components::TransformComponent &transformA,
-                   const components::ColliderComponent &colliderB,
+                   const ColliderComponent &colliderB,
                    const components::TransformComponent &transformB,
                    CollisionInfo &info);
 

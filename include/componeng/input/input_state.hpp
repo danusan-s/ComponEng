@@ -1,12 +1,12 @@
 #pragma once
 
-#include "componeng/core/raw_input_state.hpp"
+#include "componeng/input/raw_input_state.hpp"
 
-namespace componeng::resources {
+namespace componeng::input {
 
 struct InputState {
-  core::RawInputState current_state;
-  core::RawInputState previous_state;
+  RawInputState current_state;
+  RawInputState previous_state;
 
   bool isKeyPressed(int key) const {
     return current_state.keys[key] && !previous_state.keys[key];
@@ -39,4 +39,4 @@ struct InputState {
   }
 };
 
-} // namespace componeng::resources
+} // namespace componeng::input

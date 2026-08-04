@@ -1,10 +1,10 @@
 #include "componeng/ecs/world.hpp"
 
+#include "componeng/camera/main_camera.hpp"
 #include "componeng/events/entity_event.hpp"
-#include "componeng/resources/action_state.hpp"
-#include "componeng/resources/input_state.hpp"
-#include "componeng/resources/main_camera.hpp"
-#include "componeng/resources/physics_config.hpp"
+#include "componeng/input/action_state.hpp"
+#include "componeng/input/input_state.hpp"
+#include "componeng/physics/physics_config.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <fstream>
@@ -12,9 +12,9 @@
 namespace componeng::ecs {
 
 void World::init() {
-  set_resource(resources::InputState());
-  set_resource(resources::ActionState());
-  set_resource(resources::PhysicsConfig());
+  set_resource(input::InputState());
+  set_resource(input::ActionState());
+  set_resource(physics::PhysicsConfig());
   time = 0.0f;
 }
 
@@ -97,8 +97,8 @@ void World::saveScene(const std::string &filename) {
         entityJson[info.name] = info.serializer(componentPtr);
       }
 
-      if (has_resource<resources::MainCamera>() &&
-          entity == get_resource<resources::MainCamera>().entity) {
+      if (has_resource<camera::MainCamera>() &&
+          entity == get_resource<camera::MainCamera>().entity) {
         entityJson["_isMainCamera"] = true;
       }
 
@@ -177,7 +177,7 @@ void World::loadScene(const std::string &filename) {
   }
 
   if (mainCameraEntity != ecs::INVALID_ENTITY) {
-    set_resource(resources::MainCamera{mainCameraEntity});
+    set_resource(camera::MainCamera{mainCameraEntity});
     LOG_INFO("Main camera set to entity %d",
              (unsigned long long)mainCameraEntity);
   }
