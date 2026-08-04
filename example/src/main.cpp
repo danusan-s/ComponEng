@@ -76,8 +76,9 @@ public:
                              .mass = randMass(generator),
                              .restitution = 1.0f},
           MaterialComponent{.materialName = "default_diffuse"},
-          ColorComponent{.color = Vec4(randColor(generator), randColor(generator),
-                                       randColor(generator), 1.0f)},
+          ColorComponent{.color =
+                             Vec4(randColor(generator), randColor(generator),
+                                  randColor(generator), 1.0f)},
           ColliderComponent{.type = ColliderType::Box,
                             .transform =
                                 TransformComponent{.position = Vec3(0.0f),
@@ -102,8 +103,9 @@ public:
                              .mass = randMass(generator),
                              .restitution = 1.0f},
           MaterialComponent{.materialName = "default_diffuse"},
-          ColorComponent{.color = Vec4(randColor(generator), randColor(generator),
-                                       randColor(generator), 1.0f)},
+          ColorComponent{.color =
+                             Vec4(randColor(generator), randColor(generator),
+                                  randColor(generator), 1.0f)},
           ColliderComponent{.type = ColliderType::Sphere,
                             .transform =
                                 TransformComponent{.position = Vec3(0.0f),

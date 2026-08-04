@@ -166,41 +166,40 @@ api::VertexLayout GLShader::reflectInstanceLayout() const {
     raw.push_back({std::string(nameBuf.data(), length), type, location});
   }
 
-  std::sort(raw.begin(), raw.end(),
-           [](const RawAttrib &a, const RawAttrib &b) {
-             return a.location < b.location;
-           });
+  std::sort(raw.begin(), raw.end(), [](const RawAttrib &a, const RawAttrib &b) {
+    return a.location < b.location;
+  });
 
   api::VertexLayout layout;
   uint32_t offset = 0;
   for (const auto &attrib : raw) {
     switch (attrib.type) {
-    case GL_FLOAT:
-      layout.attributes.push_back({attrib.name, offset, 1, false, -1});
-      offset += sizeof(float);
-      break;
-    case GL_FLOAT_VEC2:
-      layout.attributes.push_back({attrib.name, offset, 2, false, -1});
-      offset += sizeof(float) * 2;
-      break;
-    case GL_FLOAT_VEC3:
-      layout.attributes.push_back({attrib.name, offset, 3, false, -1});
-      offset += sizeof(float) * 3;
-      break;
-    case GL_FLOAT_VEC4:
-      layout.attributes.push_back({attrib.name, offset, 4, false, -1});
-      offset += sizeof(float) * 4;
-      break;
-    case GL_FLOAT_MAT4:
-      for (int row = 0; row < 4; ++row) {
-        layout.attributes.push_back({attrib.name, offset, 4, false, row});
+      case GL_FLOAT:
+        layout.attributes.push_back({attrib.name, offset, 1, false, -1});
+        offset += sizeof(float);
+        break;
+      case GL_FLOAT_VEC2:
+        layout.attributes.push_back({attrib.name, offset, 2, false, -1});
+        offset += sizeof(float) * 2;
+        break;
+      case GL_FLOAT_VEC3:
+        layout.attributes.push_back({attrib.name, offset, 3, false, -1});
+        offset += sizeof(float) * 3;
+        break;
+      case GL_FLOAT_VEC4:
+        layout.attributes.push_back({attrib.name, offset, 4, false, -1});
         offset += sizeof(float) * 4;
-      }
-      break;
-    default:
-      LOG_ERROR("Unsupported instance attribute type for '%s'",
-                attrib.name.c_str());
-      break;
+        break;
+      case GL_FLOAT_MAT4:
+        for (int row = 0; row < 4; ++row) {
+          layout.attributes.push_back({attrib.name, offset, 4, false, row});
+          offset += sizeof(float) * 4;
+        }
+        break;
+      default:
+        LOG_ERROR("Unsupported instance attribute type for '%s'",
+                  attrib.name.c_str());
+        break;
     }
   }
   layout.stride = offset;

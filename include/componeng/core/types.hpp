@@ -89,8 +89,7 @@ using glm::scale;
 using glm::translate;
 using glm::value_ptr;
 
-using UniformMap =
-    std::unordered_map<Name, std::variant<float, core::Vec2, core::Vec3,
-                                          core::Vec4, core::Mat4>>;
+using UniformMap = std::unordered_map<
+    Name, std::variant<float, core::Vec2, core::Vec3, core::Vec4, core::Mat4>>;
 
 } // namespace componeng::core

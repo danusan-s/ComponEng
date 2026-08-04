@@ -31,3 +31,17 @@ rebuild: clean build
 .PHONY: run_tests
 run_tests: build
 	@cd $(BUILD_DIR) && $(CTEST) --output-on-failure
+
+# ===== Lint (matches the CI clang-format check) =====
+.PHONY: lint
+lint:
+	@find include/componeng src/componeng tests example \
+		-name "*.hpp" -o -name "*.cpp" | \
+		xargs clang-format --dry-run --Werror
+
+# ===== Format (apply clang-format in place) =====
+.PHONY: format
+format:
+	@find include/componeng src/componeng tests example \
+		-name "*.hpp" -o -name "*.cpp" | \
+		xargs clang-format -i
