@@ -32,8 +32,9 @@ public:
   std::unique_ptr<api::IMesh> createMesh() override;
   std::unique_ptr<api::IBuffer> createBuffer() override;
 
-  void setupInstanceAttributes(api::IBuffer &instanceBuffer) override;
-  void unbindInstanceAttributes() override;
+  void setupInstanceAttributes(api::IBuffer &instanceBuffer,
+                               const api::VertexLayout &layout) override;
+  void unbindInstanceAttributes(const api::VertexLayout &layout) override;
 
   void drawIndexedInstanced(size_t indexCount, uint32_t instanceCount) override;
 

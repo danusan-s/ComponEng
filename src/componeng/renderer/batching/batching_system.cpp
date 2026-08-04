@@ -26,13 +26,6 @@ getModelMatrix(const components::TransformComponent &transform) {
   return model;
 }
 
-static void populateBatch(const components::TransformComponent &t,
-                          core::HandleID meshID, core::HandleID materialID,
-                          BatchMap &batches) {
-  DrawKey key{meshID, materialID};
-  batches.add(key, {getModelMatrix(t)});
-}
-
 void BatchingSystem::onCreate(const ecs::SystemState &state) {
   api::IRenderDevice &renderDevice = state.world->getRenderDevice();
   m_batches = std::make_unique<BatchMap>(renderDevice);
@@ -49,38 +42,54 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
   core::Mat4 &viewProj =
       state.world->getComponent<components::CameraComponent>(mainCameraID)
           .viewProjectionMatrix;
+  const AssetManager &assetManager = state.world->get_resource<AssetManager>();
 
   int drawCalls = 0;
 
   state.world
       ->query<components::TransformComponent, components::MeshComponent,
               components::MaterialComponent>()
-      .each([&](components::TransformComponent &t, components::MeshComponent &m,
-                components::MaterialComponent &mat) {
+      .eachWithEntity([&](ecs::EntityID entity,
+                          components::TransformComponent &t,
+                          components::MeshComponent &m,
+                          components::MaterialComponent &mat) {
         if (mat.materialID == 0) {
-          mat.materialID =
-              state.world->get_resource<AssetManager>().getMaterialID(
-                  mat.materialName.empty() ? "default_diffuse"
-                                           : mat.materialName.c_str());
+          mat.materialID = assetManager.getMaterialID(
+              mat.materialName.empty() ? "default_diffuse"
+                                       : mat.materialName.c_str());
         }
+        IMaterial &material = assetManager.getMaterial(mat.materialID);
         if (mat.textureID == 0 || mat.shaderID == 0) {
-          const AssetManager &assetManager =
-              state.world->get_resource<AssetManager>();
-          Material &material = assetManager.getMaterial(mat.materialID);
           mat.textureID = material.getTextureID();
           mat.shaderID = material.getShaderID();
         }
         if (m.meshID == 0) {
-          m.meshID = state.world->get_resource<AssetManager>().getMeshID(
+          m.meshID = assetManager.getMeshID(
               m.meshName.empty() ? "cube" : m.meshName.c_str());
         }
+
         if (m.visible)
-          populateBatch(t, m.meshID, mat.materialID, *m_batches.get());
+          m_batches->add(m.meshID, mat.materialID, ecs::EntityID{entity});
       });
 
   auto &renderQueue = state.world->get_resource<RenderQueue>();
 
-  renderQueue.batches = std::move(m_batches->getMap());
+  for (const auto &[key, entities] : m_batches->getMap()) {
+    RenderBatch batch;
+    batch.meshID = key.meshID;
+    batch.materialID = key.materialID;
+
+    IMaterial &material = assetManager.getMaterial(batch.materialID);
+    batch.vertexLayout = material.getVertexLayout();
+
+    for (ecs::EntityID entity : entities) {
+      std::vector<float> instanceData =
+          material.buildInstanceDataFloats(*state.world, entity);
+      batch.instanceDatas.push_back(std::move(instanceData));
+    }
+
+    renderQueue.addBatch(std::move(batch));
+  }
 
   m_batches->clear();
 }

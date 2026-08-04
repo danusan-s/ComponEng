@@ -20,7 +20,7 @@ namespace componeng::renderer {
 static constexpr core::Vec3 DEFAULT_LIGHT_DIR = core::Vec3(-0.2f, 1.0f, -0.3f);
 static constexpr core::Vec3 DEFAULT_LIGHT_COLOR = core::Vec3(1.0f, 1.0f, 1.0f);
 
-static void setShaderUniforms(const Shader &shader, const Material &material) {
+static void setShaderUniforms(const Shader &shader, const IMaterial &material) {
   // Set material uniforms
   for (const auto &[name, value] : material.getUniforms()) {
     const char *iname = name;
@@ -68,17 +68,21 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
         lightColor = l.color;
       });
 
-  const auto &batches = state.world->get_resource<RenderQueue>().batches;
-  for (const auto &pair : batches) {
-    const DrawKey &key = pair.first;
-    const BatchData &data = pair.second;
+  int instancesRendered = 0;
+  auto &renderQueue = state.world->get_resource<RenderQueue>();
+
+  for (const auto &batch : renderQueue.getBatches()) {
+    const core::HandleID meshID = batch.meshID;
+    const core::HandleID materialID = batch.materialID;
+    const auto &data = batch;
+    const api::VertexLayout &layout = data.vertexLayout;
 
     const auto &assetManager = state.world->get_resource<AssetManager>();
-    auto &material = assetManager.getMaterial(key.materialID);
+
+    auto &material = assetManager.getMaterial(materialID);
+    const Mesh &model = assetManager.getMesh(meshID);
     const Shader &shader = assetManager.getShader(material.getShaderID());
     const Texture2D &texture = assetManager.getTexture(material.getTextureID());
-
-    const Mesh &model = assetManager.getMesh(key.meshID);
 
     shader.use();
     shader.setMatrix4("viewProj", viewProj);
@@ -92,24 +96,31 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     texture.bind();
     model.getImpl().bind();
 
-    renderDevice.setupInstanceAttributes(*data.instanceBuffer);
+    std::vector<float> flatInstanceData;
+    flatInstanceData.reserve(data.instanceDatas.size() *
+                             (layout.stride / sizeof(float)));
+    for (const auto &instance : data.instanceDatas) {
+      flatInstanceData.insert(flatInstanceData.end(), instance.begin(),
+                              instance.end());
+    }
 
-    data.instanceBuffer->setSubData(0, data.instanceDatas.data(),
-                                    data.instanceDatas.size() *
-                                        sizeof(InstanceData));
+    auto buf = renderDevice.createBuffer();
+    buf->setData(flatInstanceData.data(),
+                 flatInstanceData.size() * sizeof(float),
+                 api::IBuffer::Usage::Dynamic);
+
+    renderDevice.setupInstanceAttributes(*buf, material.getVertexLayout());
 
     renderDevice.drawIndexedInstanced(model.indexCount(),
                                       data.instanceDatas.size());
 
-    renderDevice.unbindInstanceAttributes();
+    renderDevice.unbindInstanceAttributes(material.getVertexLayout());
 
     ++drawCalls;
+    instancesRendered += batch.instanceDatas.size();
   }
 
-  int instancesRendered = 0;
-  for (const auto &pair : batches) {
-    instancesRendered += pair.second.instanceDatas.size();
-  }
+  renderQueue.clear();
 
   core::DebugUI::addValue("Instances Rendered", instancesRendered);
   core::DebugUI::addValue("Draw Calls", drawCalls);

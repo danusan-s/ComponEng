@@ -56,17 +56,6 @@ bool AssetManager::textureExists(std::string name) const {
   return m_textures.find(name) != m_textures.end();
 }
 
-void AssetManager::registerMaterial(const char *name, const char *shaderName,
-                                    const char *textureName) {
-  LOG_INFO("Registering Material: %s", name);
-  core::HandleID shaderID = getShaderID(shaderName);
-  core::HandleID textureID = getTextureID(textureName);
-  m_materialResources.push_back(
-      std::make_unique<Material>(shaderID, textureID));
-  core::HandleID id = m_materialResources.size();
-  m_materials[name] = id;
-}
-
 core::HandleID AssetManager::getMaterialID(std::string name) const {
   if (m_materials.find(name) == m_materials.end()) {
     LOG_ERROR("Material not found: %s", name.c_str());
@@ -75,7 +64,7 @@ core::HandleID AssetManager::getMaterialID(std::string name) const {
   return m_materials.at(name);
 }
 
-Material &AssetManager::getMaterial(core::HandleID id) const {
+IMaterial &AssetManager::getMaterial(core::HandleID id) const {
   return *m_materialResources.at(id - 1);
 }
 

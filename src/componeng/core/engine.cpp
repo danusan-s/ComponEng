@@ -11,6 +11,7 @@
 #include "componeng/core/debug_ui.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/physics/physics_system.hpp"
+#include "componeng/renderer/asset/diffuse.hpp"
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
@@ -62,8 +63,9 @@ void Engine::init() {
       utils::Utils::getAssetPath("assets/textures/white.png").c_str(), false,
       "white");
 
-  assetManager.registerMaterial("default_diffuse", "default", "white");
-  renderer::Material &mat =
+  assetManager.registerMaterial<renderer::DiffuseMaterial>("default_diffuse",
+                                                           "default", "white");
+  renderer::IMaterial &mat =
       assetManager.getMaterial(assetManager.getMaterialID("default_diffuse"));
   mat.setUniform("color", core::Vec3(1.0f, 1.0f, 1.0f));
 
@@ -82,9 +84,10 @@ void Engine::init() {
 void Engine::registerComponents() {
   m_world.registerComponents<
       components::TransformComponent, components::MeshComponent,
-      components::MaterialComponent, components::CameraComponent,
-      components::RigidBodyComponent, components::ColliderComponent,
-      components::AudioComponent, components::DirectionalLightComponent>();
+      components::MaterialComponent, components::ColorComponent,
+      components::CameraComponent, components::RigidBodyComponent,
+      components::ColliderComponent, components::AudioComponent,
+      components::DirectionalLightComponent>();
 }
 
 void Engine::registerSystems() {

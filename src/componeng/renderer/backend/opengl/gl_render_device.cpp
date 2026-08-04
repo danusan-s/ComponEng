@@ -1,5 +1,6 @@
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 
+#include "componeng/core/window.hpp"
 #include "componeng/utils/logger.hpp"
 #include <GLFW/glfw3.h>
 
@@ -73,26 +74,27 @@ std::unique_ptr<api::IBuffer> GLRenderDevice::createBuffer() {
   return std::make_unique<GLBuffer>();
 }
 
-void GLRenderDevice::setupInstanceAttributes(api::IBuffer &instanceBuffer) {
+void GLRenderDevice::setupInstanceAttributes(api::IBuffer &instanceBuffer,
+                                             const api::VertexLayout &layout) {
   GLuint instanceVBO = static_cast<GLBuffer &>(instanceBuffer).handle();
 
   glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
 
-  constexpr size_t instanceSize = sizeof(api::InstanceData);
-
-  for (int i = 0; i < 4; ++i) {
-    glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, instanceSize,
-                          reinterpret_cast<void *>(sizeof(float) * 4 * i));
+  for (int i = 0; i < layout.attributes.size(); ++i) {
+    const auto &attr = layout.attributes[i];
+    glVertexAttribPointer(3 + i, attr.componentCount, GL_FLOAT, attr.normalized,
+                          layout.stride,
+                          reinterpret_cast<const void *>(attr.offset));
     glEnableVertexAttribArray(3 + i);
-    glVertexAttribDivisor(3 + i, 1);
+    glVertexAttribDivisor(3 + i, 1); // Advance per instance
   }
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void GLRenderDevice::unbindInstanceAttributes() {
-  for (int i = 3; i <= 6; ++i) {
-    glDisableVertexAttribArray(i);
+void GLRenderDevice::unbindInstanceAttributes(const api::VertexLayout &layout) {
+  for (int i = 0; i < layout.attributes.size(); ++i) {
+    glDisableVertexAttribArray(3 + i);
   }
 }
 

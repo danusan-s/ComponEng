@@ -43,15 +43,6 @@ inline VertexLayout defaultMeshLayout() {
 }
 
 /**
- * @brief Per-instance data layout shared between CPU-side batching and GPU
- *        instance attribute setup. Currently just the model matrix, matching
- *        vertex attribute locations 3-6 in the shader.
- */
-struct InstanceData {
-  core::Mat4 modelMatrix;
-};
-
-/**
  * @brief API-agnostic buffer interface.
  *
  * Represents a GPU buffer (vertex, index, uniform, or instance data).
@@ -202,10 +193,11 @@ public:
    *  This is an OpenGL-specific concept; Vulkan implementations should be
    *  no-ops since instance attributes are configured at pipeline creation.
    */
-  virtual void setupInstanceAttributes(IBuffer &instanceBuffer) = 0;
+  virtual void setupInstanceAttributes(IBuffer &instanceBuffer,
+                                       const VertexLayout &layout) = 0;
 
   /** Unbind instance vertex attributes. No-op for Vulkan. */
-  virtual void unbindInstanceAttributes() = 0;
+  virtual void unbindInstanceAttributes(const VertexLayout &layout) = 0;
 
   /** Issue a draw call: indexed instanced rendering. */
   virtual void drawIndexedInstanced(size_t indexCount,

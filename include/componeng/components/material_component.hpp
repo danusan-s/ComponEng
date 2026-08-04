@@ -2,7 +2,6 @@
 
 #include "componeng/components/component_serializer.hpp"
 #include "componeng/core/types.hpp"
-#include "componeng/renderer/asset_manager.hpp"
 
 namespace componeng::components {
 
@@ -22,5 +21,17 @@ struct MaterialComponent {
 SERIALIZABLE_COMPONENT(MaterialComponent, MATERIAL_COMPONENT_FIELDS)
 
 #undef MATERIAL_COMPONENT_FIELDS
+
+struct ColorComponent {
+  static constexpr const char *component_name = "ColorComponent";
+
+  core::Vec4 color;
+};
+
+#define COLOR_COMPONENT_FIELDS(F, ctx) F(color, ctx)
+
+SERIALIZABLE_COMPONENT(ColorComponent, COLOR_COMPONENT_FIELDS)
+
+#undef COLOR_COMPONENT_FIELDS
 
 } // namespace componeng::components

@@ -4,13 +4,34 @@
 
 namespace componeng::renderer {
 
+using InstanceData = std::vector<float>;
+
 struct RenderBatch {
-  DrawKey key;
-  BatchData data;
+  core::HandleID meshID;
+  core::HandleID materialID;
+  api::VertexLayout vertexLayout;
+  std::vector<InstanceData> instanceDatas;
 };
 
 struct RenderQueue {
-  std::unordered_map<DrawKey, BatchData, DrawKeyHash> batches;
+private:
+  std::vector<RenderBatch> batches;
+
+public:
+  const std::vector<RenderBatch> &getBatches() const {
+    return batches;
+  }
+
+  void addBatch(const RenderBatch &&batch) {
+    batches.push_back(std::move(batch));
+  }
+
+  void clear() {
+    for (auto &batch : batches) {
+      batch.instanceDatas.clear();
+    }
+    batches.clear();
+  }
 };
 
 } // namespace componeng::renderer

@@ -6,6 +6,9 @@
 
 #include <cstring>
 #include <string>
+#include <string_view>
+#include <unordered_map>
+#include <variant>
 
 namespace componeng::core {
 
@@ -51,6 +54,18 @@ struct Name {
   }
 };
 
+} // namespace componeng::core
+
+namespace std {
+template <> struct hash<componeng::core::Name> {
+  std::size_t operator()(const componeng::core::Name &name) const noexcept {
+    return std::hash<std::string_view>{}(name.c_str());
+  }
+};
+} // namespace std
+
+namespace componeng::core {
+
 using HandleID = uint32_t;
 
 // Type aliases for cleaner code
@@ -73,5 +88,9 @@ using glm::rotate;
 using glm::scale;
 using glm::translate;
 using glm::value_ptr;
+
+using UniformMap =
+    std::unordered_map<Name, std::variant<float, core::Vec2, core::Vec3,
+                                          core::Vec4, core::Mat4>>;
 
 } // namespace componeng::core

@@ -45,10 +45,19 @@ public:
   core::HandleID getTextureID(std::string name) const;
   bool textureExists(std::string name) const;
 
+  template <typename T>
   void registerMaterial(const char *name, const char *shaderName,
-                        const char *textureName);
+                        const char *textureName) {
+    core::HandleID shaderID = getShaderID(shaderName);
+    core::HandleID textureID = getTextureID(textureName);
+    auto material = std::make_unique<T>(shaderID, textureID);
+    m_materialResources.push_back(std::move(material));
+    core::HandleID id = m_materialResources.size();
+    m_materials[name] = id;
+  }
+
   core::HandleID getMaterialID(std::string name) const;
-  Material &getMaterial(core::HandleID id) const;
+  IMaterial &getMaterial(core::HandleID id) const;
 
   void addMesh(std::string name, std::unique_ptr<Mesh> mesh);
   void loadMesh(const char *file, std::string name);
@@ -69,7 +78,7 @@ private:
 
   std::vector<std::unique_ptr<Shader>> m_shaderResources;
   std::vector<std::unique_ptr<Texture2D>> m_textureResources;
-  std::vector<std::unique_ptr<Material>> m_materialResources;
+  std::vector<std::unique_ptr<IMaterial>> m_materialResources;
   std::vector<std::unique_ptr<Mesh>> m_meshResources;
   std::vector<std::string> m_audioPaths;
 

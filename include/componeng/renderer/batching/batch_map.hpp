@@ -28,39 +28,32 @@ struct DrawKeyHash {
   }
 };
 
-using InstanceData = api::InstanceData;
-
-struct BatchData {
-  std::unique_ptr<api::IBuffer> instanceBuffer;
-  std::vector<InstanceData> instanceDatas;
-};
-
 class BatchMap {
-
-  std::unordered_map<DrawKey, BatchData, DrawKeyHash> map_;
+  std::unordered_map<DrawKey, std::vector<ecs::EntityID>, DrawKeyHash> map_;
   api::IRenderDevice &device;
 
 public:
   BatchMap(api::IRenderDevice &device) : device(device) {
   }
-  void add(const DrawKey &key, InstanceData &&value) {
+
+  void add(const DrawKey &key, ecs::EntityID value) {
     auto it = map_.find(key);
+    if (it != map_.end()) {
+      it->second.push_back(value);
+    } else {
+      map_[key] = {value};
+    }
+  }
 
-    if (it == map_.end()) {
-      it = map_.emplace(key, BatchData{}).first;
-      BatchData &batch = it->second;
-      batch.instanceBuffer = device.createBuffer();
-      batch.instanceBuffer->setData(nullptr,
-                                    ecs::MAX_ENTITIES * sizeof(InstanceData));
-      device.setupInstanceAttributes(*batch.instanceBuffer);
-    };
-
-    it->second.instanceDatas.push_back(std::move(value));
+  void add(core::HandleID meshID, core::HandleID materialID,
+           ecs::EntityID value) {
+    DrawKey key{meshID, materialID};
+    add(key, std::move(value));
   }
 
   void clear() {
     for (auto &pair : map_) {
-      pair.second.instanceDatas.clear();
+      pair.second.clear();
     }
   }
 
