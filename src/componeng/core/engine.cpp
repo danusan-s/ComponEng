@@ -65,9 +65,6 @@ void Engine::init() {
 
   assetManager.registerMaterial<renderer::DiffuseMaterial>("default_diffuse",
                                                            "default", "white");
-  renderer::IMaterial &mat =
-      assetManager.getMaterial(assetManager.getMaterialID("default_diffuse"));
-  mat.setUniform("color", core::Vec3(1.0f, 1.0f, 1.0f));
 
   assetManager.loadMesh(
       utils::Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");
