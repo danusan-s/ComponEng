@@ -28,6 +28,7 @@ file(GLOB ENGINE_SOURCES
     "src/componeng/systems/*.cpp"
     "src/componeng/physics/*.cpp"
     "src/componeng/ecs/*.cpp"
+    "src/componeng/utils/*.cpp"
     "src/glad/*.c"
     "src/imgui/*.cpp"
 )

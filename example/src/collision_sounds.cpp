@@ -41,9 +41,6 @@ void CollisionSounds::onUpdate(const componeng::ecs::SystemState &state) {
     auto position = a_transform.position -
                     event.info.normal * event.info.penetration * 0.5f;
 
-    audioEngine.playSoundFromFile(soundPath, position.x, position.y, position.z,
-                                  0.8f, 1.0f, false, 1.0f, 1000.0f);
-
     // LOG_INFO("Collision detected between Entity %d and Entity %d at position
     // "
     //          "(%.2f, %.2f, %.2f)",

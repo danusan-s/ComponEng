@@ -1,3 +1,4 @@
+#include "componeng/core/types.hpp"
 #define MINIAUDIO_IMPLEMENTATION
 
 #include "componeng/resources/audio_engine.hpp"
@@ -24,8 +25,8 @@ void AudioEngine::init() {
 }
 
 void AudioEngine::shutdown() {
-  for (auto &sound : m_activeSounds) {
-    ma_sound_uninit(sound.get());
+  for (auto &soundPair : m_activeSounds) {
+    ma_sound_uninit(soundPair.second.get());
   }
   ma_engine_uninit(&m_audioEngine);
   LOG_INFO("Audio engine shutdown");
@@ -60,6 +61,17 @@ void AudioEngine::setSoundPosition(ma_sound *sound, float x, float y, float z) {
   ma_sound_set_position(sound, x, y, z);
 }
 
+void AudioEngine::updateSoundPosition(core::HandleID id, float x, float y,
+                                      float z) {
+  auto it = m_activeSounds.find(id);
+  if (it != m_activeSounds.end()) {
+    ma_sound *sound = it->second.get();
+    ma_sound_set_position(sound, x, y, z);
+  } else {
+    LOG_ERROR("Sound with ID %u not found", id);
+  }
+}
+
 void AudioEngine::setSoundSettings(ma_sound *sound, float volume, float pitch,
                                    bool loop) {
   ma_sound_set_volume(sound, volume);
@@ -74,9 +86,10 @@ void AudioEngine::setSound3D(ma_sound *sound, float minDistance,
   ma_sound_set_attenuation_model(sound, ma_attenuation_model_linear);
 }
 
-bool AudioEngine::playSound(std::unique_ptr<ma_sound> sound) {
+bool AudioEngine::playSound(core::HandleID id,
+                            std::unique_ptr<ma_sound> sound) {
   ma_result result = ma_sound_start(sound.get());
-  m_activeSounds.push_back(std::move(sound));
+  m_activeSounds[id] = (std::move(sound));
   if (result != MA_SUCCESS) {
     LOG_ERROR("Failed to play sound");
     return false;
@@ -84,29 +97,13 @@ bool AudioEngine::playSound(std::unique_ptr<ma_sound> sound) {
   return true;
 }
 
-bool AudioEngine::playSoundFromFile(const char *filePath, float x, float y,
-                                    float z, float volume, float pitch,
-                                    bool loop, float minDistance,
-                                    float maxDistance) {
-  auto sound = createSound(filePath);
-  if (!sound) {
-    return false;
-  }
-  setSoundPosition(sound.get(), x, y, z);
-  setSoundSettings(sound.get(), volume, pitch, loop);
-  setSound3D(sound.get(), minDistance, maxDistance);
-  return playSound(std::move(sound));
-}
-
 void AudioEngine::cleanupFinishedSounds() {
-  for (size_t i = 0; i < m_activeSounds.size();) {
-    auto &sound = m_activeSounds[i];
+  for (auto i = m_activeSounds.begin(); i != m_activeSounds.end();) {
+    auto &sound = i->second;
 
     if (!ma_sound_is_playing(sound.get())) {
       ma_sound_uninit(sound.get());
-
-      m_activeSounds[i] = std::move(m_activeSounds.back());
-      m_activeSounds.pop_back();
+      m_activeSounds.erase(i);
     } else {
       ++i;
     }

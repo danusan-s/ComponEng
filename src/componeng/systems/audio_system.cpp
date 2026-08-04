@@ -48,8 +48,10 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
         if (audio.audioID == 0) {
           audio.audioID = assetManager.getAudioID(audio.audioName);
         }
-
-        if (!audio.playOnAwake || audio.isPlaying) {
+        if (audio.isPlaying && audio.is3D) {
+          audioEngine.updateSoundPosition(audio.audioID, transform.position.x,
+                                          transform.position.y,
+                                          transform.position.z);
           return;
         }
 
@@ -67,7 +69,7 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
         audioEngine.setSoundSettings(sound.get(), audio.volume, audio.pitch,
                                      audio.loop ? MA_TRUE : MA_FALSE);
 
-        if (audioEngine.playSound(std::move(sound))) {
+        if (audioEngine.playSound(audio.audioID, std::move(sound))) {
           audio.isPlaying = true;
         }
       });

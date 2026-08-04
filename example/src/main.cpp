@@ -55,11 +55,15 @@ public:
                                        .is3D = true,
                                        .minDistance = 1.0f,
                                        .maxDistance = 300.0f},
+                        RigidBodyComponent{.type = RigidBodyComponent::Dynamic,
+                                           .mass = 1.0f,
+                                           .restitution = 1.0f},
+                        ColliderComponent{.type = ColliderType::Box},
                         MaterialComponent{.materialName = "default_diffuse"},
                         ColorComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f)},
                         MeshComponent{.meshName = "cube"});
 
-    const int count = 100;
+    const int count = 0;
 
     for (int i = 0; i < count; ++i) {
       componeng::ecs::EntityID entity = world.createEntity();
