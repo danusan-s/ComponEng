@@ -48,6 +48,9 @@ static inline glm::mat4 DeserializeMat4(const std::vector<float> &data) {
 template <typename T> struct is_vec3 : std::false_type {};
 template <> struct is_vec3<glm::vec3> : std::true_type {};
 
+template <typename T> struct is_vec4 : std::false_type {};
+template <> struct is_vec4<glm::vec4> : std::true_type {};
+
 template <typename T> struct is_mat4 : std::false_type {};
 template <> struct is_mat4<glm::mat4> : std::true_type {};
 
@@ -70,6 +73,8 @@ void serialize_field(nlohmann::json &j, const char *name, const T &obj,
     j[name] = val.c_str();
   } else if constexpr (is_vec3<MT>::value) {
     j[name] = {val.x, val.y, val.z};
+  } else if constexpr (is_vec4<MT>::value) {
+    j[name] = {val.x, val.y, val.z, val.w};
   } else if constexpr (is_mat4<MT>::value) {
     j[name] = SerializeMat4(val);
   } else if constexpr (std::is_enum_v<MT>) {

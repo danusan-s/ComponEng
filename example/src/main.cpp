@@ -3,6 +3,7 @@
 #include "componeng/core/engine.hpp"
 #include "componeng/core/game.hpp"
 #include "componeng/core/transform_component.hpp"
+#include "componeng/ecs/scene_serializer.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/physics/collider_component.hpp"
 #include "componeng/physics/rigidbody_component.hpp"
@@ -34,7 +35,8 @@ public:
     world.registerSystem<CollisionSounds>(SystemGroup::Simulation);
 
     if (loadFromFile) {
-      world.loadScene(Utils::getAssetPath("assets/scenes/test_scene.json"));
+      SceneSerializer::load(
+          world, Utils::getAssetPath("assets/scenes/test_scene.json"));
       return;
     }
     std::default_random_engine generator;
@@ -138,7 +140,8 @@ public:
 
   void shutdown(World &world) override {
     if (saveToFile) {
-      world.saveScene(Utils::getAssetPath("assets/scenes/test_scene.json"));
+      SceneSerializer::save(
+          world, Utils::getAssetPath("assets/scenes/test_scene.json"));
     }
   }
 };

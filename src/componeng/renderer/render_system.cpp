@@ -107,7 +107,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     auto buf = renderDevice.createBuffer();
     buf->setData(flatInstanceData.data(),
                  flatInstanceData.size() * sizeof(float),
-                 api::IBuffer::Usage::Dynamic);
+                 api::IBuffer::Usage::Static);
 
     renderDevice.setupInstanceAttributes(*buf, material.getVertexLayout());
 

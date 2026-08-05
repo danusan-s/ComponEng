@@ -19,6 +19,8 @@
 
 namespace componeng::ecs {
 
+class SceneSerializer;
+
 /**
  * @brief Central ECS world that ties together all subsystems.
  *
@@ -28,6 +30,8 @@ namespace componeng::ecs {
  * SystemManager, and ThreadPool.
  */
 class World {
+  friend class SceneSerializer;
+
 private:
   ComponentRegistry m_componentRegistry;
   EntityManager m_entityManager;
@@ -60,9 +64,6 @@ public:
     inputState.previous_state = inputState.current_state;
     actionState.swapBuffers();
   }
-
-  void saveScene(const std::string &filename);
-  void loadScene(const std::string &filename);
 
   template <typename T> void registerComponent() {
     m_componentRegistry.registerComponent<T>();
