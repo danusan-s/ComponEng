@@ -2,7 +2,7 @@
 
 #include "componeng/core/types.hpp"
 
-namespace componeng::components {
+namespace componeng::renderer {
 
 struct DirectionalLightComponent {
   constexpr static const char *component_name = "DirectionalLightComponent";
@@ -20,4 +20,4 @@ struct PointLightComponent {
   float radius;
 };
 
-} // namespace componeng::components
+} // namespace componeng::renderer

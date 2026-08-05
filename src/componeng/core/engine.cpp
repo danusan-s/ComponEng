@@ -6,11 +6,8 @@
 #include "componeng/camera/camera_component.hpp"
 #include "componeng/camera/camera_system.hpp"
 #include "componeng/camera/main_camera.hpp"
-#include "componeng/components/light_component.hpp"
-#include "componeng/components/material_component.hpp"
-#include "componeng/components/mesh_component.hpp"
-#include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
+#include "componeng/core/transform_component.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/input/input_system.hpp"
 #include "componeng/physics/collider_component.hpp"
@@ -21,6 +18,9 @@
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 #include "componeng/renderer/batching/batching_system.hpp"
+#include "componeng/renderer/component/light_component.hpp"
+#include "componeng/renderer/component/material_component.hpp"
+#include "componeng/renderer/component/mesh_component.hpp"
 #include "componeng/renderer/culling/culling_system.hpp"
 #include "componeng/renderer/render_system.hpp"
 #include "componeng/utils/logger.hpp"
@@ -79,12 +79,12 @@ void Engine::init() {
 }
 
 void Engine::registerComponents() {
-  m_world.registerComponents<
-      components::TransformComponent, components::MeshComponent,
-      components::MaterialComponent, components::ColorComponent,
-      camera::CameraComponent, physics::RigidBodyComponent,
-      physics::ColliderComponent, audio::AudioComponent,
-      components::DirectionalLightComponent>();
+  m_world
+      .registerComponents<core::TransformComponent, renderer::MeshComponent,
+                          renderer::MaterialComponent, renderer::ColorComponent,
+                          camera::CameraComponent, physics::RigidBodyComponent,
+                          physics::ColliderComponent, audio::AudioComponent,
+                          renderer::DirectionalLightComponent>();
 }
 
 void Engine::registerSystems() {
@@ -112,9 +112,9 @@ void Engine::ensureDefaultCamera() {
   ecs::EntityID cameraEntity = m_world.createEntity();
   m_world.addComponents(
       cameraEntity,
-      components::TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
-                                     .rotation = Vec3(0.0f, 0.0f, 0.0f),
-                                     .scale = Vec3(1.0f)},
+      core::TransformComponent{.position = Vec3(0.0f, 5.0f, 0.0f),
+                               .rotation = Vec3(0.0f, 0.0f, 0.0f),
+                               .scale = Vec3(1.0f)},
       camera::CameraComponent{.fov = 45.0f,
                               .aspectRatio = 16.0f / 9.0f,
                               .nearPlane = 0.1f,

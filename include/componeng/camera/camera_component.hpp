@@ -1,7 +1,7 @@
 #pragma once
 
-#include "componeng/components/component_serializer.hpp"
 #include "componeng/core/types.hpp"
+#include "componeng/ecs/component_serializer.hpp"
 
 namespace componeng::camera {
 
@@ -17,7 +17,7 @@ struct CameraComponent {
 
 } // namespace componeng::camera
 
-namespace componeng::components {
+namespace componeng::ecs {
 
 #define CAMERA_COMPONENT_FIELDS(F, ctx)                                        \
   F(fov, ctx)                                                                  \
@@ -30,4 +30,4 @@ SERIALIZABLE_COMPONENT(camera::CameraComponent, CAMERA_COMPONENT_FIELDS)
 
 #undef CAMERA_COMPONENT_FIELDS
 
-} // namespace componeng::components
+} // namespace componeng::ecs

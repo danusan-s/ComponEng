@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/components/transform_component.hpp"
+#include "componeng/core/transform_component.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/physics/collider_component.hpp"
 
@@ -20,32 +20,30 @@ struct CollisionInfo {
  * @brief Computes the world-space transform of a collider given its local
  * transform and entity transform.
  */
-components::TransformComponent
-getWorldTransform(const components::TransformComponent &localTransform,
-                  const components::TransformComponent &parentTransform);
+core::TransformComponent
+getWorldTransform(const core::TransformComponent &localTransform,
+                  const core::TransformComponent &parentTransform);
 
 /**
  * @brief Tests two axis-aligned bounding boxes for overlap.
  * @return true if overlapping, with contact info filled into @p info.
  */
-bool testBoxBox(const components::TransformComponent &a,
-                const components::TransformComponent &b, CollisionInfo &info);
+bool testBoxBox(const core::TransformComponent &a,
+                const core::TransformComponent &b, CollisionInfo &info);
 
 /**
  * @brief Tests two spheres for overlap.
  * @return true if overlapping, with contact info filled into @p info.
  */
-bool testSphereSphere(const components::TransformComponent &a,
-                      const components::TransformComponent &b,
-                      CollisionInfo &info);
+bool testSphereSphere(const core::TransformComponent &a,
+                      const core::TransformComponent &b, CollisionInfo &info);
 
 /**
  * @brief Tests a Box and a sphere for overlap.
  * @return true if overlapping, with contact info filled into @p info.
  */
-bool testBoxSphere(const components::TransformComponent &box,
-                   const components::TransformComponent &sphere,
-                   CollisionInfo &info);
+bool testBoxSphere(const core::TransformComponent &box,
+                   const core::TransformComponent &sphere, CollisionInfo &info);
 
 /**
  * @brief Tests a sphere and a Box for overlap (reverse of testBoxSphere).
@@ -55,9 +53,8 @@ bool testBoxSphere(const components::TransformComponent &box,
  *
  * @return true if overlapping, with contact info filled into @p info.
  */
-bool testSphereBox(const components::TransformComponent &sphere,
-                   const components::TransformComponent &box,
-                   CollisionInfo &info);
+bool testSphereBox(const core::TransformComponent &sphere,
+                   const core::TransformComponent &box, CollisionInfo &info);
 
 /**
  * @brief Dispatches to the appropriate shape-pair test based on collider types.
@@ -66,9 +63,9 @@ bool testSphereBox(const components::TransformComponent &sphere,
  * Returns false for unsupported combinations.
  */
 bool testCollision(const ColliderComponent &colliderA,
-                   const components::TransformComponent &transformA,
+                   const core::TransformComponent &transformA,
                    const ColliderComponent &colliderB,
-                   const components::TransformComponent &transformB,
+                   const core::TransformComponent &transformB,
                    CollisionInfo &info);
 
 } // namespace componeng::physics

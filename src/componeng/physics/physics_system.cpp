@@ -1,6 +1,6 @@
 #include "componeng/physics/physics_system.hpp"
 
-#include "componeng/components/transform_component.hpp"
+#include "componeng/core/transform_component.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/events/collision_event.hpp"
@@ -16,7 +16,7 @@ namespace componeng::physics {
 
 struct EntityPhysicsData {
   ecs::EntityID entity;
-  components::TransformComponent *transform;
+  core::TransformComponent *transform;
   RigidBodyComponent *rigidbody;
   ColliderComponent *collider;
 };
@@ -105,8 +105,8 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
     g_accumulatedTime -= fixedTimeStep;
 
     ecs::ThreadPool &pool = state.world->threadPool();
-    state.world->query<components::TransformComponent, RigidBodyComponent>()
-        .eachParallel(pool, [&](components::TransformComponent &transform,
+    state.world->query<core::TransformComponent, RigidBodyComponent>()
+        .eachParallel(pool, [&](core::TransformComponent &transform,
                                 RigidBodyComponent &rigidbody) {
           if (rigidbody.type == RigidBodyComponent::Static)
             return;
@@ -119,18 +119,18 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
     std::vector<EntityPhysicsData> colliders;
 
     state.world
-        ->query<components::TransformComponent, RigidBodyComponent,
+        ->query<core::TransformComponent, RigidBodyComponent,
                 ColliderComponent>()
         .eachWithEntity(
-            [&](ecs::EntityID entity, components::TransformComponent &transform,
+            [&](ecs::EntityID entity, core::TransformComponent &transform,
                 RigidBodyComponent &rigidbody, ColliderComponent &collider) {
               colliders.push_back({entity, &transform, &rigidbody, &collider});
             });
 
-    state.world->query<components::TransformComponent, ColliderComponent>()
+    state.world->query<core::TransformComponent, ColliderComponent>()
         .exclude<RigidBodyComponent>()
         .eachWithEntity([&](ecs::EntityID entity,
-                            components::TransformComponent &transform,
+                            core::TransformComponent &transform,
                             ColliderComponent &collider) {
           colliders.push_back({entity, &transform, nullptr, &collider});
         });

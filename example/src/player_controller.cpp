@@ -1,7 +1,7 @@
 #include "player_controller.hpp"
 
 #include "componeng/camera/main_camera.hpp"
-#include "componeng/components/transform_component.hpp"
+#include "componeng/core/transform_component.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/input/action_state.hpp"
 #include "componeng/input/input_state.hpp"
@@ -13,7 +13,7 @@ static constexpr float DEFAULT_MOVE_SPEED = 100.0f;
 static constexpr float MOUSE_SENSITIVITY = 0.1f;
 static constexpr float PITCH_LIMIT = 89.0f;
 
-static void getCameraVectors(const components::TransformComponent &transform,
+static void getCameraVectors(const core::TransformComponent &transform,
                              core::Vec3 &front, core::Vec3 &right,
                              core::Vec3 &up) {
   float cosYaw = cos(core::radians(transform.rotation.y));
@@ -30,7 +30,7 @@ static void getCameraVectors(const components::TransformComponent &transform,
   up = normalize(cross(right, front));
 }
 
-static void processKeyboardInput(components::TransformComponent &transform,
+static void processKeyboardInput(core::TransformComponent &transform,
                                  input::ActionState &actions, float deltaTime,
                                  float speed) {
   float velocity = speed * deltaTime;
@@ -56,7 +56,7 @@ static void processKeyboardInput(components::TransformComponent &transform,
         transform.position - core::Vec3(0.0f, 1.0f, 0.0f) * velocity;
 }
 
-static void processMouseInput(components::TransformComponent &transform,
+static void processMouseInput(core::TransformComponent &transform,
                               input::InputState &input, float sensitivity) {
   transform.rotation.y += input.getMouseDeltaX() * sensitivity;
   transform.rotation.x -= input.getMouseDeltaY() * sensitivity;
@@ -77,9 +77,8 @@ void PlayerController::onUpdate(const componeng::ecs::SystemState &state) {
   ecs::EntityID mainCameraEntity =
       state.world->getResource<camera::MainCamera>().entity;
 
-  components::TransformComponent &transform =
-      state.world->getComponent<components::TransformComponent>(
-          mainCameraEntity);
+  core::TransformComponent &transform =
+      state.world->getComponent<core::TransformComponent>(mainCameraEntity);
 
   processKeyboardInput(transform, actions, state.deltaTime, DEFAULT_MOVE_SPEED);
 

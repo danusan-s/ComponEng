@@ -2,8 +2,8 @@
 
 #include "componeng/camera/camera_component.hpp"
 #include "componeng/camera/main_camera.hpp"
-#include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
+#include "componeng/core/transform_component.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/world.hpp"
 #include <GLFW/glfw3.h>
@@ -12,7 +12,7 @@
 
 namespace componeng::camera {
 
-static void updateCameraVectors(const components::TransformComponent &transform,
+static void updateCameraVectors(const core::TransformComponent &transform,
                                 core::Vec3 &front, core::Vec3 &right,
                                 core::Vec3 &up) {
   float cosYaw = cos(core::radians(transform.rotation.y));
@@ -33,9 +33,8 @@ void CameraSystem::onUpdate(const ecs::SystemState &state) {
   ecs::EntityID mainCameraEntity =
       state.world->getResource<MainCamera>().entity;
 
-  components::TransformComponent &transform =
-      state.world->getComponent<components::TransformComponent>(
-          mainCameraEntity);
+  core::TransformComponent &transform =
+      state.world->getComponent<core::TransformComponent>(mainCameraEntity);
 
   CameraComponent &camera =
       state.world->getComponent<CameraComponent>(mainCameraEntity);

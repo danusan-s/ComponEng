@@ -1,7 +1,7 @@
 #pragma once
 
-#include "componeng/components/component_serializer.hpp"
-#include "componeng/components/transform_component.hpp"
+#include "componeng/core/transform_component.hpp"
+#include "componeng/ecs/component_serializer.hpp"
 
 namespace componeng::physics {
 
@@ -11,13 +11,13 @@ struct ColliderComponent {
   static constexpr const char *component_name = "ColliderComponent";
 
   ColliderType type = ColliderType::Box;
-  components::TransformComponent transform;
+  core::TransformComponent transform;
   bool isTrigger = false;
 };
 
 } // namespace componeng::physics
 
-namespace componeng::components {
+namespace componeng::ecs {
 
 #define COLLIDER_COMPONENT_FIELDS(F, ctx)                                      \
   F(type, ctx)                                                                 \
@@ -28,4 +28,4 @@ SERIALIZABLE_COMPONENT(physics::ColliderComponent, COLLIDER_COMPONENT_FIELDS)
 
 #undef COLLIDER_COMPONENT_FIELDS
 
-} // namespace componeng::components
+} // namespace componeng::ecs

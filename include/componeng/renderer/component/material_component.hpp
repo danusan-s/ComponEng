@@ -1,9 +1,9 @@
 #pragma once
 
-#include "componeng/components/component_serializer.hpp"
 #include "componeng/core/types.hpp"
+#include "componeng/ecs/component_serializer.hpp"
 
-namespace componeng::components {
+namespace componeng::renderer {
 
 struct MaterialComponent {
   static constexpr const char *component_name = "MaterialComponent";
@@ -16,22 +16,26 @@ struct MaterialComponent {
   core::HandleID shaderID = 0;
 };
 
-#define MATERIAL_COMPONENT_FIELDS(F, ctx) F(materialName, ctx)
-
-SERIALIZABLE_COMPONENT(MaterialComponent, MATERIAL_COMPONENT_FIELDS)
-
-#undef MATERIAL_COMPONENT_FIELDS
-
 struct ColorComponent {
   static constexpr const char *component_name = "ColorComponent";
 
   core::Vec4 color;
 };
 
+} // namespace componeng::renderer
+
+namespace componeng::ecs {
+
+#define MATERIAL_COMPONENT_FIELDS(F, ctx) F(materialName, ctx)
+
+SERIALIZABLE_COMPONENT(renderer::MaterialComponent, MATERIAL_COMPONENT_FIELDS)
+
+#undef MATERIAL_COMPONENT_FIELDS
+
 #define COLOR_COMPONENT_FIELDS(F, ctx) F(color, ctx)
 
-SERIALIZABLE_COMPONENT(ColorComponent, COLOR_COMPONENT_FIELDS)
+SERIALIZABLE_COMPONENT(renderer::ColorComponent, COLOR_COMPONENT_FIELDS)
 
 #undef COLOR_COMPONENT_FIELDS
 
-} // namespace componeng::components
+} // namespace componeng::ecs

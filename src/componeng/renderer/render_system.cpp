@@ -2,11 +2,8 @@
 
 #include "componeng/camera/camera_component.hpp"
 #include "componeng/camera/main_camera.hpp"
-#include "componeng/components/light_component.hpp"
-#include "componeng/components/material_component.hpp"
-#include "componeng/components/mesh_component.hpp"
-#include "componeng/components/transform_component.hpp"
 #include "componeng/core/debug_ui.hpp"
+#include "componeng/core/transform_component.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
@@ -14,6 +11,9 @@
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
+#include "componeng/renderer/component/light_component.hpp"
+#include "componeng/renderer/component/material_component.hpp"
+#include "componeng/renderer/component/mesh_component.hpp"
 
 namespace componeng::renderer {
 
@@ -51,7 +51,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
       state.world->getResource<camera::MainCamera>().entity;
 
   core::Vec3 &cameraPos =
-      state.world->getComponent<components::TransformComponent>(mainCameraID)
+      state.world->getComponent<core::TransformComponent>(mainCameraID)
           .position;
   core::Mat4 &viewProj =
       state.world->getComponent<camera::CameraComponent>(mainCameraID)
@@ -62,8 +62,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   core::Vec3 lightDir = DEFAULT_LIGHT_DIR;
   core::Vec3 lightColor = DEFAULT_LIGHT_COLOR;
 
-  state.world->query<components::DirectionalLightComponent>().each(
-      [&](components::DirectionalLightComponent &l) {
+  state.world->query<renderer::DirectionalLightComponent>().each(
+      [&](renderer::DirectionalLightComponent &l) {
         lightDir = l.direction;
         lightColor = l.color;
       });

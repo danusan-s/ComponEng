@@ -1,7 +1,7 @@
 #pragma once
 
-#include "componeng/components/material_component.hpp"
-#include "componeng/components/transform_component.hpp"
+#include "componeng/core/transform_component.hpp"
+#include "componeng/renderer/component/material_component.hpp"
 #include "material.hpp"
 
 namespace componeng::renderer {
@@ -16,7 +16,7 @@ public:
                                      ecs::EntityID entity) const override {
     core::UniformMap instanceData;
     const auto &transform =
-        world.getComponent<components::TransformComponent>(entity);
+        world.getComponent<core::TransformComponent>(entity);
     core::Mat4 modelMatrix = core::Mat4(1.0f);
     modelMatrix = translate(modelMatrix, transform.position);
     modelMatrix =
@@ -29,8 +29,8 @@ public:
 
     instanceData["instanceModel"] = modelMatrix;
     instanceData["instanceColor"] =
-        world.hasComponent<components::ColorComponent>(entity)
-            ? world.getComponent<components::ColorComponent>(entity).color
+        world.hasComponent<renderer::ColorComponent>(entity)
+            ? world.getComponent<renderer::ColorComponent>(entity).color
             : core::Vec4(1.0f);
 
     return instanceData;

@@ -1,4 +1,5 @@
 -std=c++17
 -Iinclude
--Iinclude/imgui
+-Iinclude/third_party
+-Iinclude/third_party/imgui
 -lglfw

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/components/component_serializer.hpp"
+#include "componeng/ecs/component_serializer.hpp"
 #include "entity.hpp"
 
 #include <array>
@@ -84,16 +84,16 @@ public:
       };
     }
     // Store serializer and deserializer if specialization exists for this type.
-    if constexpr (std::is_base_of_v<components::ComponentSerializer<T>,
-                                    components::ComponentSerializer<T>>) {
+    if constexpr (std::is_base_of_v<ComponentSerializer<T>,
+                                    ComponentSerializer<T>>) {
       m_componentInfos[id].serializer =
           [](const void *componentPtr) -> nlohmann::json {
         const T &component = *static_cast<const T *>(componentPtr);
-        return components::ComponentSerializer<T>::serialize(component);
+        return ComponentSerializer<T>::serialize(component);
       };
       m_componentInfos[id].deserializer =
           [](const nlohmann::json &json) -> void * {
-        T component = components::ComponentSerializer<T>::deserialize(json);
+        T component = ComponentSerializer<T>::deserialize(json);
         return new T(std::move(component));
       };
     }

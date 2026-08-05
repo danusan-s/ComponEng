@@ -2,7 +2,7 @@
 
 #include "componeng/audio/audio_component.hpp"
 #include "componeng/camera/main_camera.hpp"
-#include "componeng/components/transform_component.hpp"
+#include "componeng/core/transform_component.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset_manager.hpp"
@@ -16,10 +16,10 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
   auto &audioEngine = state.world->getResource<AudioEngine>();
 
   auto &mainCamera = state.world->getResource<camera::MainCamera>();
-  if (state.world->hasComponent<componeng::components::TransformComponent>(
+  if (state.world->hasComponent<componeng::core::TransformComponent>(
           mainCamera.entity)) {
     auto &camTransform =
-        state.world->getComponent<componeng::components::TransformComponent>(
+        state.world->getComponent<componeng::core::TransformComponent>(
             mainCamera.entity);
     audioEngine.setListenerPosition(camTransform.position.x,
                                     camTransform.position.y,
@@ -40,8 +40,8 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
                                        up.z);
   }
 
-  state.world->query<AudioComponent, components::TransformComponent>().each(
-      [&](AudioComponent &audio, components::TransformComponent &transform) {
+  state.world->query<AudioComponent, core::TransformComponent>().each(
+      [&](AudioComponent &audio, core::TransformComponent &transform) {
         if (audio.audioID == 0) {
           audio.audioID = assetManager.getAudioID(audio.audioName);
         }

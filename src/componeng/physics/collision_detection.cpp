@@ -1,24 +1,24 @@
 #include "componeng/physics/collision_detection.hpp"
 
-#include "componeng/components/transform_component.hpp"
+#include "componeng/core/transform_component.hpp"
 
 #include <algorithm>
 #include <cmath>
 
 namespace componeng::physics {
 
-components::TransformComponent
-getWorldTransform(const components::TransformComponent &localTransform,
-                  const components::TransformComponent &parentTransform) {
-  components::TransformComponent worldTransform;
+core::TransformComponent
+getWorldTransform(const core::TransformComponent &localTransform,
+                  const core::TransformComponent &parentTransform) {
+  core::TransformComponent worldTransform;
   worldTransform.position = parentTransform.position + localTransform.position;
   worldTransform.rotation = parentTransform.rotation + localTransform.rotation;
   worldTransform.scale = parentTransform.scale * localTransform.scale;
   return worldTransform;
 }
 
-bool testBoxBox(const components::TransformComponent &a,
-                const components::TransformComponent &b, CollisionInfo &info) {
+bool testBoxBox(const core::TransformComponent &a,
+                const core::TransformComponent &b, CollisionInfo &info) {
   core::Vec3 diff = b.position - a.position;
   core::Vec3 halfExtentsA = a.scale;
   core::Vec3 halfExtentsB = b.scale;
@@ -49,9 +49,8 @@ bool testBoxBox(const components::TransformComponent &a,
   return true;
 }
 
-bool testSphereSphere(const components::TransformComponent &a,
-                      const components::TransformComponent &b,
-                      CollisionInfo &info) {
+bool testSphereSphere(const core::TransformComponent &a,
+                      const core::TransformComponent &b, CollisionInfo &info) {
   core::Vec3 delta = b.position - a.position;
   float distance = length(delta);
 
@@ -71,9 +70,8 @@ bool testSphereSphere(const components::TransformComponent &a,
   return true;
 }
 
-bool testBoxSphere(const components::TransformComponent &a,
-                   const components::TransformComponent &b,
-                   CollisionInfo &info) {
+bool testBoxSphere(const core::TransformComponent &a,
+                   const core::TransformComponent &b, CollisionInfo &info) {
   core::Vec3 centerA = a.position;
   core::Vec3 sphereCenter = b.position;
 
@@ -123,22 +121,21 @@ bool testBoxSphere(const components::TransformComponent &a,
   return true;
 }
 
-bool testSphereBox(const components::TransformComponent &a,
-                   const components::TransformComponent &b,
-                   CollisionInfo &info) {
+bool testSphereBox(const core::TransformComponent &a,
+                   const core::TransformComponent &b, CollisionInfo &info) {
   bool res = testBoxSphere(b, a, info);
   info.normal = -info.normal;
   return res;
 }
 
 bool testCollision(const ColliderComponent &colliderA,
-                   const components::TransformComponent &localTransformA,
+                   const core::TransformComponent &localTransformA,
                    const ColliderComponent &colliderB,
-                   const components::TransformComponent &localTransformB,
+                   const core::TransformComponent &localTransformB,
                    CollisionInfo &info) {
-  const components::TransformComponent worldTransformA =
+  const core::TransformComponent worldTransformA =
       getWorldTransform(colliderA.transform, localTransformA);
-  const components::TransformComponent worldTransformB =
+  const core::TransformComponent worldTransformB =
       getWorldTransform(colliderB.transform, localTransformB);
 
   if (colliderA.type == ColliderType::Box &&

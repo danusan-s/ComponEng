@@ -1,18 +1,18 @@
 #include "componeng/audio/audio_component.hpp"
-#include "componeng/components/material_component.hpp"
-#include "componeng/components/mesh_component.hpp"
-#include "componeng/components/transform_component.hpp"
+#include "componeng/core/transform_component.hpp"
 #include "componeng/ecs/archetype/archetype.hpp"
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
+#include "componeng/renderer/component/material_component.hpp"
+#include "componeng/renderer/component/mesh_component.hpp"
 #include "gtest/gtest.h"
 
 #include <cstring>
 
 using namespace componeng::audio;
-using namespace componeng::components;
 using namespace componeng::core;
 using namespace componeng::ecs;
+using namespace componeng::renderer;
 
 template <typename T> ComponentID reg(ComponentRegistry &r) {
   return r.registerComponent<T>();

@@ -10,7 +10,7 @@
 #include <string>
 #include <type_traits>
 
-namespace componeng::components {
+namespace componeng::ecs {
 
 template <typename T> struct ComponentSerializer {
   static nlohmann::json serialize(const T &component) {
@@ -122,12 +122,12 @@ void deserialize_field(const nlohmann::json &j, const char *name, T &obj,
 // Type and default are deduced from pointer-to-member and member initializers.
 
 #define SERIALIZE_FIELD(name, ctx)                                             \
-  ::componeng::components::serialize_field(                                    \
-      j, #name, ctx, &std::decay_t<decltype(ctx)>::name);
+  ::componeng::ecs::serialize_field(j, #name, ctx,                             \
+                                    &std::decay_t<decltype(ctx)>::name);
 
 #define DESERIALIZE_FIELD(name, ctx)                                           \
-  ::componeng::components::deserialize_field(                                  \
-      j, #name, ctx, &std::decay_t<decltype(ctx)>::name);
+  ::componeng::ecs::deserialize_field(j, #name, ctx,                           \
+                                      &std::decay_t<decltype(ctx)>::name);
 
 #define SERIALIZABLE_COMPONENT(Type, Fields)                                   \
   template <> struct ComponentSerializer<Type> {                               \
@@ -141,4 +141,4 @@ void deserialize_field(const nlohmann::json &j, const char *name, T &obj,
     }                                                                          \
   };
 
-} // namespace componeng::components
+} // namespace componeng::ecs

@@ -30,8 +30,8 @@ file(GLOB ENGINE_SOURCES
     "src/componeng/physics/*.cpp"
     "src/componeng/ecs/*.cpp"
     "src/componeng/utils/*.cpp"
-    "src/glad/*.c"
-    "src/imgui/*.cpp"
+    "src/third_party/glad/*.c"
+    "src/third_party/imgui/*.cpp"
 )
 
 # Remove main.cpp if it exists in src/
@@ -44,7 +44,8 @@ add_library(ComponEng STATIC ${ENGINE_SOURCES})
 target_include_directories(ComponEng
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/imgui
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/third_party
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/third_party/imgui
 )
 
 # GLM experimental

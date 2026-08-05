@@ -1,9 +1,9 @@
 #pragma once
 
-#include "componeng/components/component_serializer.hpp"
-#include "componeng/renderer/asset_manager.hpp"
+#include "componeng/core/types.hpp"
+#include "componeng/ecs/component_serializer.hpp"
 
-namespace componeng::components {
+namespace componeng::renderer {
 
 struct MeshComponent {
   static constexpr const char *component_name = "MeshComponent";
@@ -15,10 +15,14 @@ struct MeshComponent {
   bool visible = true;
 };
 
+} // namespace componeng::renderer
+
+namespace componeng::ecs {
+
 #define MESH_COMPONENT_FIELDS(F, ctx) F(meshName, ctx)
 
-SERIALIZABLE_COMPONENT(MeshComponent, MESH_COMPONENT_FIELDS)
+SERIALIZABLE_COMPONENT(renderer::MeshComponent, MESH_COMPONENT_FIELDS)
 
 #undef MESH_COMPONENT_FIELDS
 
-} // namespace componeng::components
+} // namespace componeng::ecs

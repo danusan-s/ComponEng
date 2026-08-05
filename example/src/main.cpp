@@ -1,21 +1,20 @@
 #include "collision_sounds.hpp"
 #include "componeng/audio/audio_component.hpp"
-#include "componeng/components/material_component.hpp"
-#include "componeng/components/mesh_component.hpp"
-#include "componeng/components/transform_component.hpp"
 #include "componeng/core/engine.hpp"
 #include "componeng/core/game.hpp"
+#include "componeng/core/transform_component.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/physics/collider_component.hpp"
 #include "componeng/physics/rigidbody_component.hpp"
 #include "componeng/renderer/asset_manager.hpp"
+#include "componeng/renderer/component/material_component.hpp"
+#include "componeng/renderer/component/mesh_component.hpp"
 #include "componeng/utils/utils.hpp"
 #include "player_controller.hpp"
 
 #include <random>
 
 using namespace componeng::core;
-using namespace componeng::components;
 using namespace componeng::audio;
 using namespace componeng::physics;
 using namespace componeng::ecs;
@@ -72,8 +71,8 @@ public:
 
       float scale = randScale(generator);
       world.addComponents(
-          entity, componeng::components::MeshComponent{.meshName = "cube"},
-          componeng::components::TransformComponent{
+          entity, componeng::renderer::MeshComponent{.meshName = "cube"},
+          componeng::core::TransformComponent{
               .position = Vec3(randPosition(generator), randPosition(generator),
                                randPosition(generator)),
               .rotation = Vec3(0.0f),
