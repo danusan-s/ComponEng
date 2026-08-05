@@ -10,15 +10,15 @@
 
 void CollisionSounds::onUpdate(const componeng::ecs::SystemState &state) {
   auto &collisionEvents =
-      state.world->get_events<componeng::events::CollisionEvent>();
+      state.world->getEvents<componeng::events::CollisionEvent>();
   auto &assetManager =
-      state.world->get_resource<componeng::renderer::AssetManager>();
+      state.world->getResource<componeng::renderer::AssetManager>();
   auto &audioEngine =
-      state.world->get_resource<componeng::audio::AudioEngine>();
+      state.world->getResource<componeng::audio::AudioEngine>();
 
   auto soundPath = assetManager.getAudio(assetManager.getAudioID("boop"));
 
-  auto &mainCamera = state.world->get_resource<componeng::camera::MainCamera>();
+  auto &mainCamera = state.world->getResource<componeng::camera::MainCamera>();
   if (state.world->hasComponent<componeng::components::TransformComponent>(
           mainCamera.entity)) {
     auto &camTransform =

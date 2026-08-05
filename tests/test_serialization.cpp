@@ -2,7 +2,7 @@
 #include "componeng/components/material_component.hpp"
 #include "componeng/components/mesh_component.hpp"
 #include "componeng/components/transform_component.hpp"
-#include "componeng/ecs/archetype.hpp"
+#include "componeng/ecs/archetype/archetype.hpp"
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "gtest/gtest.h"

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "componeng/ecs/archetype.hpp"
-#include "componeng/ecs/archetype_manager.hpp"
+#include "componeng/ecs/archetype/archetype.hpp"
+#include "componeng/ecs/archetype/archetype_manager.hpp"
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/entity_manager.hpp"
@@ -55,8 +55,8 @@ public:
   void *getWindowHandle() const;
 
   void swapInputBuffers() {
-    auto &inputState = get_resource<input::InputState>();
-    auto &actionState = get_resource<input::ActionState>();
+    auto &inputState = getResource<input::InputState>();
+    auto &actionState = getResource<input::ActionState>();
     inputState.previous_state = inputState.current_state;
     actionState.swapBuffers();
   }
@@ -227,23 +227,23 @@ public:
     return record.signature.test(componentID);
   }
 
-  template <typename T> void set_resource(T &&value) {
+  template <typename T> void setResource(T &&value) {
     m_resourceManager.set<T>(std::forward<T>(value));
   }
 
-  template <typename T> T &get_resource() {
+  template <typename T> T &getResource() {
     return m_resourceManager.get<T>();
   }
 
-  template <typename T> bool has_resource() {
+  template <typename T> bool hasResource() {
     return m_resourceManager.contains<T>();
   }
 
-  template <typename T> void emit_event(const T &event) {
+  template <typename T> void emitEvent(const T &event) {
     m_eventBus.emit<T>(event);
   }
 
-  template <typename T> const std::vector<T> &get_events() {
+  template <typename T> const std::vector<T> &getEvents() {
     return m_eventBus.getEvents<T>();
   }
 

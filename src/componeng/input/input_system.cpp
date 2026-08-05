@@ -18,8 +18,8 @@ constexpr auto ATTACK_KEY = GLFW_MOUSE_BUTTON_LEFT;
 constexpr auto AIM_KEY = GLFW_MOUSE_BUTTON_RIGHT;
 
 void InputSystem::onUpdate(const ecs::SystemState &state) {
-  auto &inputState = state.world->get_resource<InputState>();
-  auto &actionState = state.world->get_resource<ActionState>();
+  auto &inputState = state.world->getResource<InputState>();
+  auto &actionState = state.world->getResource<ActionState>();
 
   actionState.current[(size_t)Action::MoveForward] =
       inputState.isKeyDown(FORWARD_KEY);

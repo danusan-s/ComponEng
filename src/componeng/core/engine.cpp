@@ -33,7 +33,7 @@ void Engine::init() {
 
   std::unique_ptr<renderer::api::IRenderDevice> renderDevice =
       std::make_unique<renderer::opengl::GLRenderDevice>();
-  m_world.set_resource<std::unique_ptr<renderer::api::IRenderDevice>>(
+  m_world.setResource<std::unique_ptr<renderer::api::IRenderDevice>>(
       std::move(renderDevice));
 
   m_window.init(1280, 720, "ECS Game");
@@ -43,14 +43,14 @@ void Engine::init() {
 
   DebugUI::init();
 
-  m_world.set_resource<audio::AudioEngine>(audio::AudioEngine());
-  auto &audioEngine = m_world.get_resource<audio::AudioEngine>();
+  m_world.setResource<audio::AudioEngine>(audio::AudioEngine());
+  auto &audioEngine = m_world.getResource<audio::AudioEngine>();
   audioEngine.init();
 
   LOG_INFO("Initialized audio engine");
 
-  m_world.set_resource<renderer::AssetManager>(renderer::AssetManager());
-  auto &assetManager = m_world.get_resource<renderer::AssetManager>();
+  m_world.setResource<renderer::AssetManager>(renderer::AssetManager());
+  auto &assetManager = m_world.getResource<renderer::AssetManager>();
 
   LOG_INFO("Loading built-in assets...");
 
@@ -105,7 +105,7 @@ void Engine::registerSystems() {
 }
 
 void Engine::ensureDefaultCamera() {
-  if (m_world.has_resource<camera::MainCamera>()) {
+  if (m_world.hasResource<camera::MainCamera>()) {
     return;
   }
 
@@ -120,7 +120,7 @@ void Engine::ensureDefaultCamera() {
                               .nearPlane = 0.1f,
                               .farPlane = 10000.0f});
 
-  m_world.set_resource(camera::MainCamera{.entity = cameraEntity});
+  m_world.setResource(camera::MainCamera{.entity = cameraEntity});
 }
 
 void Engine::run(IGame &game) {
@@ -173,8 +173,8 @@ void Engine::run(IGame &game) {
 
 void Engine::shutdown() {
   DebugUI::shutdown();
-  auto &assetManager = m_world.get_resource<renderer::AssetManager>();
-  auto &audioEngine = m_world.get_resource<audio::AudioEngine>();
+  auto &assetManager = m_world.getResource<renderer::AssetManager>();
+  auto &audioEngine = m_world.getResource<audio::AudioEngine>();
   assetManager.clear();
   audioEngine.shutdown();
   m_window.shutdown();

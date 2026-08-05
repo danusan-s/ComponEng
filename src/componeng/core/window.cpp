@@ -42,7 +42,7 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
     } else {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
       g_mouseLocked = true;
-      auto &state = engine->m_world.get_resource<input::InputState>();
+      auto &state = engine->m_world.getResource<input::InputState>();
       state.previous_state.mouseX = state.current_state.mouseX;
       state.previous_state.mouseY = state.current_state.mouseY;
     }
@@ -52,7 +52,7 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
     return;
 
   input::RawInputState &inputState =
-      engine->m_world.get_resource<input::InputState>().current_state;
+      engine->m_world.getResource<input::InputState>().current_state;
 
   if (key >= 0 && key < 1024) {
     if (action == GLFW_PRESS) {
@@ -73,7 +73,7 @@ static void mouseButtonCallback(GLFWwindow *window, int button, int action,
     return;
 
   input::RawInputState &inputState =
-      engine->m_world.get_resource<input::InputState>().current_state;
+      engine->m_world.getResource<input::InputState>().current_state;
 
   if (!g_mouseLocked)
     return;
@@ -93,7 +93,7 @@ static void cursorPosCallback(GLFWwindow *window, double xposIn,
     return;
 
   input::RawInputState &inputState =
-      engine->m_world.get_resource<input::InputState>().current_state;
+      engine->m_world.getResource<input::InputState>().current_state;
 
   float xpos = static_cast<float>(xposIn);
   float ypos = static_cast<float>(yposIn);

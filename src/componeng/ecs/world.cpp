@@ -12,9 +12,9 @@
 namespace componeng::ecs {
 
 void World::init() {
-  set_resource(input::InputState());
-  set_resource(input::ActionState());
-  set_resource(physics::PhysicsConfig());
+  setResource(input::InputState());
+  setResource(input::ActionState());
+  setResource(physics::PhysicsConfig());
   time = 0.0f;
 }
 
@@ -60,7 +60,7 @@ void *World::getWindowHandle() const {
 }
 
 renderer::api::IRenderDevice &World::getRenderDevice() {
-  return *get_resource<std::unique_ptr<renderer::api::IRenderDevice>>().get();
+  return *getResource<std::unique_ptr<renderer::api::IRenderDevice>>().get();
 }
 
 void World::saveScene(const std::string &filename) {
@@ -97,8 +97,8 @@ void World::saveScene(const std::string &filename) {
         entityJson[info.name] = info.serializer(componentPtr);
       }
 
-      if (has_resource<camera::MainCamera>() &&
-          entity == get_resource<camera::MainCamera>().entity) {
+      if (hasResource<camera::MainCamera>() &&
+          entity == getResource<camera::MainCamera>().entity) {
         entityJson["_isMainCamera"] = true;
       }
 
@@ -177,7 +177,7 @@ void World::loadScene(const std::string &filename) {
   }
 
   if (mainCameraEntity != ecs::INVALID_ENTITY) {
-    set_resource(camera::MainCamera{mainCameraEntity});
+    setResource(camera::MainCamera{mainCameraEntity});
     LOG_INFO("Main camera set to entity %d",
              (unsigned long long)mainCameraEntity);
   }

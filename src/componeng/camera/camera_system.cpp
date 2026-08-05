@@ -31,7 +31,7 @@ static void updateCameraVectors(const components::TransformComponent &transform,
 
 void CameraSystem::onUpdate(const ecs::SystemState &state) {
   ecs::EntityID mainCameraEntity =
-      state.world->get_resource<MainCamera>().entity;
+      state.world->getResource<MainCamera>().entity;
 
   components::TransformComponent &transform =
       state.world->getComponent<components::TransformComponent>(

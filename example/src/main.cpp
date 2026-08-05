@@ -28,7 +28,7 @@ bool saveToFile = true;
 class Game : public IGame {
 public:
   void init(World &world) override {
-    auto &assetManager = world.get_resource<AssetManager>();
+    auto &assetManager = world.getResource<AssetManager>();
     assetManager.loadAudio(Utils::getAssetPath("assets/audio/boop.wav").c_str(),
                            "boop");
     world.registerSystem<PlayerController>(SystemGroup::Simulation);

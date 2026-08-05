@@ -97,7 +97,7 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
 void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
   g_accumulatedTime += state.deltaTime;
 
-  const auto &physicsConfig = state.world->get_resource<PhysicsConfig>();
+  const auto &physicsConfig = state.world->getResource<PhysicsConfig>();
   const float fixedTimeStep = physicsConfig.fixedTimeStep;
   core::Vec3 g_gravity = physicsConfig.gravity;
 
@@ -176,7 +176,7 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
         resolveCollision(colliders[pair.indexA], colliders[pair.indexB],
                          pair.info);
 
-        state.world->emit_event<events::CollisionEvent>(
+        state.world->emitEvent<events::CollisionEvent>(
             {.entityA = colliders[pair.indexA].entity,
              .entityB = colliders[pair.indexB].entity,
              .info = pair.info});

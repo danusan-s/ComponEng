@@ -69,13 +69,13 @@ static void processMouseInput(components::TransformComponent &transform,
 
 void PlayerController::onUpdate(const componeng::ecs::SystemState &state) {
   componeng::input::InputState &input =
-      state.world->get_resource<input::InputState>();
+      state.world->getResource<input::InputState>();
 
   componeng::input::ActionState &actions =
-      state.world->get_resource<input::ActionState>();
+      state.world->getResource<input::ActionState>();
 
   ecs::EntityID mainCameraEntity =
-      state.world->get_resource<camera::MainCamera>().entity;
+      state.world->getResource<camera::MainCamera>().entity;
 
   components::TransformComponent &transform =
       state.world->getComponent<components::TransformComponent>(

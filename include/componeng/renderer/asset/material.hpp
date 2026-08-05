@@ -17,6 +17,8 @@ public:
       : m_shaderID(shaderID), m_textureID(textureID) {
   }
 
+  virtual ~IMaterial() = default;
+
   core::HandleID getShaderID() const {
     return m_shaderID;
   }

@@ -14,7 +14,7 @@ namespace componeng::renderer {
 
 void CullingSystem::onUpdate(const ecs::SystemState &state) {
   ecs::EntityID mainCameraID =
-      state.world->get_resource<camera::MainCamera>().entity;
+      state.world->getResource<camera::MainCamera>().entity;
 
   core::Vec3 &cameraPos =
       state.world->getComponent<components::TransformComponent>(mainCameraID)

@@ -48,7 +48,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   renderDevice.clear(0.0f, 0.0f, 0.0f, 1.0f);
 
   ecs::EntityID mainCameraID =
-      state.world->get_resource<camera::MainCamera>().entity;
+      state.world->getResource<camera::MainCamera>().entity;
 
   core::Vec3 &cameraPos =
       state.world->getComponent<components::TransformComponent>(mainCameraID)
@@ -69,7 +69,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
       });
 
   int instancesRendered = 0;
-  auto &renderQueue = state.world->get_resource<RenderQueue>();
+  auto &renderQueue = state.world->getResource<RenderQueue>();
 
   for (const auto &batch : renderQueue.getBatches()) {
     const core::HandleID meshID = batch.meshID;
@@ -77,7 +77,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     const auto &data = batch;
     const api::VertexLayout &layout = data.vertexLayout;
 
-    const auto &assetManager = state.world->get_resource<AssetManager>();
+    const auto &assetManager = state.world->getResource<AssetManager>();
 
     auto &material = assetManager.getMaterial(materialID);
     const Mesh &model = assetManager.getMesh(meshID);

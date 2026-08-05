@@ -28,12 +28,12 @@ getModelMatrix(const components::TransformComponent &transform) {
 
 void BatchingSystem::onCreate(const ecs::SystemState &state) {
   m_batches = std::make_unique<BatchMap>();
-  state.world->set_resource(RenderQueue());
+  state.world->setResource(RenderQueue());
 }
 
 void BatchingSystem::onUpdate(const ecs::SystemState &state) {
   ecs::EntityID mainCameraID =
-      state.world->get_resource<camera::MainCamera>().entity;
+      state.world->getResource<camera::MainCamera>().entity;
 
   core::Vec3 &cameraPos =
       state.world->getComponent<components::TransformComponent>(mainCameraID)
@@ -41,7 +41,7 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
   core::Mat4 &viewProj =
       state.world->getComponent<camera::CameraComponent>(mainCameraID)
           .viewProjectionMatrix;
-  const AssetManager &assetManager = state.world->get_resource<AssetManager>();
+  const AssetManager &assetManager = state.world->getResource<AssetManager>();
 
   int drawCalls = 0;
 
@@ -71,7 +71,7 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
           m_batches->add(m.meshID, mat.materialID, ecs::EntityID{entity});
       });
 
-  auto &renderQueue = state.world->get_resource<RenderQueue>();
+  auto &renderQueue = state.world->getResource<RenderQueue>();
 
   for (const auto &[key, entities] : m_batches->getMap()) {
     RenderBatch batch;

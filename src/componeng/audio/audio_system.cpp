@@ -12,10 +12,10 @@
 namespace componeng::audio {
 
 void AudioSystem::onUpdate(const ecs::SystemState &state) {
-  auto &assetManager = state.world->get_resource<renderer::AssetManager>();
-  auto &audioEngine = state.world->get_resource<AudioEngine>();
+  auto &assetManager = state.world->getResource<renderer::AssetManager>();
+  auto &audioEngine = state.world->getResource<AudioEngine>();
 
-  auto &mainCamera = state.world->get_resource<camera::MainCamera>();
+  auto &mainCamera = state.world->getResource<camera::MainCamera>();
   if (state.world->hasComponent<componeng::components::TransformComponent>(
           mainCamera.entity)) {
     auto &camTransform =

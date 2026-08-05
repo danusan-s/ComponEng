@@ -1,4 +1,4 @@
-#include "componeng/ecs/archetype.hpp"
+#include "componeng/ecs/archetype/archetype.hpp"
 #include <gtest/gtest.h>
 
 struct Pos {

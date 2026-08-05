@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/ecs/archetype.hpp"
+#include "componeng/ecs/archetype/archetype.hpp"
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/thread_pool.hpp"
