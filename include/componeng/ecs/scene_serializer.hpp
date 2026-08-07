@@ -15,8 +15,16 @@ class World;
  */
 class SceneSerializer {
 public:
-  static void save(World &world, const std::string &filename);
-  static void load(World &world, const std::string &filename);
+  /// @return true on success; false if the file could not be written.
+  static bool save(World &world, const std::string &filename);
+
+  /**
+   * Adds the file's entities to @p world — it does NOT clear the existing
+   * scene first. Callers wanting replace-semantics must destroy the old
+   * entities themselves.
+   * @return true on success; false if the file was missing or malformed.
+   */
+  static bool load(World &world, const std::string &filename);
 };
 
 } // namespace componeng::ecs

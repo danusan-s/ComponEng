@@ -17,14 +17,15 @@ public:
     core::UniformMap instanceData;
     const auto &transform =
         world.getComponent<core::TransformComponent>(entity);
+    // TransformComponent::rotation is in degrees; glm::rotate takes radians.
     core::Mat4 modelMatrix = core::Mat4(1.0f);
     modelMatrix = translate(modelMatrix, transform.position);
-    modelMatrix =
-        rotate(modelMatrix, transform.rotation.x, core::Vec3(1.0f, 0.0f, 0.0f));
-    modelMatrix =
-        rotate(modelMatrix, transform.rotation.y, core::Vec3(0.0f, 1.0f, 0.0f));
-    modelMatrix =
-        rotate(modelMatrix, transform.rotation.z, core::Vec3(0.0f, 0.0f, 1.0f));
+    modelMatrix = rotate(modelMatrix, core::radians(transform.rotation.x),
+                         core::Vec3(1.0f, 0.0f, 0.0f));
+    modelMatrix = rotate(modelMatrix, core::radians(transform.rotation.y),
+                         core::Vec3(0.0f, 1.0f, 0.0f));
+    modelMatrix = rotate(modelMatrix, core::radians(transform.rotation.z),
+                         core::Vec3(0.0f, 0.0f, 1.0f));
     modelMatrix = scale(modelMatrix, transform.scale);
 
     instanceData["instanceModel"] = modelMatrix;

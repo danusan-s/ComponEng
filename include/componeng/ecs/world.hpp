@@ -128,7 +128,7 @@ public:
         std::memcpy(dst.at(newRow), src.at(oldRow), src.m_stride);
       }
       EntityID moved = oldArchetype->removeEntity(entity);
-      if (moved != entity) {
+      if (moved != INVALID_ENTITY) {
         m_entityManager.getRecord(moved).row = oldRow;
       }
     }
@@ -174,7 +174,7 @@ public:
         std::memcpy(dst.at(newRow), src.at(oldRow), src.m_stride);
       }
       EntityID moved = oldArchetype->removeEntity(entity);
-      if (moved != entity) {
+      if (moved != INVALID_ENTITY) {
         m_entityManager.getRecord(moved).row = oldRow;
       }
     }
@@ -214,7 +214,7 @@ public:
       std::memcpy(dst.at(newRow), src.at(oldRow), src.m_stride);
     }
     EntityID moved = oldArchetype->removeEntity(entity);
-    if (moved != entity) {
+    if (moved != INVALID_ENTITY) {
       m_entityManager.getRecord(moved).row = oldRow;
     }
 

@@ -15,16 +15,6 @@
 
 namespace componeng::renderer {
 
-static core::Mat4 getModelMatrix(const core::TransformComponent &transform) {
-  core::Mat4 model = core::Mat4(1.0f);
-  model = translate(model, transform.position);
-  model = rotate(model, transform.rotation.x, core::Vec3(1.0f, 0.0f, 0.0f));
-  model = rotate(model, transform.rotation.y, core::Vec3(0.0f, 1.0f, 0.0f));
-  model = rotate(model, transform.rotation.z, core::Vec3(0.0f, 0.0f, 1.0f));
-  model = scale(model, transform.scale);
-  return model;
-}
-
 void BatchingSystem::onCreate(const ecs::SystemState &state) {
   m_batches = std::make_unique<BatchMap>();
   state.world->setResource(RenderQueue());

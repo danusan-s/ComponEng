@@ -24,6 +24,16 @@ struct ComponentInfo {
   void (*destructor)(void *) = nullptr;
   nlohmann::json (*serializer)(const void *) = nullptr;
   void *(*deserializer)(const nlohmann::json &) = nullptr;
+  /**
+   * Frees the heap object returned by deserializer.
+   *
+   * Callers typically memcpy the deserialized bytes into archetype storage
+   * (see World::addComponentById) and then free the source. That is only
+   * correct because every component type is trivially copyable — which is
+   * why core::Name exists instead of std::string. A component with an owning
+   * member would turn this into a double-free.
+   */
+  void (*deleter)(void *) = nullptr;
 };
 
 /**
@@ -95,6 +105,9 @@ public:
           [](const nlohmann::json &json) -> void * {
         T component = ComponentSerializer<T>::deserialize(json);
         return new T(std::move(component));
+      };
+      m_componentInfos[id].deleter = [](void *ptr) {
+        delete static_cast<T *>(ptr);
       };
     }
 

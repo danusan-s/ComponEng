@@ -107,6 +107,13 @@ void deserialize_field(const nlohmann::json &j, const char *name, T &obj,
       val.y = j[name][1];
       val.z = j[name][2];
     }
+  } else if constexpr (is_vec4<MT>::value) {
+    if (j.contains(name) && j[name].is_array() && j[name].size() == 4) {
+      val.x = j[name][0];
+      val.y = j[name][1];
+      val.z = j[name][2];
+      val.w = j[name][3];
+    }
   } else if constexpr (is_mat4<MT>::value) {
     if (j.contains(name) && j[name].is_array()) {
       val = DeserializeMat4(j[name].get<std::vector<float>>());

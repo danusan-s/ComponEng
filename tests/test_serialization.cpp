@@ -3,11 +3,15 @@
 #include "componeng/ecs/archetype/archetype.hpp"
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
+#include "componeng/ecs/scene_serializer.hpp"
+#include "componeng/ecs/world.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
 #include "gtest/gtest.h"
 
+#include <cstdio>
 #include <cstring>
+#include <memory>
 
 using namespace componeng::audio;
 using namespace componeng::core;
@@ -62,6 +66,33 @@ TEST(SerializationTest, RoundTripAudioComponent) {
   EXPECT_EQ(orig.playOnAwake, restored.playOnAwake);
   EXPECT_EQ(orig.loop, restored.loop);
   EXPECT_EQ(orig.volume, restored.volume);
+}
+
+TEST(SerializationTest, RoundTripColorComponent) {
+  ColorComponent orig;
+  orig.color = Vec4(0.25f, 0.5f, 0.75f, 1.0f);
+
+  auto json = ComponentSerializer<ColorComponent>::serialize(orig);
+  auto restored = ComponentSerializer<ColorComponent>::deserialize(json);
+
+  EXPECT_FLOAT_EQ(orig.color.r, restored.color.r);
+  EXPECT_FLOAT_EQ(orig.color.g, restored.color.g);
+  EXPECT_FLOAT_EQ(orig.color.b, restored.color.b);
+  EXPECT_FLOAT_EQ(orig.color.a, restored.color.a);
+}
+
+TEST(SerializationTest, RoundTripTransformComponent) {
+  TransformComponent orig;
+  orig.position = Vec3(1.0f, -2.0f, 3.5f);
+  orig.rotation = Vec3(0.0f, 90.0f, 45.0f);
+  orig.scale = Vec3(2.0f, 2.0f, 2.0f);
+
+  auto json = ComponentSerializer<TransformComponent>::serialize(orig);
+  auto restored = ComponentSerializer<TransformComponent>::deserialize(json);
+
+  EXPECT_EQ(orig.position, restored.position);
+  EXPECT_EQ(orig.rotation, restored.rotation);
+  EXPECT_EQ(orig.scale, restored.scale);
 }
 
 TEST(SerializationTest, ArchetypeMigrationPreservesLongStrings) {
@@ -140,4 +171,63 @@ TEST(SerializationTest, MultipleEntityMigrations) {
   auto json = ComponentSerializer<MeshComponent>::serialize(
       *static_cast<MeshComponent *>(arch2.getColumn(meshCID).at(0)));
   EXPECT_EQ(json["meshName"], "entity_0_with_a_long_name_to_test");
+}
+
+namespace {
+
+std::unique_ptr<World> makeSceneWorld() {
+  auto world = std::make_unique<World>();
+  world->init();
+  world->registerComponents<TransformComponent, MeshComponent,
+                            MaterialComponent, ColorComponent>();
+  return world;
+}
+
+} // namespace
+
+// End-to-end through SceneSerializer: this is what the editor's Save/Open does.
+// Also exercises ComponentInfo::deleter — under ASan a regression here surfaces
+// as a leak report rather than a failed assertion.
+TEST(SerializationTest, SceneRoundTripPreservesTransformAndColor) {
+  const std::string path = "test_scene_roundtrip.json";
+
+  {
+    auto world = makeSceneWorld();
+    EntityID entity = world->createEntity();
+    world->addComponents(
+        entity,
+        TransformComponent{.position = Vec3(10.0f, -4.0f, 2.5f),
+                           .rotation = Vec3(0.0f, 90.0f, 0.0f),
+                           .scale = Vec3(3.0f)},
+        MeshComponent{.meshName = "cube"},
+        MaterialComponent{.materialName = "default_diffuse"},
+        ColorComponent{.color = Vec4(0.25f, 0.5f, 0.75f, 1.0f)});
+
+    ASSERT_TRUE(SceneSerializer::save(*world, path));
+  }
+
+  auto world = makeSceneWorld();
+  ASSERT_TRUE(SceneSerializer::load(*world, path));
+
+  int count = 0;
+  world->query<TransformComponent, MeshComponent, ColorComponent>().each(
+      [&](TransformComponent &t, MeshComponent &m, ColorComponent &c) {
+        ++count;
+        EXPECT_EQ(t.position, Vec3(10.0f, -4.0f, 2.5f));
+        EXPECT_EQ(t.rotation, Vec3(0.0f, 90.0f, 0.0f));
+        EXPECT_EQ(t.scale, Vec3(3.0f));
+        EXPECT_EQ(m.meshName, "cube");
+        EXPECT_FLOAT_EQ(c.color.r, 0.25f);
+        EXPECT_FLOAT_EQ(c.color.g, 0.5f);
+        EXPECT_FLOAT_EQ(c.color.b, 0.75f);
+        EXPECT_FLOAT_EQ(c.color.a, 1.0f);
+      });
+  EXPECT_EQ(count, 1);
+
+  std::remove(path.c_str());
+}
+
+TEST(SerializationTest, LoadReportsFailureForMissingFile) {
+  auto world = makeSceneWorld();
+  EXPECT_FALSE(SceneSerializer::load(*world, "no_such_scene_file.json"));
 }

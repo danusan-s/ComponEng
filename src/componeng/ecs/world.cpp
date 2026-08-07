@@ -23,10 +23,18 @@ EntityID World::createEntity() {
 
 void World::destroyEntity(EntityID entity) {
   m_eventBus.emit<events::EntityDestroyEvent>({.entity = entity});
-  Archetype *currArchetype = m_archetypeManager.getBySignature(
-      m_entityManager.getRecord(entity).signature);
+  EntityRecord &record = m_entityManager.getRecord(entity);
+  Archetype *currArchetype =
+      m_archetypeManager.getBySignature(record.signature);
   if (currArchetype) {
-    currArchetype->removeEntity(entity);
+    // Archetype storage is swap-remove: the entity previously occupying the
+    // last row is moved into the freed row, so its record must be repointed
+    // or every later access reads the wrong (or an out-of-bounds) row.
+    std::size_t freedRow = record.row;
+    EntityID moved = currArchetype->removeEntity(entity);
+    if (moved != INVALID_ENTITY) {
+      m_entityManager.getRecord(moved).row = freedRow;
+    }
   }
   m_entityManager.destroyEntity(entity);
 }

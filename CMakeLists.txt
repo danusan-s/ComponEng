@@ -130,6 +130,7 @@ set(TEST_SOURCES
     tests/test_query.cpp
     tests/test_collision.cpp
     tests/test_serialization.cpp
+    tests/test_world.cpp
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})

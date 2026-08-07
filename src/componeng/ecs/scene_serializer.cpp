@@ -8,7 +8,7 @@
 
 namespace componeng::ecs {
 
-void SceneSerializer::save(World &world, const std::string &filename) {
+bool SceneSerializer::save(World &world, const std::string &filename) {
   std::array<Archetype, MAX_ARCHETYPES> &archetypes =
       world.m_archetypeManager.getArchetypes();
 
@@ -55,28 +55,34 @@ void SceneSerializer::save(World &world, const std::string &filename) {
   std::ofstream file(filename);
   if (!file.is_open()) {
     LOG_ERROR("Failed to open file %s for saving scene", filename.c_str());
-    return;
+    return false;
   }
 
   file << sceneJson.dump(4);
   file.close();
   LOG_INFO("Scene saved to %s", filename.c_str());
+  return true;
 }
 
-void SceneSerializer::load(World &world, const std::string &filename) {
+bool SceneSerializer::load(World &world, const std::string &filename) {
   std::ifstream file(filename);
   if (!file.is_open()) {
     LOG_ERROR("Failed to open file %s for loading scene", filename.c_str());
-    return;
+    return false;
   }
 
   nlohmann::json sceneJson;
-  file >> sceneJson;
+  try {
+    file >> sceneJson;
+  } catch (const nlohmann::json::parse_error &e) {
+    LOG_ERROR("Failed to parse scene %s: %s", filename.c_str(), e.what());
+    return false;
+  }
   file.close();
 
   if (!sceneJson.contains("entities") || !sceneJson["entities"].is_array()) {
     LOG_ERROR("Invalid scene format: missing 'entities' array");
-    return;
+    return false;
   }
 
   EntityID mainCameraEntity = INVALID_ENTITY;
@@ -113,8 +119,13 @@ void SceneSerializer::load(World &world, const std::string &filename) {
         continue;
       }
 
+      // addComponentById memcpys the bytes into archetype storage, so the
+      // heap object the deserializer handed back must be released here.
       void *componentPtr = info.deserializer(componentData);
       world.addComponentById(entity, componentID, componentPtr);
+      if (info.deleter) {
+        info.deleter(componentPtr);
+      }
     }
 
     if (entityJson.contains("_isMainCamera") &&
@@ -130,6 +141,7 @@ void SceneSerializer::load(World &world, const std::string &filename) {
   }
 
   LOG_INFO("Scene loaded from %s", filename.c_str());
+  return true;
 }
 
 } // namespace componeng::ecs
