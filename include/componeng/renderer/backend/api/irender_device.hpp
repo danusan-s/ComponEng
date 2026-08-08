@@ -72,6 +72,11 @@ public:
   virtual void setSubData(size_t offset, const void *data,
                           size_t sizeBytes) = 0;
 
+  /** Current allocated size in bytes (last size passed to setData), 0 if
+   *  setData has never been called. Lets callers decide whether a new
+   *  upload fits via setSubData or needs setData to grow the buffer. */
+  virtual size_t size() const = 0;
+
   /** Release GPU resources. */
   virtual void release() = 0;
 };

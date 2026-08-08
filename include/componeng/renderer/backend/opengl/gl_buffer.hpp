@@ -14,6 +14,9 @@ public:
   setData(const void *data, size_t sizeBytes,
           api::IBuffer::Usage usage = api::IBuffer::Usage::Dynamic) override;
   void setSubData(size_t offset, const void *data, size_t sizeBytes) override;
+  size_t size() const override {
+    return m_size;
+  }
   void release() override;
 
   GLuint handle() const {

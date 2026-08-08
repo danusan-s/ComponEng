@@ -17,6 +17,9 @@ GLShader::~GLShader() {
 
 void GLShader::loadGLSL(const char *vertexSource, const char *fragmentSource,
                         const char *geometrySource) {
+  // Any cached locations belong to the program we're about to delete.
+  m_uniformLocationCache.clear();
+
   if (m_id != 0) {
     glDeleteProgram(m_id);
     m_id = 0;
@@ -113,29 +116,39 @@ void GLShader::release() {
   }
 }
 
+GLint GLShader::getUniformLocation(const char *name) const {
+  auto it = m_uniformLocationCache.find(name);
+  if (it != m_uniformLocationCache.end()) {
+    return it->second;
+  }
+  GLint location = glGetUniformLocation(m_id, name);
+  m_uniformLocationCache.emplace(name, location);
+  return location;
+}
+
 void GLShader::setFloat(const char *name, float value) const {
-  glUniform1f(glGetUniformLocation(m_id, name), value);
+  glUniform1f(getUniformLocation(name), value);
 }
 
 void GLShader::setInteger(const char *name, int value) const {
-  glUniform1i(glGetUniformLocation(m_id, name), value);
+  glUniform1i(getUniformLocation(name), value);
 }
 
 void GLShader::setVector2f(const char *name, float x, float y) const {
-  glUniform2f(glGetUniformLocation(m_id, name), x, y);
+  glUniform2f(getUniformLocation(name), x, y);
 }
 
 void GLShader::setVector3f(const char *name, float x, float y, float z) const {
-  glUniform3f(glGetUniformLocation(m_id, name), x, y, z);
+  glUniform3f(getUniformLocation(name), x, y, z);
 }
 
 void GLShader::setVector4f(const char *name, float x, float y, float z,
                            float w) const {
-  glUniform4f(glGetUniformLocation(m_id, name), x, y, z, w);
+  glUniform4f(getUniformLocation(name), x, y, z, w);
 }
 
 void GLShader::setMatrix4(const char *name, const float *matrix) const {
-  glUniformMatrix4fv(glGetUniformLocation(m_id, name), 1, false, matrix);
+  glUniformMatrix4fv(getUniformLocation(name), 1, false, matrix);
 }
 
 api::VertexLayout GLShader::reflectInstanceLayout() const {

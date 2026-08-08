@@ -68,6 +68,7 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
 
     IMaterial &material = assetManager.getMaterial(batch.materialID);
     batch.vertexLayout = material.getVertexLayout();
+    batch.instanceDatas.reserve(entities.size());
 
     for (ecs::EntityID entity : entities) {
       std::vector<float> instanceData =

@@ -3,6 +3,8 @@
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "glad/glad.h"
 
+#include <unordered_map>
+
 namespace componeng::renderer::opengl {
 
 class GLShader : public api::IShader {
@@ -34,8 +36,10 @@ public:
 
 private:
   void checkCompileErrors(GLuint object, const std::string &type);
+  GLint getUniformLocation(const char *name) const;
 
   GLuint m_id = 0;
+  mutable std::unordered_map<std::string, GLint> m_uniformLocationCache;
 };
 
 } // namespace componeng::renderer::opengl

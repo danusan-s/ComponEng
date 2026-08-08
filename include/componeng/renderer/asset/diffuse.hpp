@@ -12,9 +12,8 @@ public:
   // reflects it straight off the compiled shader's active attributes.
   using IMaterial::IMaterial;
 
-  core::UniformMap buildInstanceData(ecs::World &world,
-                                     ecs::EntityID entity) const override {
-    core::UniformMap instanceData;
+  void buildInstanceData(ecs::World &world, ecs::EntityID entity,
+                         core::UniformMap &outInstanceData) const override {
     const auto &transform =
         world.getComponent<core::TransformComponent>(entity);
     // TransformComponent::rotation is in degrees; glm::rotate takes radians.
@@ -28,13 +27,11 @@ public:
                          core::Vec3(0.0f, 0.0f, 1.0f));
     modelMatrix = scale(modelMatrix, transform.scale);
 
-    instanceData["instanceModel"] = modelMatrix;
-    instanceData["instanceColor"] =
+    outInstanceData["instanceModel"] = modelMatrix;
+    outInstanceData["instanceColor"] =
         world.hasComponent<renderer::ColorComponent>(entity)
             ? world.getComponent<renderer::ColorComponent>(entity).color
             : core::Vec4(1.0f);
-
-    return instanceData;
   }
 };
 

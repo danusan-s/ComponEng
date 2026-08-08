@@ -104,10 +104,22 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
                               instance.end());
     }
 
-    auto buf = renderDevice.createBuffer();
-    buf->setData(flatInstanceData.data(),
-                 flatInstanceData.size() * sizeof(float),
-                 api::IBuffer::Usage::Static);
+    // Reuse one GPU buffer per (mesh,material) combo across frames instead of
+    // creating/destroying one every draw call; only reallocate (setData) when
+    // this batch needs more room than it did before, otherwise update the
+    // existing buffer in place (setSubData).
+    std::unique_ptr<api::IBuffer> &buf =
+        m_instanceBuffers[DrawKey{meshID, materialID}];
+    if (!buf) {
+      buf = renderDevice.createBuffer();
+    }
+    size_t requiredBytes = flatInstanceData.size() * sizeof(float);
+    if (requiredBytes > buf->size()) {
+      buf->setData(flatInstanceData.data(), requiredBytes,
+                   api::IBuffer::Usage::Dynamic);
+    } else if (requiredBytes > 0) {
+      buf->setSubData(0, flatInstanceData.data(), requiredBytes);
+    }
 
     renderDevice.setupInstanceAttributes(*buf, material.getVertexLayout());
 

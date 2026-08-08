@@ -37,7 +37,7 @@ public:
     m_uniforms[name] = value;
   }
 
-  core::UniformMap getUniforms() const {
+  const core::UniformMap &getUniforms() const {
     return m_uniforms;
   }
 
@@ -58,8 +58,13 @@ public:
     return m_vertexLayout;
   }
 
-  virtual core::UniformMap buildInstanceData(ecs::World &world,
-                                             ecs::EntityID entity) const = 0;
+  /** Populates outInstanceData with this material's per-entity attribute
+   *  values, keyed by the shader's own attribute names (see
+   *  reflectInstanceLayout). Writes into a caller-owned map rather than
+   *  returning one, since buildInstanceDataFloats calls this once per entity
+   *  every frame and reuses a single scratch map across those calls. */
+  virtual void buildInstanceData(ecs::World &world, ecs::EntityID entity,
+                                 core::UniformMap &outInstanceData) const = 0;
 
   std::vector<float> buildInstanceDataFloats(ecs::World &world,
                                              ecs::EntityID entity) const {
@@ -70,12 +75,16 @@ public:
       return instanceDataFloats;
     }
 
-    core::UniformMap instanceData = buildInstanceData(world, entity);
+    // Reused across calls (BatchingSystem drives this sequentially per
+    // material via eachWithEntity, never in parallel) to avoid rebuilding an
+    // unordered_map's bucket array from scratch for every entity every frame.
+    m_scratchInstanceData.clear();
+    buildInstanceData(world, entity, m_scratchInstanceData);
     auto *base = reinterpret_cast<uint8_t *>(instanceDataFloats.data());
 
     for (const auto &attr : layout.attributes) {
-      auto it = instanceData.find(attr.name.c_str());
-      if (it == instanceData.end()) {
+      auto it = m_scratchInstanceData.find(attr.name.c_str());
+      if (it == m_scratchInstanceData.end()) {
         continue;
       }
       const auto &value = it->second;
@@ -122,6 +131,7 @@ private:
   api::VertexLayout m_vertexLayout;
   core::UniformMap m_uniforms;
   std::unordered_set<core::Name> m_knownUniforms;
+  mutable core::UniformMap m_scratchInstanceData;
 };
 
 } // namespace componeng::renderer
