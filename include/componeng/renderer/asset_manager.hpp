@@ -36,14 +36,14 @@ public:
   audio::AudioEngine *m_audioEngine = nullptr;
 
   void loadShader(const char *vShaderFile, const char *fShaderFile,
-                  const char *gShaderFile, std::string name);
+                  const char *gShaderFile, core::Name name);
   const Shader &getShader(core::HandleID id) const;
-  core::HandleID getShaderID(std::string name) const;
+  core::HandleID getShaderID(core::Name name) const;
 
-  void loadTexture(const char *file, bool alpha, std::string name);
+  void loadTexture(const char *file, bool alpha, core::Name name);
   const Texture2D &getTexture(core::HandleID id) const;
-  core::HandleID getTextureID(std::string name) const;
-  bool textureExists(std::string name) const;
+  core::HandleID getTextureID(core::Name name) const;
+  bool textureExists(core::Name name) const;
 
   template <typename T>
   void registerMaterial(const char *name, const char *shaderName,
@@ -61,25 +61,25 @@ public:
     m_materials[name] = id;
   }
 
-  core::HandleID getMaterialID(std::string name) const;
+  core::HandleID getMaterialID(core::Name name) const;
   IMaterial &getMaterial(core::HandleID id) const;
 
-  void addMesh(std::string name, std::unique_ptr<Mesh> mesh);
-  void loadMesh(const char *file, std::string name);
+  void addMesh(core::Name name, std::unique_ptr<Mesh> mesh);
+  void loadMesh(const char *file, core::Name name);
   const Mesh &getMesh(core::HandleID id) const;
-  core::HandleID getMeshID(std::string name) const;
+  core::HandleID getMeshID(core::Name name) const;
 
-  void loadAudio(const char *file, std::string name);
-  core::HandleID getAudioID(std::string name) const;
+  void loadAudio(const char *file, core::Name name);
+  core::HandleID getAudioID(core::Name name) const;
   const char *getAudio(core::HandleID id) const;
   void clear();
 
 private:
-  std::unordered_map<std::string, core::HandleID> m_shaders;
-  std::unordered_map<std::string, core::HandleID> m_textures;
-  std::unordered_map<std::string, core::HandleID> m_materials;
-  std::unordered_map<std::string, core::HandleID> m_meshes;
-  std::unordered_map<std::string, core::HandleID> m_audios;
+  std::unordered_map<core::Name, core::HandleID> m_shaders;
+  std::unordered_map<core::Name, core::HandleID> m_textures;
+  std::unordered_map<core::Name, core::HandleID> m_materials;
+  std::unordered_map<core::Name, core::HandleID> m_meshes;
+  std::unordered_map<core::Name, core::HandleID> m_audios;
 
   std::vector<std::unique_ptr<Shader>> m_shaderResources;
   std::vector<std::unique_ptr<Texture2D>> m_textureResources;

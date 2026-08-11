@@ -5,6 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <cstring>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -13,14 +14,26 @@
 namespace componeng::core {
 
 struct Name {
-  char value[64] = {};
+  // Trivially copyable so components holding a Name can live in archetype
+  // storage, which relocates rows with memcpy
+  static constexpr std::size_t CAPACITY = 64;
+  static constexpr std::size_t MAX_LENGTH = CAPACITY - 1;
+
+  char value[CAPACITY] = {};
 
   Name() = default;
   Name(const char *s) {
-    if (s) {
-      std::strncpy(value, s, sizeof(value) - 1);
-      value[sizeof(value) - 1] = '\0';
+    if (!s)
+      return;
+    const std::size_t length = std::strlen(s);
+    // Truncating would silently alias two distinct names onto one key
+    if (length > MAX_LENGTH) {
+      throw std::length_error(
+          std::string("Name exceeds ") + std::to_string(MAX_LENGTH) +
+          " characters: " + std::string(s, MAX_LENGTH) + "...");
     }
+    std::memcpy(value, s, length);
+    value[length] = '\0';
   }
   Name(const std::string &s) : Name(s.c_str()) {
   }

@@ -120,10 +120,28 @@ bool SceneSerializer::load(World &world, const std::string &filename) {
         continue;
       }
 
+      // Scene data is untrusted: a field that won't fit its component (an
+      // over-long core::Name, say) throws rather than silently truncating.
+      void *componentPtr = nullptr;
+      try {
+        componentPtr = info.deserializer(componentData);
+      } catch (const std::exception &e) {
+        LOG_ERROR("Failed to deserialize component '%s': %s, skipping",
+                  componentName.c_str(), e.what());
+        continue;
+      }
+
       // addComponentById memcpys the bytes into archetype storage, so the
-      // heap object the deserializer handed back must be released here.
-      void *componentPtr = info.deserializer(componentData);
-      world.addComponentById(entity, componentID, componentPtr);
+      // heap object the deserializer handed back must be released here --
+      // including if that call throws.
+      try {
+        world.addComponentById(entity, componentID, componentPtr);
+      } catch (...) {
+        if (info.deleter) {
+          info.deleter(componentPtr);
+        }
+        throw;
+      }
       if (info.deleter) {
         info.deleter(componentPtr);
       }

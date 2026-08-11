@@ -43,10 +43,10 @@ public:
 
   /** Called by AssetManager::registerMaterial right after construction, from
    *  the shader's reflected active uniforms; makes setUniform() typo-safe. */
-  void setKnownUniforms(const std::vector<std::string> &names) {
+  void setKnownUniforms(const std::vector<core::Name> &names) {
     m_knownUniforms.clear();
     for (const auto &n : names) {
-      m_knownUniforms.insert(core::Name(n));
+      m_knownUniforms.insert(n);
     }
   }
 
@@ -83,7 +83,7 @@ public:
     auto *base = reinterpret_cast<uint8_t *>(instanceDataFloats.data());
 
     for (const auto &attr : layout.attributes) {
-      auto it = m_scratchInstanceData.find(attr.name.c_str());
+      auto it = m_scratchInstanceData.find(attr.name);
       if (it == m_scratchInstanceData.end()) {
         continue;
       }

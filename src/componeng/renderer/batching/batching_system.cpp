@@ -42,8 +42,8 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
                           renderer::MaterialComponent &mat) {
         if (mat.materialID == 0) {
           mat.materialID = assetManager.getMaterialID(
-              mat.materialName.empty() ? "default_diffuse"
-                                       : mat.materialName.c_str());
+              mat.materialName.empty() ? core::Name("default_diffuse")
+                                       : mat.materialName);
         }
         IMaterial &material = assetManager.getMaterial(mat.materialID);
         if (mat.textureID == 0 || mat.shaderID == 0) {
@@ -52,7 +52,7 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
         }
         if (m.meshID == 0) {
           m.meshID = assetManager.getMeshID(
-              m.meshName.empty() ? "cube" : m.meshName.c_str());
+              m.meshName.empty() ? core::Name("cube") : m.meshName);
         }
 
         if (m.visible)

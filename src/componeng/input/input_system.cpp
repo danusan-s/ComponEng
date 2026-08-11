@@ -29,7 +29,8 @@ void InputSystem::onUpdate(const ecs::SystemState &state) {
       inputState.isKeyDown(LEFT_KEY);
   actionState.current[static_cast<size_t>(Action::MoveRight)] =
       inputState.isKeyDown(RIGHT_KEY);
-  actionState.current[static_cast<size_t>(Action::Jump)] = inputState.isKeyDown(JUMP_KEY);
+  actionState.current[static_cast<size_t>(Action::Jump)] =
+      inputState.isKeyDown(JUMP_KEY);
   actionState.current[static_cast<size_t>(Action::Crouch)] =
       inputState.isKeyDown(CROUCH_KEY);
   actionState.current[static_cast<size_t>(Action::Sprint)] =

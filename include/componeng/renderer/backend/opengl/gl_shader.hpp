@@ -32,7 +32,7 @@ public:
   void setMatrix4(const char *name, const float *matrix) const override;
 
   api::VertexLayout reflectInstanceLayout() const override;
-  std::vector<std::string> reflectActiveUniformNames() const override;
+  std::vector<core::Name> reflectActiveUniformNames() const override;
 
   GLuint handle() const {
     return m_id;
@@ -43,7 +43,7 @@ private:
   GLint getUniformLocation(const char *name) const;
 
   GLuint m_id = 0;
-  mutable std::unordered_map<std::string, GLint> m_uniformLocationCache;
+  mutable std::unordered_map<core::Name, GLint> m_uniformLocationCache;
 };
 
 } // namespace componeng::renderer::opengl

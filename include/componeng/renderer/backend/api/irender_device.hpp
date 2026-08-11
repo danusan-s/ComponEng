@@ -13,7 +13,7 @@ namespace componeng::renderer::api {
  * @brief Describes the layout of a single vertex attribute.
  */
 struct VertexAttribute {
-  std::string name;
+  core::Name name;
   uint32_t offset;
   uint32_t componentCount;
   bool normalized;
@@ -127,7 +127,7 @@ public:
   /** Reflect the linked program's active uniform names (for validating
    *  setUniform() calls against the shader that will actually consume them).
    */
-  virtual std::vector<std::string> reflectActiveUniformNames() const = 0;
+  virtual std::vector<core::Name> reflectActiveUniformNames() const = 0;
 };
 
 /**

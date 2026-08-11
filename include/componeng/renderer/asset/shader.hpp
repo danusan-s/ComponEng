@@ -26,7 +26,7 @@ public:
   void setMatrix4(const char *name, const core::Mat4 &matrix) const;
 
   api::VertexLayout reflectInstanceLayout() const;
-  std::vector<std::string> reflectActiveUniformNames() const;
+  std::vector<core::Name> reflectActiveUniformNames() const;
 
 private:
   std::unique_ptr<api::IShader> m_impl;

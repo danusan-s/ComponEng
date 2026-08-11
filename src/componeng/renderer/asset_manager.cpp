@@ -13,7 +13,7 @@
 namespace componeng::renderer {
 
 void AssetManager::loadShader(const char *vShaderFile, const char *fShaderFile,
-                              const char *gShaderFile, std::string name) {
+                              const char *gShaderFile, core::Name name) {
   LOG_INFO("Loading Shader: %s", name.c_str());
   m_shaderResources.push_back(
       loadShaderFromFile(vShaderFile, fShaderFile, gShaderFile));
@@ -25,7 +25,7 @@ const Shader &AssetManager::getShader(core::HandleID id) const {
   return *m_shaderResources.at(id - 1);
 }
 
-core::HandleID AssetManager::getShaderID(std::string name) const {
+core::HandleID AssetManager::getShaderID(core::Name name) const {
   if (m_shaders.find(name) == m_shaders.end()) {
     LOG_ERROR("Shader not found: %s", name.c_str());
     throw std::runtime_error("Shader not found");
@@ -33,7 +33,7 @@ core::HandleID AssetManager::getShaderID(std::string name) const {
   return m_shaders.at(name);
 }
 
-void AssetManager::loadTexture(const char *file, bool alpha, std::string name) {
+void AssetManager::loadTexture(const char *file, bool alpha, core::Name name) {
   LOG_INFO("Loading Texture: %s", name.c_str());
   m_textureResources.push_back(loadTextureFromFile(file, alpha));
   core::HandleID id = m_textureResources.size();
@@ -44,7 +44,7 @@ const Texture2D &AssetManager::getTexture(core::HandleID id) const {
   return *m_textureResources.at(id - 1);
 }
 
-core::HandleID AssetManager::getTextureID(std::string name) const {
+core::HandleID AssetManager::getTextureID(core::Name name) const {
   if (m_textures.find(name) == m_textures.end()) {
     LOG_ERROR("Texture not found: %s", name.c_str());
     throw std::runtime_error("Texture not found");
@@ -52,11 +52,11 @@ core::HandleID AssetManager::getTextureID(std::string name) const {
   return m_textures.at(name);
 }
 
-bool AssetManager::textureExists(std::string name) const {
+bool AssetManager::textureExists(core::Name name) const {
   return m_textures.find(name) != m_textures.end();
 }
 
-core::HandleID AssetManager::getMaterialID(std::string name) const {
+core::HandleID AssetManager::getMaterialID(core::Name name) const {
   if (m_materials.find(name) == m_materials.end()) {
     LOG_ERROR("Material not found: %s", name.c_str());
     throw std::runtime_error("Material not found");
@@ -68,7 +68,7 @@ IMaterial &AssetManager::getMaterial(core::HandleID id) const {
   return *m_materialResources.at(id - 1);
 }
 
-void AssetManager::addMesh(std::string name, std::unique_ptr<Mesh> mesh) {
+void AssetManager::addMesh(core::Name name, std::unique_ptr<Mesh> mesh) {
   LOG_INFO("Adding Mesh: %s", name.c_str());
   mesh->uploadToGPU();
   m_meshResources.push_back(std::move(mesh));
@@ -76,7 +76,7 @@ void AssetManager::addMesh(std::string name, std::unique_ptr<Mesh> mesh) {
   m_meshes[name] = id;
 }
 
-void AssetManager::loadMesh(const char *file, std::string name) {
+void AssetManager::loadMesh(const char *file, core::Name name) {
   LOG_INFO("Loading Model: %s", name.c_str());
   m_meshResources.push_back(loadMeshFromFile(file));
   core::HandleID id = m_meshResources.size();
@@ -87,7 +87,7 @@ const Mesh &AssetManager::getMesh(core::HandleID id) const {
   return *m_meshResources.at(id - 1);
 }
 
-core::HandleID AssetManager::getMeshID(std::string name) const {
+core::HandleID AssetManager::getMeshID(core::Name name) const {
   if (m_meshes.find(name) == m_meshes.end()) {
     LOG_ERROR("Mesh not found: %s", name.c_str());
     throw std::runtime_error("Mesh not found");
@@ -156,7 +156,7 @@ std::unique_ptr<Mesh> AssetManager::loadMeshFromFile(const char *file) {
   return mesh;
 }
 
-void AssetManager::loadAudio(const char *file, std::string name) {
+void AssetManager::loadAudio(const char *file, core::Name name) {
   LOG_INFO("Loading Audio: %s", name.c_str());
 
   m_audioPaths.push_back(file);
@@ -165,7 +165,7 @@ void AssetManager::loadAudio(const char *file, std::string name) {
   LOG_INFO("Audio loaded successfully: %s (ID: %u)", name.c_str(), id);
 }
 
-core::HandleID AssetManager::getAudioID(std::string name) const {
+core::HandleID AssetManager::getAudioID(core::Name name) const {
   return m_audios.at(name);
 }
 

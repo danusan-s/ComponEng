@@ -59,7 +59,7 @@ api::VertexLayout Shader::reflectInstanceLayout() const {
   return m_impl->reflectInstanceLayout();
 }
 
-std::vector<std::string> Shader::reflectActiveUniformNames() const {
+std::vector<core::Name> Shader::reflectActiveUniformNames() const {
   return m_impl->reflectActiveUniformNames();
 }
 

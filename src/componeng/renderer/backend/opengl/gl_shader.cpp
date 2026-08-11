@@ -219,7 +219,7 @@ api::VertexLayout GLShader::reflectInstanceLayout() const {
   return layout;
 }
 
-std::vector<std::string> GLShader::reflectActiveUniformNames() const {
+std::vector<core::Name> GLShader::reflectActiveUniformNames() const {
   GLint activeUniforms = 0;
   glGetProgramiv(m_id, GL_ACTIVE_UNIFORMS, &activeUniforms);
 
@@ -227,14 +227,14 @@ std::vector<std::string> GLShader::reflectActiveUniformNames() const {
   glGetProgramiv(m_id, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLen);
   std::vector<char> nameBuf(maxNameLen > 0 ? maxNameLen : 1);
 
-  std::vector<std::string> names;
+  std::vector<core::Name> names;
   for (GLint i = 0; i < activeUniforms; ++i) {
     GLsizei length = 0;
     GLint size = 0;
     GLenum type = 0;
     glGetActiveUniform(m_id, i, static_cast<GLsizei>(nameBuf.size()), &length,
                        &size, &type, nameBuf.data());
-    names.emplace_back(nameBuf.data(), length);
+    names.emplace_back(std::string(nameBuf.data(), length));
   }
   return names;
 }
