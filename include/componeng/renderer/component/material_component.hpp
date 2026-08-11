@@ -19,7 +19,7 @@ struct MaterialComponent {
 struct ColorComponent {
   static constexpr const char *component_name = "ColorComponent";
 
-  core::Vec4 color;
+  core::Vec4 color = core::Vec4(1.0f);
 };
 
 } // namespace componeng::renderer

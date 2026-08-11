@@ -4,48 +4,47 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "componeng/core/string_interner.hpp"
+
 #include <cstring>
-#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 
 namespace componeng::core {
 
+/**
+ * @brief Handle to an interned, immutable string.
+ *
+ * Just an id into a process-wide string table, so it is trivially copyable
+ * (archetype storage relocates component rows with memcpy) and has no length
+ * limit. Equality and hashing compare ids, never characters.
+ *
+ * Resolving back to text (c_str/size) takes a lock and is meant for cold
+ * paths: serialization, logging, debug UI.
+ */
 struct Name {
-  // Trivially copyable so components holding a Name can live in archetype
-  // storage, which relocates rows with memcpy
-  static constexpr std::size_t CAPACITY = 64;
-  static constexpr std::size_t MAX_LENGTH = CAPACITY - 1;
-
-  char value[CAPACITY] = {};
+  NameID id = EMPTY_NAME;
 
   Name() = default;
-  Name(const char *s) {
-    if (!s)
-      return;
-    const std::size_t length = std::strlen(s);
-    // Truncating would silently alias two distinct names onto one key
-    if (length > MAX_LENGTH) {
-      throw std::length_error(
-          std::string("Name exceeds ") + std::to_string(MAX_LENGTH) +
-          " characters: " + std::string(s, MAX_LENGTH) + "...");
-    }
-    std::memcpy(value, s, length);
-    value[length] = '\0';
+  Name(const char *s)
+      : id(s ? StringInterner::instance().intern(s) : EMPTY_NAME) {
   }
-  Name(const std::string &s) : Name(s.c_str()) {
+  Name(const std::string &s) : id(StringInterner::instance().intern(s)) {
+  }
+  Name(std::string_view s) : id(StringInterner::instance().intern(s)) {
   }
 
   const char *c_str() const {
-    return value;
+    return StringInterner::instance().resolve(id);
   }
   bool operator==(const Name &other) const {
-    return std::strcmp(value, other.value) == 0;
+    return id == other.id;
   }
   bool operator==(const char *s) const {
-    return s && std::strcmp(value, s) == 0;
+    return s && id == StringInterner::instance().intern(s);
   }
   bool operator!=(const Name &other) const {
     return !(*this == other);
@@ -54,25 +53,28 @@ struct Name {
     return !(*this == s);
   }
   operator const char *() const {
-    return value;
+    return c_str();
   }
   operator std::string() const {
-    return value;
+    return c_str();
   }
   bool empty() const {
-    return value[0] == '\0';
+    return id == EMPTY_NAME;
   }
   std::size_t size() const {
-    return std::strlen(value);
+    return StringInterner::instance().length(id);
   }
 };
+
+static_assert(std::is_trivially_copyable_v<Name>,
+              "Name must stay memcpy-relocatable for archetype storage");
 
 } // namespace componeng::core
 
 namespace std {
 template <> struct hash<componeng::core::Name> {
   std::size_t operator()(const componeng::core::Name &name) const noexcept {
-    return std::hash<std::string_view>{}(name.c_str());
+    return std::hash<componeng::core::NameID>{}(name.id);
   }
 };
 } // namespace std

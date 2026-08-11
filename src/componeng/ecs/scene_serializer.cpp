@@ -120,8 +120,8 @@ bool SceneSerializer::load(World &world, const std::string &filename) {
         continue;
       }
 
-      // Scene data is untrusted: a field that won't fit its component (an
-      // over-long core::Name, say) throws rather than silently truncating.
+      // Scene data is untrusted; a malformed field must skip its component
+      // rather than abort the whole load.
       void *componentPtr = nullptr;
       try {
         componentPtr = info.deserializer(componentData);
