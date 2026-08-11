@@ -67,6 +67,12 @@ public:
 
     return m_entityRecords[id];
   }
+
+  const EntityRecord &getRecord(EntityID id) const {
+    assert(id < MAX_ENTITIES && "Entity out of range.");
+
+    return m_entityRecords[id];
+  }
 };
 
 } // namespace componeng::ecs

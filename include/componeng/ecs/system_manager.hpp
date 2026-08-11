@@ -74,7 +74,7 @@ public:
     std::vector<size_t> inDegree(m_systems.size(), 0);
     std::vector<std::vector<SystemID>> reverseGraph(m_systems.size());
 
-    for (int i = 0; i < m_dependencies.size(); ++i) {
+    for (size_t i = 0; i < m_dependencies.size(); ++i) {
       inDegree[i] = m_dependencies[i].size();
       for (SystemID dep : m_dependencies[i]) {
         reverseGraph[dep].push_back(i);
@@ -83,7 +83,7 @@ public:
 
     std::queue<SystemID> q;
 
-    for (int i = 0; i < inDegree.size(); ++i) {
+    for (size_t i = 0; i < inDegree.size(); ++i) {
       if (inDegree[i] == 0) {
         q.push(i);
       }

@@ -21,23 +21,12 @@ void BatchingSystem::onCreate(const ecs::SystemState &state) {
 }
 
 void BatchingSystem::onUpdate(const ecs::SystemState &state) {
-  ecs::EntityID mainCameraID =
-      state.world->getResource<camera::MainCamera>().entity;
-
-  core::Vec3 &cameraPos =
-      state.world->getComponent<core::TransformComponent>(mainCameraID)
-          .position;
-  core::Mat4 &viewProj =
-      state.world->getComponent<camera::CameraComponent>(mainCameraID)
-          .viewProjectionMatrix;
   const AssetManager &assetManager = state.world->getResource<AssetManager>();
-
-  int drawCalls = 0;
 
   state.world
       ->query<core::TransformComponent, renderer::MeshComponent,
               renderer::MaterialComponent>()
-      .eachWithEntity([&](ecs::EntityID entity, core::TransformComponent &t,
+      .eachWithEntity([&](ecs::EntityID entity, core::TransformComponent &,
                           renderer::MeshComponent &m,
                           renderer::MaterialComponent &mat) {
         if (mat.materialID == 0) {
@@ -82,7 +71,7 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
   m_batches->clear();
 }
 
-void BatchingSystem::onDestroy(const ecs::SystemState &state) {
+void BatchingSystem::onDestroy(const ecs::SystemState &) {
   m_batches.reset();
 }
 

@@ -5,9 +5,9 @@
 
 namespace componeng::renderer::opengl {
 
-class GLTexture : public api::ITexture {
+class GLTexture final : public api::ITexture {
 public:
-  GLTexture();
+  GLTexture() = default;
   ~GLTexture() override;
 
   // Owns a GL handle freed in the dtor; copying it would double-free

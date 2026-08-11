@@ -14,7 +14,7 @@ namespace componeng::renderer {
  * Performs builds draw batches, and issues draw calls
  * using instanced rendering through the render device abstraction.
  */
-class BatchingSystem : public ecs::ISystem {
+class BatchingSystem final : public ecs::ISystem {
 public:
   void onCreate(const ecs::SystemState &state) override;
   void onUpdate(const ecs::SystemState &state) override;

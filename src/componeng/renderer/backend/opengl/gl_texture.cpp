@@ -2,9 +2,6 @@
 
 namespace componeng::renderer::opengl {
 
-GLTexture::GLTexture() : m_id(0) {
-}
-
 GLTexture::~GLTexture() {
   release();
 }

@@ -13,13 +13,13 @@
 namespace componeng::ecs {
 
 template <typename T> struct ComponentSerializer {
-  static nlohmann::json serialize(const T &component) {
+  static nlohmann::json serialize(const T &) {
     LOG_ERROR("Serialization not implemented for this component type. %s",
               typeid(T).name());
     return nlohmann::json();
   }
 
-  static T deserialize(const nlohmann::json &componentJson) {
+  static T deserialize(const nlohmann::json &) {
     LOG_ERROR("Deserialization not implemented for this component type. %s",
               typeid(T).name());
     return T();

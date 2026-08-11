@@ -47,8 +47,14 @@ std::string Utils::getExecutableDir() {
 
 std::string Utils::getAssetPath(const std::string &relativePath) {
   static std::filesystem::path root = [] {
+    // This file is at <root>/src/componeng/utils/utils.cpp, so four hops up
+    // lands on the project root. Move this file and you must update the count.
+    constexpr int HOPS_TO_PROJECT_ROOT = 4;
     std::filesystem::path p = __FILE__;
-    return p.parent_path().parent_path().parent_path().parent_path();
+    for (int i = 0; i < HOPS_TO_PROJECT_ROOT; ++i) {
+      p = p.parent_path();
+    }
+    return p;
   }();
 
   std::filesystem::path assetPath = root / relativePath;

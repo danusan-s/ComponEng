@@ -13,7 +13,7 @@ static bool isMouseLocked(GLFWwindow *window) {
   return glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
 }
 
-static void framebufferSizeCallback(GLFWwindow *window, int width, int height) {
+static void framebufferSizeCallback(GLFWwindow *, int width, int height) {
   float targetAspectRatio = 16.0f / 9.0f;
   float currentAspectRatio = static_cast<float>(width) / height;
 
@@ -31,8 +31,8 @@ static void framebufferSizeCallback(GLFWwindow *window, int width, int height) {
   glViewport(0, yOffset, width, newHeight);
 }
 
-static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
-                        int mode) {
+static void keyCallback(GLFWwindow *window, int key, int /*scancode*/,
+                        int action, int /*mode*/) {
   auto *engine = static_cast<Engine *>(glfwGetWindowUserPointer(window));
   if (!engine)
     return;
@@ -67,7 +67,7 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
 }
 
 static void mouseButtonCallback(GLFWwindow *window, int button, int action,
-                                int mods) {
+                                int /*mods*/) {
   auto *engine = static_cast<Engine *>(glfwGetWindowUserPointer(window));
   if (!engine)
     return;

@@ -50,7 +50,7 @@ void DebugUI::addValue(const std::string &label, float v) {
   ImGui::Text("%s: %.2f", label.c_str(), v);
 }
 
-void DebugUI::addVec3(const std::string &label, Vec3 v) {
+void DebugUI::addVec3(const std::string &label, const Vec3 &v) {
   ImGui::Text("%s: (%.2f, %.2f, %.2f)", label.c_str(), v.x, v.y, v.z);
 }
 

@@ -5,9 +5,9 @@
 
 namespace componeng::renderer::opengl {
 
-class GLMesh : public api::IMesh {
+class GLMesh final : public api::IMesh {
 public:
-  GLMesh();
+  GLMesh() = default;
   ~GLMesh() override;
 
   // Owns GL handles freed in the dtor; copying it would double-free

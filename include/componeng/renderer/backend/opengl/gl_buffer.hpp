@@ -5,7 +5,7 @@
 
 namespace componeng::renderer::opengl {
 
-class GLBuffer : public api::IBuffer {
+class GLBuffer final : public api::IBuffer {
 public:
   GLBuffer();
   ~GLBuffer() override;

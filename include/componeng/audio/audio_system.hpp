@@ -4,7 +4,7 @@
 
 namespace componeng::audio {
 
-class AudioSystem : public ecs::ISystem {
+class AudioSystem final : public ecs::ISystem {
 public:
   void onUpdate(const ecs::SystemState &state) override;
 };

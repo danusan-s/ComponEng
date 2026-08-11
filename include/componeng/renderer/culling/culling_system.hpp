@@ -7,7 +7,7 @@ namespace componeng::renderer {
 /**
  * @brief Presentation-phase system that frustum culling
  */
-class CullingSystem : public ecs::ISystem {
+class CullingSystem final : public ecs::ISystem {
 public:
   void onUpdate(const ecs::SystemState &state) override;
 

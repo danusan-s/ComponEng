@@ -27,8 +27,10 @@ public:
 
   ComponentColumn(size_t componentSize, size_t alignment,
                   void (*destructor)(void *) = nullptr)
-      : m_buffer(alignment), m_count(0), m_stride(componentSize),
-        m_destructor(destructor) {
+      // Order must match declaration order; members initialize in the latter
+      // regardless of how they are listed here.
+      : m_buffer(alignment), m_destructor(destructor), m_stride(componentSize),
+        m_count(0) {
     if (m_stride % alignment != 0) {
       m_stride = (m_stride / alignment + 1) * alignment;
     }

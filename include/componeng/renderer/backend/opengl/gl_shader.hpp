@@ -7,9 +7,9 @@
 
 namespace componeng::renderer::opengl {
 
-class GLShader : public api::IShader {
+class GLShader final : public api::IShader {
 public:
-  GLShader();
+  GLShader() = default;
   ~GLShader() override;
 
   // Owns a GL handle freed in the dtor; copying it would double-free

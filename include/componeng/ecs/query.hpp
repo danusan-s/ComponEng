@@ -83,7 +83,7 @@ private:
   std::array<Archetype, MAX_ARCHETYPES> &m_archetypes;
   std::vector<Archetype *> m_matchingArchetypes;
   bool m_dirty = true;
-  ComponentRegistry &registry;
+  ComponentRegistry &m_registry;
   QueryDesc desc;
 
 public:
@@ -120,12 +120,12 @@ public:
 
   Query(std::array<Archetype, MAX_ARCHETYPES> &archetypes,
         ComponentRegistry &registry)
-      : m_archetypes(archetypes), registry(registry) {
-    desc.required = registry.makeSignature<Req...>();
+      : m_archetypes(archetypes), m_registry(registry) {
+    desc.required = m_registry.makeSignature<Req...>();
   }
 
   template <typename... Excl> Query<Req...> &exclude() {
-    desc.excluded = registry.makeSignature<Excl...>();
+    desc.excluded = m_registry.makeSignature<Excl...>();
     return *this;
   }
 
@@ -135,7 +135,7 @@ public:
     for (Archetype *archetype : m_matchingArchetypes) {
 
       ComponentColumn *reqCols[] = {
-          &archetype->getColumn(registry.getComponentID<Req>())...};
+          &archetype->getColumn(m_registry.getComponentID<Req>())...};
 
       size_t n = archetype->getEntityCount();
       for (size_t i = 0; i < n; ++i)
@@ -148,7 +148,7 @@ public:
 
     for (Archetype *archetype : m_matchingArchetypes) {
       ComponentColumn *reqCols[] = {
-          &archetype->getColumn(registry.getComponentID<Req>())...};
+          &archetype->getColumn(m_registry.getComponentID<Req>())...};
 
       size_t n = archetype->getEntityCount();
       for (size_t i = 0; i < n; ++i)
@@ -174,7 +174,7 @@ public:
       // time it takes to just run the loop in the current thread.
       if (n < 50) {
         ComponentColumn *reqCols[] = {
-            &archetype->getColumn(registry.getComponentID<Req>())...};
+            &archetype->getColumn(m_registry.getComponentID<Req>())...};
         for (size_t i = 0; i < n; ++i) {
           invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
         }
@@ -189,9 +189,9 @@ public:
         size_t end = (c == numChunks - 1) ? n : start + chunkSize;
 
         futures.push_back(pool.submit([this, a, start, end, fn]() {
-          Archetype *archetype = m_matchingArchetypes[a];
+          Archetype *chunkArchetype = m_matchingArchetypes[a];
           ComponentColumn *reqCols[] = {
-              &archetype->getColumn(registry.getComponentID<Req>())...};
+              &chunkArchetype->getColumn(m_registry.getComponentID<Req>())...};
 
           for (size_t i = start; i < end; ++i) {
             invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
@@ -206,12 +206,12 @@ public:
 
   QueryIterator<Req...> begin() {
     updateMatchingArchetypes();
-    return QueryIterator<Req...>(m_matchingArchetypes, registry);
+    return QueryIterator<Req...>(m_matchingArchetypes, m_registry);
   }
 
   QueryIterator<Req...> end() {
     updateMatchingArchetypes();
-    return QueryIterator<Req...>(m_matchingArchetypes, registry,
+    return QueryIterator<Req...>(m_matchingArchetypes, m_registry,
                                  m_matchingArchetypes.size(), 0);
   }
 };

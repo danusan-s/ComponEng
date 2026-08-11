@@ -8,9 +8,6 @@
 
 namespace componeng::renderer::opengl {
 
-GLShader::GLShader() : m_id(0) {
-}
-
 GLShader::~GLShader() {
   release();
 }

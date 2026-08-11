@@ -12,7 +12,7 @@ struct CameraComponent {
   float aspectRatio = 16.0f / 9.0f;
   float nearPlane = 0.1f;
   float farPlane = 1000.0f;
-  core::Mat4 viewProjectionMatrix;
+  core::Mat4 viewProjectionMatrix = core::Mat4(1.0f);
 };
 
 } // namespace componeng::camera

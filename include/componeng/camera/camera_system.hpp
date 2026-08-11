@@ -10,7 +10,7 @@ namespace componeng::camera {
  * Updates the camera entity's TransformComponent and computes the
  * view/projection matrix in CameraComponent.
  */
-class CameraSystem : public ecs::ISystem {
+class CameraSystem final : public ecs::ISystem {
 public:
   void onUpdate(const ecs::SystemState &state) override;
 };

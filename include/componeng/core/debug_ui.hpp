@@ -23,7 +23,7 @@ public:
   // Helper functions to add different types of information to the debug UI
   static void addText(const std::string &label, const std::string &value);
   static void addValue(const std::string &label, float v);
-  static void addVec3(const std::string &label, Vec3 v);
+  static void addVec3(const std::string &label, const Vec3 &v);
   static void addSlider(const std::string &label, float *v, float min,
                         float max);
 

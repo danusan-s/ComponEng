@@ -4,9 +4,6 @@
 
 namespace componeng::renderer::opengl {
 
-GLMesh::GLMesh() : m_vao(0), m_vbo(0), m_ebo(0), m_indexCount(0) {
-}
-
 GLMesh::~GLMesh() {
   release();
 }

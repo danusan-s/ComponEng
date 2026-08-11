@@ -14,10 +14,10 @@ GLRenderDevice::GLRenderDevice() {
 GLRenderDevice::~GLRenderDevice() {
 }
 
-void GLRenderDevice::init(void *windowHandle) {
-  GLFWwindow *window = static_cast<GLFWwindow *>(windowHandle);
-
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+// windowHandle is unused here: the caller has already made the GL context
+// current, and glad resolves entry points from it. Other backends need it.
+void GLRenderDevice::init(void * /*windowHandle*/) {
+  if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
     LOG_ERROR("Failed to initialize GLAD");
     return;
   }
@@ -80,9 +80,10 @@ void GLRenderDevice::setupInstanceAttributes(api::IBuffer &instanceBuffer,
 
   glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
 
-  for (int i = 0; i < layout.attributes.size(); ++i) {
+  for (size_t i = 0; i < layout.attributes.size(); ++i) {
     const auto &attr = layout.attributes[i];
-    GLuint location = api::kFirstInstanceAttribLocation + i;
+    GLuint location =
+        api::kFirstInstanceAttribLocation + static_cast<GLuint>(i);
     glVertexAttribPointer(location, attr.componentCount, GL_FLOAT,
                           attr.normalized, layout.stride,
                           reinterpret_cast<const void *>(attr.offset));
@@ -94,8 +95,9 @@ void GLRenderDevice::setupInstanceAttributes(api::IBuffer &instanceBuffer,
 }
 
 void GLRenderDevice::unbindInstanceAttributes(const api::VertexLayout &layout) {
-  for (int i = 0; i < layout.attributes.size(); ++i) {
-    glDisableVertexAttribArray(api::kFirstInstanceAttribLocation + i);
+  for (size_t i = 0; i < layout.attributes.size(); ++i) {
+    glDisableVertexAttribArray(api::kFirstInstanceAttribLocation +
+                               static_cast<GLuint>(i));
   }
 }
 
