@@ -15,7 +15,8 @@ set_property(CACHE RENDERER_BACKEND PROPERTY STRINGS "opengl" "vulkan")
 find_package(glfw3 3.3 REQUIRED)
 find_package(OpenGL REQUIRED)
 
-file(GLOB ENGINE_SOURCES
+# Split first-party from vendored so warning flags can target only our code
+file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/*.cpp"
     "src/componeng/*.c"
     "src/componeng/core/*.cpp"
@@ -30,12 +31,16 @@ file(GLOB ENGINE_SOURCES
     "src/componeng/physics/*.cpp"
     "src/componeng/ecs/*.cpp"
     "src/componeng/utils/*.cpp"
+)
+file(GLOB ENGINE_THIRD_PARTY_SOURCES
     "src/third_party/glad/*.c"
     "src/third_party/imgui/*.cpp"
 )
 
 # Remove main.cpp if it exists in src/
-list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*main\\.cpp$")
+list(FILTER ENGINE_FIRST_PARTY_SOURCES EXCLUDE REGEX ".*main\\.cpp$")
+
+set(ENGINE_SOURCES ${ENGINE_FIRST_PARTY_SOURCES} ${ENGINE_THIRD_PARTY_SOURCES})
 
 # Create STATIC library instead of executable
 add_library(ComponEng STATIC ${ENGINE_SOURCES})
@@ -59,6 +64,15 @@ target_compile_options(ComponEng PUBLIC
 )
 target_link_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-fsanitize=address>
+)
+
+# PRIVATE: don't force these diagnostics onto example/ and tests
+target_compile_options(ComponEng PRIVATE
+    -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual
+)
+# Vendored code isn't ours to fix; silence it so it can't drown out our warnings
+set_source_files_properties(${ENGINE_THIRD_PARTY_SOURCES} PROPERTIES
+    COMPILE_OPTIONS "-w"
 )
 
 # Link dependencies
