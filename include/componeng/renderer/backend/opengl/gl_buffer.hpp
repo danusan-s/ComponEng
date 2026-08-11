@@ -10,6 +10,10 @@ public:
   GLBuffer();
   ~GLBuffer() override;
 
+  // Owns a GL handle freed in the dtor; copying it would double-free
+  GLBuffer(const GLBuffer &) = delete;
+  GLBuffer &operator=(const GLBuffer &) = delete;
+
   void
   setData(const void *data, size_t sizeBytes,
           api::IBuffer::Usage usage = api::IBuffer::Usage::Dynamic) override;

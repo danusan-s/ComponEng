@@ -12,6 +12,10 @@ public:
   GLShader();
   ~GLShader() override;
 
+  // Owns a GL handle freed in the dtor; copying it would double-free
+  GLShader(const GLShader &) = delete;
+  GLShader &operator=(const GLShader &) = delete;
+
   void loadGLSL(const char *vertexSource, const char *fragmentSource,
                 const char *geometrySource = nullptr) override;
   void loadSPIRV(const char *vertexPath, const char *fragmentPath,
