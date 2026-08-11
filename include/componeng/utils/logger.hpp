@@ -23,8 +23,11 @@ namespace componeng::utils {
  */
 class Logger {
 public:
-  static void Log(const char *file, const char *func, const char *prefix,
-                  const char *fmt, ...) {
+  // format(printf, 4, 5): lets -Wformat check LOG_INFO/LOG_ERROR call sites
+  __attribute__((format(printf, 4, 5))) static void Log(const char *file,
+                                                        const char *func,
+                                                        const char *prefix,
+                                                        const char *fmt, ...) {
     char buffer[512];
     va_list args;
     va_start(args, fmt);

@@ -133,11 +133,11 @@ public:
 
     if (oldArchetype == nullptr) {
       LOG_INFO("Adding first component to entity %llu",
-               (unsigned long long)entity);
+               static_cast<unsigned long long>(entity));
     } else {
       LOG_INFO("Moving entity %llu to new archetype %s from old archetype %s",
-               (unsigned long long)entity, newSig.to_string().c_str(),
-               oldSig.to_string().c_str());
+               static_cast<unsigned long long>(entity),
+               newSig.to_string().c_str(), oldSig.to_string().c_str());
     }
 
     migrateEntityToArchetype(entity, record.row, oldSig, newSig, oldArchetype,

@@ -89,7 +89,8 @@ bool SceneSerializer::load(World &world, const std::string &filename) {
 
   for (const auto &entityJson : sceneJson["entities"]) {
     EntityID entity = world.createEntity();
-    LOG_INFO("Created entity %d from scene", (unsigned long long)entity);
+    LOG_INFO("Created entity %llu from scene",
+             static_cast<unsigned long long>(entity));
 
     for (auto it = entityJson.begin(); it != entityJson.end(); ++it) {
       const std::string &componentName = it.key();
@@ -136,8 +137,8 @@ bool SceneSerializer::load(World &world, const std::string &filename) {
 
   if (mainCameraEntity != INVALID_ENTITY) {
     world.setResource(camera::MainCamera{mainCameraEntity});
-    LOG_INFO("Main camera set to entity %d",
-             (unsigned long long)mainCameraEntity);
+    LOG_INFO("Main camera set to entity %llu",
+             static_cast<unsigned long long>(mainCameraEntity));
   }
 
   LOG_INFO("Scene loaded from %s", filename.c_str());

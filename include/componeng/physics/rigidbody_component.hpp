@@ -8,13 +8,13 @@ namespace componeng::physics {
 struct RigidBodyComponent {
   static constexpr const char *component_name = "RigidBodyComponent";
 
-  enum Type {
+  enum class Type {
     Static,   // Immovable object, not affected by forces
     Dynamic,  // Affected by forces, can move and rotate
     Kinematic // Moves according to user velocities, not affected by forces
   };
 
-  Type type = Static;
+  Type type = Type::Static;
   core::Vec3 velocity;
   float mass = 1.0f;
   float restitution = 0.5f;

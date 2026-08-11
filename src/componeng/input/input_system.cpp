@@ -21,22 +21,22 @@ void InputSystem::onUpdate(const ecs::SystemState &state) {
   auto &inputState = state.world->getResource<InputState>();
   auto &actionState = state.world->getResource<ActionState>();
 
-  actionState.current[(size_t)Action::MoveForward] =
+  actionState.current[static_cast<size_t>(Action::MoveForward)] =
       inputState.isKeyDown(FORWARD_KEY);
-  actionState.current[(size_t)Action::MoveBackward] =
+  actionState.current[static_cast<size_t>(Action::MoveBackward)] =
       inputState.isKeyDown(BACKWARD_KEY);
-  actionState.current[(size_t)Action::MoveLeft] =
+  actionState.current[static_cast<size_t>(Action::MoveLeft)] =
       inputState.isKeyDown(LEFT_KEY);
-  actionState.current[(size_t)Action::MoveRight] =
+  actionState.current[static_cast<size_t>(Action::MoveRight)] =
       inputState.isKeyDown(RIGHT_KEY);
-  actionState.current[(size_t)Action::Jump] = inputState.isKeyDown(JUMP_KEY);
-  actionState.current[(size_t)Action::Crouch] =
+  actionState.current[static_cast<size_t>(Action::Jump)] = inputState.isKeyDown(JUMP_KEY);
+  actionState.current[static_cast<size_t>(Action::Crouch)] =
       inputState.isKeyDown(CROUCH_KEY);
-  actionState.current[(size_t)Action::Sprint] =
+  actionState.current[static_cast<size_t>(Action::Sprint)] =
       inputState.isKeyDown(SPRINT_KEY);
-  actionState.current[(size_t)Action::Attack] =
+  actionState.current[static_cast<size_t>(Action::Attack)] =
       inputState.isMouseButtonPressed(ATTACK_KEY);
-  actionState.current[(size_t)Action::Aim] =
+  actionState.current[static_cast<size_t>(Action::Aim)] =
       inputState.isMouseButtonPressed(AIM_KEY);
 }
 

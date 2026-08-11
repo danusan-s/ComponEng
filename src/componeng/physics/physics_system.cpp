@@ -37,16 +37,16 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
   float restitutionA = 0.0f;
   float restitutionB = 0.0f;
 
-  if (a.rigidbody && a.rigidbody->type != RigidBodyComponent::Static) {
-    if (a.rigidbody->type == RigidBodyComponent::Dynamic) {
+  if (a.rigidbody && a.rigidbody->type != RigidBodyComponent::Type::Static) {
+    if (a.rigidbody->type == RigidBodyComponent::Type::Dynamic) {
       inverseMassA =
           a.rigidbody->mass != 0.0f ? 1.0f / a.rigidbody->mass : 0.0f;
     }
     restitutionA = a.rigidbody->restitution;
   }
 
-  if (b.rigidbody && b.rigidbody->type != RigidBodyComponent::Static) {
-    if (b.rigidbody->type == RigidBodyComponent::Dynamic) {
+  if (b.rigidbody && b.rigidbody->type != RigidBodyComponent::Type::Static) {
+    if (b.rigidbody->type == RigidBodyComponent::Type::Dynamic) {
       inverseMassB =
           b.rigidbody->mass != 0.0f ? 1.0f / b.rigidbody->mass : 0.0f;
     }
@@ -71,10 +71,10 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
 
   core::Vec3 impulse = j * info.normal;
 
-  if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Dynamic) {
+  if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Type::Dynamic) {
     a.rigidbody->velocity -= impulse * inverseMassA;
   }
-  if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Dynamic) {
+  if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Type::Dynamic) {
     b.rigidbody->velocity += impulse * inverseMassB;
   }
 
@@ -84,10 +84,10 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
                               percent / (inverseMassA + inverseMassB);
   core::Vec3 correction = correctionMagnitude * info.normal;
 
-  if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Dynamic) {
+  if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Type::Dynamic) {
     a.transform->position -= correction * inverseMassA;
   }
-  if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Dynamic) {
+  if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Type::Dynamic) {
     b.transform->position += correction * inverseMassB;
   }
 }
@@ -106,9 +106,9 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
     state.world->query<core::TransformComponent, RigidBodyComponent>()
         .eachParallel(pool, [&](core::TransformComponent &transform,
                                 RigidBodyComponent &rigidbody) {
-          if (rigidbody.type == RigidBodyComponent::Static)
+          if (rigidbody.type == RigidBodyComponent::Type::Static)
             return;
-          if (rigidbody.type == RigidBodyComponent::Dynamic) {
+          if (rigidbody.type == RigidBodyComponent::Type::Dynamic) {
             rigidbody.velocity += g_gravity * fixedTimeStep;
           }
           transform.position += rigidbody.velocity * fixedTimeStep;

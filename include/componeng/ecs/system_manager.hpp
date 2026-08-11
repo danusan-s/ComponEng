@@ -13,10 +13,11 @@
 
 namespace componeng::ecs {
 
-enum SystemGroup { Initialization, Simulation, Presentation };
+enum class SystemGroup { Initialization, Simulation, Presentation };
 
-constexpr SystemGroup GROUP_ORDER[] = {Initialization, Simulation,
-                                       Presentation};
+constexpr SystemGroup GROUP_ORDER[] = {SystemGroup::Initialization,
+                                       SystemGroup::Simulation,
+                                       SystemGroup::Presentation};
 constexpr size_t NUM_GROUPS = sizeof(GROUP_ORDER) / sizeof(SystemGroup);
 
 using SystemID = size_t;

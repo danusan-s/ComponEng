@@ -70,17 +70,17 @@ void Mesh::generateFromWavefrontObj(const std::string &data) {
         int texIndex = std::stoi(texIndexStr) - 1;
         int normIndex = std::stoi(normIndexStr) - 1;
 
-        if (posIndex < 0 || posIndex >= (int)positions.size()) {
+        if (posIndex < 0 || posIndex >= static_cast<int>(positions.size())) {
           LOG_ERROR("Invalid position index in OBJ file: %s.",
                     posIndexStr.c_str());
           continue;
         }
-        if (texIndex < 0 || texIndex >= (int)texCoords.size()) {
+        if (texIndex < 0 || texIndex >= static_cast<int>(texCoords.size())) {
           LOG_ERROR("Invalid texture coordinate index in OBJ file: %s.",
                     texIndexStr.c_str());
           continue;
         }
-        if (normIndex < 0 || normIndex >= (int)normals.size()) {
+        if (normIndex < 0 || normIndex >= static_cast<int>(normals.size())) {
           LOG_ERROR("Invalid normal index in OBJ file: %s.",
                     normIndexStr.c_str());
           continue;
