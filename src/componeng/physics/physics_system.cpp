@@ -27,8 +27,6 @@ struct CollisionPair {
   CollisionInfo info;
 };
 
-static double g_accumulatedTime = 0.0f;
-
 static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
                              const CollisionInfo &info) {
   if (a.collider->isTrigger || b.collider->isTrigger)
@@ -95,14 +93,14 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
 }
 
 void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
-  g_accumulatedTime += state.deltaTime;
+  m_accumulatedTime += state.deltaTime;
 
   const auto &physicsConfig = state.world->getResource<PhysicsConfig>();
   const float fixedTimeStep = physicsConfig.fixedTimeStep;
   core::Vec3 g_gravity = physicsConfig.gravity;
 
-  while (g_accumulatedTime >= fixedTimeStep) {
-    g_accumulatedTime -= fixedTimeStep;
+  while (m_accumulatedTime >= fixedTimeStep) {
+    m_accumulatedTime -= fixedTimeStep;
 
     ecs::ThreadPool &pool = state.world->threadPool();
     state.world->query<core::TransformComponent, RigidBodyComponent>()

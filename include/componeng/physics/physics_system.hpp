@@ -15,6 +15,10 @@ namespace componeng::physics {
 class PhysicsSystem : public ecs::ISystem {
 public:
   void onUpdate(const ecs::SystemState &state) override;
+
+private:
+  // Per-system so two worlds don't share one accumulator
+  double m_accumulatedTime = 0.0;
 };
 
 } // namespace componeng::physics

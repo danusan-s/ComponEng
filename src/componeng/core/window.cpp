@@ -9,7 +9,9 @@
 
 namespace componeng::core {
 
-static bool g_mouseLocked = true;
+static bool isMouseLocked(GLFWwindow *window) {
+  return glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
+}
 
 static void framebufferSizeCallback(GLFWwindow *window, int width, int height) {
   float targetAspectRatio = 16.0f / 9.0f;
@@ -36,19 +38,17 @@ static void keyCallback(GLFWwindow *window, int key, int scancode, int action,
     return;
 
   if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
-    if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED) {
+    if (isMouseLocked(window)) {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-      g_mouseLocked = false;
     } else {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-      g_mouseLocked = true;
       auto &state = engine->m_world.getResource<input::InputState>();
       state.previous_state.mouseX = state.current_state.mouseX;
       state.previous_state.mouseY = state.current_state.mouseY;
     }
   }
 
-  if (!g_mouseLocked)
+  if (!isMouseLocked(window))
     return;
 
   input::RawInputState &inputState =
@@ -75,7 +75,7 @@ static void mouseButtonCallback(GLFWwindow *window, int button, int action,
   input::RawInputState &inputState =
       engine->m_world.getResource<input::InputState>().current_state;
 
-  if (!g_mouseLocked)
+  if (!isMouseLocked(window))
     return;
 
   if (button >= 0 && button < 8) {
@@ -85,7 +85,7 @@ static void mouseButtonCallback(GLFWwindow *window, int button, int action,
 
 static void cursorPosCallback(GLFWwindow *window, double xposIn,
                               double yposIn) {
-  if (!g_mouseLocked)
+  if (!isMouseLocked(window))
     return;
 
   auto *engine = static_cast<Engine *>(glfwGetWindowUserPointer(window));
