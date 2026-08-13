@@ -15,6 +15,8 @@ public:
   // Owns a GL handle freed in the dtor; copying it would double-free
   GLShader(const GLShader &) = delete;
   GLShader &operator=(const GLShader &) = delete;
+  GLShader(GLShader &&) = delete;
+  GLShader &operator=(GLShader &&) = delete;
 
   void loadGLSL(const char *vertexSource, const char *fragmentSource,
                 const char *geometrySource = nullptr) override;

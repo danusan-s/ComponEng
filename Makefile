@@ -32,12 +32,24 @@ rebuild: clean build
 run_tests: build
 	@cd $(BUILD_DIR) && $(CTEST) --output-on-failure
 
-# ===== Lint (matches the CI clang-format check) =====
+# ===== Lint (matches the CI lint job) =====
 .PHONY: lint
-lint:
+lint: format-check tidy
+
+# Formatting only -- fast, no build required
+.PHONY: format-check
+format-check:
 	@find include/componeng src/componeng tests example \
 		-name "*.hpp" -o -name "*.cpp" | \
 		xargs clang-format --dry-run --Werror
+
+# Static analysis. Needs compile_commands.json; reuses whatever the build dir
+# is already configured as rather than reconfiguring it out from under you.
+.PHONY: tidy
+tidy:
+	@test -f $(BUILD_DIR)/compile_commands.json || $(MAKE) build
+	@clang-tidy -p $(BUILD_DIR) --warnings-as-errors='*' \
+		$$(find src/componeng -name "*.cpp")
 
 # ===== Format (apply clang-format in place) =====
 .PHONY: format

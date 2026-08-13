@@ -17,7 +17,7 @@ namespace componeng::renderer {
  */
 class Mesh {
 public:
-  Mesh();
+  Mesh() = default;
 
   void uploadToGPU();
 

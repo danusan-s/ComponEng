@@ -47,24 +47,25 @@ public:
     std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);
 
     EntityID soundEntity = world.createEntity();
-    world.addComponents(soundEntity,
-                        TransformComponent{.position = glm::vec3(0, 0, 0),
-                                           .rotation = glm::vec3(0, 0, 0),
-                                           .scale = glm::vec3(1, 1, 1)},
-                        AudioComponent{.audioName = "boop",
-                                       .playOnAwake = true,
-                                       .loop = true,
-                                       .volume = 0.8f,
-                                       .is3D = true,
-                                       .minDistance = 1.0f,
-                                       .maxDistance = 300.0f},
-                        RigidBodyComponent{.type = RigidBodyComponent::Type::Dynamic,
-                                           .mass = 1.0f,
-                                           .restitution = 1.0f},
-                        ColliderComponent{.type = ColliderType::Box},
-                        MaterialComponent{.materialName = "default_diffuse"},
-                        ColorComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f)},
-                        MeshComponent{.meshName = "cube"});
+    world.addComponents(
+        soundEntity,
+        TransformComponent{.position = glm::vec3(0, 0, 0),
+                           .rotation = glm::vec3(0, 0, 0),
+                           .scale = glm::vec3(1, 1, 1)},
+        AudioComponent{.audioName = "boop",
+                       .playOnAwake = true,
+                       .loop = true,
+                       .volume = 0.8f,
+                       .is3D = true,
+                       .minDistance = 1.0f,
+                       .maxDistance = 300.0f},
+        RigidBodyComponent{.type = RigidBodyComponent::Type::Dynamic,
+                           .mass = 1.0f,
+                           .restitution = 1.0f},
+        ColliderComponent{.type = ColliderType::Box},
+        MaterialComponent{.materialName = "default_diffuse"},
+        ColorComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f)},
+        MeshComponent{.meshName = "cube"});
 
     const int count = 100;
 

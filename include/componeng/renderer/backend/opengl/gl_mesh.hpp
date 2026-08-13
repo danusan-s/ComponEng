@@ -13,6 +13,8 @@ public:
   // Owns GL handles freed in the dtor; copying it would double-free
   GLMesh(const GLMesh &) = delete;
   GLMesh &operator=(const GLMesh &) = delete;
+  GLMesh(GLMesh &&) = delete;
+  GLMesh &operator=(GLMesh &&) = delete;
 
   void upload(const float *vertices, size_t vertexCount,
               const uint32_t *indices, size_t indexCount,

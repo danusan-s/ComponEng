@@ -8,12 +8,6 @@
 
 namespace componeng::audio {
 
-AudioEngine::AudioEngine() {
-}
-
-AudioEngine::~AudioEngine() {
-}
-
 void AudioEngine::init() {
   ma_result result = ma_engine_init(nullptr, &m_audioEngine);
   if (result != MA_SUCCESS) {

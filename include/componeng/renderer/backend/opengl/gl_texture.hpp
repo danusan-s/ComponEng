@@ -13,6 +13,8 @@ public:
   // Owns a GL handle freed in the dtor; copying it would double-free
   GLTexture(const GLTexture &) = delete;
   GLTexture &operator=(const GLTexture &) = delete;
+  GLTexture(GLTexture &&) = delete;
+  GLTexture &operator=(GLTexture &&) = delete;
 
   void generate(uint32_t width, uint32_t height, const unsigned char *data,
                 bool alpha) override;

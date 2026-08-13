@@ -10,8 +10,8 @@ namespace componeng::audio {
 
 class AudioEngine {
 public:
-  AudioEngine();
-  ~AudioEngine();
+  AudioEngine() = default;
+  ~AudioEngine() = default;
 
   AudioEngine(const AudioEngine &) = delete;
   AudioEngine &operator=(const AudioEngine &) = delete;

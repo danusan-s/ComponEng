@@ -8,9 +8,6 @@
 
 namespace componeng::renderer {
 
-Mesh::Mesh() {
-}
-
 void Mesh::uploadToGPU() {
   if (m_vertices.empty() || m_indices.empty()) {
     LOG_ERROR("Cannot initialize buffers for an empty mesh.");
@@ -102,17 +99,26 @@ void Mesh::generateFromWavefrontObj(const std::string &data) {
         ++faceVertCount;
       }
       if (faceVertCount == 3) {
-        m_indices.push_back((unsigned int)(m_vertices.size() / 8) - 3);
-        m_indices.push_back((unsigned int)(m_vertices.size() / 8) - 2);
-        m_indices.push_back((unsigned int)(m_vertices.size() / 8) - 1);
+        m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
+                            3);
+        m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
+                            2);
+        m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
+                            1);
       } else if (faceVertCount == 4) {
-        m_indices.push_back((unsigned int)(m_vertices.size() / 8) - 4);
-        m_indices.push_back((unsigned int)(m_vertices.size() / 8) - 3);
-        m_indices.push_back((unsigned int)(m_vertices.size() / 8) - 2);
+        m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
+                            4);
+        m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
+                            3);
+        m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
+                            2);
 
-        m_indices.push_back((unsigned int)(m_vertices.size() / 8) - 4);
-        m_indices.push_back((unsigned int)(m_vertices.size() / 8) - 2);
-        m_indices.push_back((unsigned int)(m_vertices.size() / 8) - 1);
+        m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
+                            4);
+        m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
+                            2);
+        m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
+                            1);
       }
     }
   }

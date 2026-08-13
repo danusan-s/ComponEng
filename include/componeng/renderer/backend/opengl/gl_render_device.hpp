@@ -15,10 +15,15 @@ namespace componeng::renderer::opengl {
  * Handles GL context loading (glad), global GL state setup, and creates
  * OpenGL-backed resources (shaders, textures, meshes, buffers).
  */
-class GLRenderDevice : public api::IRenderDevice {
+class GLRenderDevice final : public api::IRenderDevice {
 public:
-  GLRenderDevice();
-  ~GLRenderDevice() override;
+  GLRenderDevice() = default;
+  ~GLRenderDevice() override = default;
+
+  GLRenderDevice(const GLRenderDevice &) = delete;
+  GLRenderDevice &operator=(const GLRenderDevice &) = delete;
+  GLRenderDevice(GLRenderDevice &&) = delete;
+  GLRenderDevice &operator=(GLRenderDevice &&) = delete;
 
   void init(void *windowHandle) override;
   void setViewport(int x, int y, int w, int h) override;
@@ -37,9 +42,6 @@ public:
   void unbindInstanceAttributes(const api::VertexLayout &layout) override;
 
   void drawIndexedInstanced(size_t indexCount, uint32_t instanceCount) override;
-
-private:
-  void *m_windowHandle{nullptr};
 };
 
 } // namespace componeng::renderer::opengl

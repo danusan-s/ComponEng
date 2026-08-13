@@ -13,6 +13,8 @@ public:
   // Owns a GL handle freed in the dtor; copying it would double-free
   GLBuffer(const GLBuffer &) = delete;
   GLBuffer &operator=(const GLBuffer &) = delete;
+  GLBuffer(GLBuffer &&) = delete;
+  GLBuffer &operator=(GLBuffer &&) = delete;
 
   void
   setData(const void *data, size_t sizeBytes,

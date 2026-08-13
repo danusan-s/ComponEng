@@ -27,6 +27,8 @@ public:
 
   StringInterner(const StringInterner &) = delete;
   StringInterner &operator=(const StringInterner &) = delete;
+  StringInterner(StringInterner &&) = delete;
+  StringInterner &operator=(StringInterner &&) = delete;
 
   // Thread-safe. Returns the existing id if this text was already interned.
   NameID intern(std::string_view s);
@@ -40,6 +42,7 @@ public:
 
 private:
   StringInterner() = default;
+  ~StringInterner() = default;
 };
 
 } // namespace componeng::core

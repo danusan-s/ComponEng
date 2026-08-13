@@ -52,3 +52,28 @@ jobs:
         find include/componeng src/componeng tests example \
           -name "*.hpp" -o -name "*.cpp" | \
           xargs clang-format --dry-run --Werror
+
+  tidy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          clang-tidy \
+          libglfw3-dev \
+          libgl1-mesa-dev \
+          libglm-dev
+
+    # clang-tidy needs compile_commands.json, which configuring generates.
+    - name: Configure CMake
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug
+
+    - name: Run clang-tidy
+      run: |
+        clang-tidy -p build --warnings-as-errors='*' \
+          $(find src/componeng -name "*.cpp")

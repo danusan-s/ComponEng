@@ -22,6 +22,12 @@ namespace componeng::ecs {
  */
 class ThreadPool {
 public:
+  // Owns running threads and a queue they reference
+  ThreadPool(const ThreadPool &) = delete;
+  ThreadPool &operator=(const ThreadPool &) = delete;
+  ThreadPool(ThreadPool &&) = delete;
+  ThreadPool &operator=(ThreadPool &&) = delete;
+
   explicit ThreadPool(size_t numThreads = 0) : m_stop(false) {
     if (numThreads == 0) {
       numThreads = std::thread::hardware_concurrency();

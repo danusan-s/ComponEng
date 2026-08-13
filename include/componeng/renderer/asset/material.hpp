@@ -54,7 +54,7 @@ public:
     m_vertexLayout = layout;
   }
 
-  const api::VertexLayout getVertexLayout() const {
+  const api::VertexLayout &getVertexLayout() const {
     return m_vertexLayout;
   }
 

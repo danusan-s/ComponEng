@@ -13,7 +13,7 @@ namespace componeng::renderer {
  */
 class Texture2D {
 public:
-  Texture2D();
+  Texture2D() = default;
 
   void generate(uint32_t width, uint32_t height, unsigned char *data,
                 bool alpha = false);

@@ -3,6 +3,9 @@ project(ComponEng)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# compile_commands.json, needed by clang-tidy and clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
@@ -67,8 +70,9 @@ target_link_options(ComponEng PUBLIC
 )
 
 # PRIVATE: don't force these diagnostics onto example/ and tests
+# -Werror: the engine builds warning-clean, so keep it that way
 target_compile_options(ComponEng PRIVATE
-    -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual
+    -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror
 )
 # Vendored code isn't ours to fix; silence it so it can't drown out our warnings
 set_source_files_properties(${ENGINE_THIRD_PARTY_SOURCES} PROPERTIES

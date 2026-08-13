@@ -8,12 +8,6 @@
 
 namespace componeng::renderer::opengl {
 
-GLRenderDevice::GLRenderDevice() {
-}
-
-GLRenderDevice::~GLRenderDevice() {
-}
-
 // windowHandle is unused here: the caller has already made the GL context
 // current, and glad resolves entry points from it. Other backends need it.
 void GLRenderDevice::init(void * /*windowHandle*/) {
