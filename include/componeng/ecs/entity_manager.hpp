@@ -12,9 +12,9 @@ namespace componeng::ecs {
  * @brief Metadata stored per entity: its archetype row and component signature.
  */
 struct EntityRecord {
-  std::size_t row;
+  std::size_t row = 0;
   Signature signature;
-  uint32_t generation;
+  uint32_t generation = 0;
 };
 
 /**
@@ -27,10 +27,10 @@ class EntityManager {
 private:
   std::queue<EntityID> m_freeIDs;
   std::array<EntityRecord, MAX_ENTITIES> m_entityRecords;
-  uint32_t m_livingEntityCount;
+  uint32_t m_livingEntityCount = 0;
 
 public:
-  EntityManager() : m_livingEntityCount(0) {
+  EntityManager() {
     for (EntityID id = 1; id < MAX_ENTITIES; ++id) {
       m_freeIDs.push(id);
     }

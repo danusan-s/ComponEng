@@ -6,8 +6,8 @@
 
 namespace componeng::renderer {
 struct FrustumPlane {
-  core::Vec3 normal;
-  float distance;
+  core::Vec3 normal = core::Vec3(0.0f);
+  float distance = 0.0f;
 };
 
 class Frustum {

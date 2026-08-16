@@ -6,8 +6,8 @@
 namespace componeng::events {
 
 struct CollisionEvent {
-  ecs::EntityID entityA;
-  ecs::EntityID entityB;
+  ecs::EntityID entityA = ecs::INVALID_ENTITY;
+  ecs::EntityID entityB = ecs::INVALID_ENTITY;
   physics::CollisionInfo info;
 };
 

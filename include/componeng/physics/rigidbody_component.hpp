@@ -15,7 +15,7 @@ struct RigidBodyComponent {
   };
 
   Type type = Type::Static;
-  core::Vec3 velocity;
+  core::Vec3 velocity = core::Vec3(0.0f);
   float mass = 1.0f;
   float restitution = 0.5f;
 };

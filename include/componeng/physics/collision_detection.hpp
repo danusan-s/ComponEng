@@ -12,8 +12,8 @@ namespace componeng::physics {
  * The normal points from collider A toward collider B.
  */
 struct CollisionInfo {
-  core::Vec3 normal;
-  float penetration;
+  core::Vec3 normal = core::Vec3(0.0f);
+  float penetration = 0.0f;
 };
 
 /**

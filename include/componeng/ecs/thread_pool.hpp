@@ -28,7 +28,7 @@ public:
   ThreadPool(ThreadPool &&) = delete;
   ThreadPool &operator=(ThreadPool &&) = delete;
 
-  explicit ThreadPool(size_t numThreads = 0) : m_stop(false) {
+  explicit ThreadPool(size_t numThreads = 0) {
     if (numThreads == 0) {
       numThreads = std::thread::hardware_concurrency();
       if (numThreads == 0)
@@ -86,7 +86,7 @@ private:
   std::queue<std::function<void()>> m_tasks;
   std::mutex m_mutex;
   std::condition_variable m_cv;
-  bool m_stop;
+  bool m_stop = false;
 };
 
 } // namespace componeng::ecs

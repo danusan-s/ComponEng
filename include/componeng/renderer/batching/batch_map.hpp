@@ -11,8 +11,8 @@
 namespace componeng::renderer {
 
 struct DrawKey {
-  core::HandleID meshID;
-  core::HandleID materialID;
+  core::HandleID meshID = 0;
+  core::HandleID materialID = 0;
 
   bool operator==(const DrawKey &other) const {
     return materialID == other.materialID && meshID == other.meshID;

@@ -19,8 +19,8 @@ struct QueryDesc {
 template <typename... Req> class QueryIterator {
 private:
   std::vector<Archetype *> &m_archetypes;
-  size_t m_archetypeIndex;
-  size_t m_rowIndex;
+  size_t m_archetypeIndex = 0;
+  size_t m_rowIndex = 0;
 
   ComponentRegistry &m_registry;
 

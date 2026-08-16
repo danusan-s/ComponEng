@@ -22,15 +22,14 @@ private:
   void (*m_destructor)(void *) = nullptr;
 
 public:
-  size_t m_stride;
-  size_t m_count;
+  size_t m_stride = 0;
+  size_t m_count = 0;
 
   ComponentColumn(size_t componentSize, size_t alignment,
                   void (*destructor)(void *) = nullptr)
       // Order must match declaration order; members initialize in the latter
       // regardless of how they are listed here.
-      : m_buffer(alignment), m_destructor(destructor), m_stride(componentSize),
-        m_count(0) {
+      : m_buffer(alignment), m_destructor(destructor), m_stride(componentSize) {
     if (m_stride % alignment != 0) {
       m_stride = (m_stride / alignment + 1) * alignment;
     }

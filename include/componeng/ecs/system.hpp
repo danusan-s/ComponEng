@@ -14,8 +14,8 @@ namespace componeng::ecs {
  * frame time (deltaTime) for time-based updates.
  */
 struct SystemState {
-  World *world;
-  float deltaTime;
+  World *world = nullptr;
+  float deltaTime = 0.0f;
 };
 
 /**

@@ -18,9 +18,9 @@ namespace componeng::ecs {
  * callback for non-trivially-destructible types.
  */
 struct ComponentInfo {
-  const char *name;
-  size_t size;
-  size_t alignment;
+  const char *name = nullptr;
+  size_t size = 0;
+  size_t alignment = 0;
   void (*destructor)(void *) = nullptr;
   nlohmann::json (*serializer)(const void *) = nullptr;
   void *(*deserializer)(const nlohmann::json &) = nullptr;

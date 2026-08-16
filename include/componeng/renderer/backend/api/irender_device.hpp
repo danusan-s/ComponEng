@@ -14,9 +14,9 @@ namespace componeng::renderer::api {
  */
 struct VertexAttribute {
   core::Name name;
-  uint32_t offset;
-  uint32_t componentCount;
-  bool normalized;
+  uint32_t offset = 0;
+  uint32_t componentCount = 0;
+  bool normalized = false;
   // >= 0 if this slot holds one row of a mat4-typed value (see
   // IShader::reflectInstanceLayout); componentCount is then that row's width
   // and `name` is the mat4 value's own name, shared across its 4 rows.
@@ -28,7 +28,7 @@ struct VertexAttribute {
  */
 struct VertexLayout {
   std::vector<VertexAttribute> attributes;
-  uint32_t stride;
+  uint32_t stride = 0;
 };
 
 /**

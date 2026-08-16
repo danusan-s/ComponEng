@@ -7,8 +7,8 @@ namespace componeng::renderer {
 using InstanceData = std::vector<float>;
 
 struct RenderBatch {
-  core::HandleID meshID;
-  core::HandleID materialID;
+  core::HandleID meshID = 0;
+  core::HandleID materialID = 0;
   api::VertexLayout vertexLayout;
   std::vector<InstanceData> instanceDatas;
 };

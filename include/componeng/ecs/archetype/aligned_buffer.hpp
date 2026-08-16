@@ -19,7 +19,7 @@ private:
   std::byte *m_data = nullptr;
   size_t m_size = 0;
   size_t m_capacity = 0;
-  size_t m_alignment;
+  size_t m_alignment = 0;
 
 public:
   explicit AlignedBuffer(size_t alignment)

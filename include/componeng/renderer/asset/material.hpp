@@ -126,8 +126,8 @@ public:
   }
 
 private:
-  core::HandleID m_shaderID;
-  core::HandleID m_textureID;
+  core::HandleID m_shaderID = 0;
+  core::HandleID m_textureID = 0;
   api::VertexLayout m_vertexLayout;
   core::UniformMap m_uniforms;
   std::unordered_set<core::Name> m_knownUniforms;
