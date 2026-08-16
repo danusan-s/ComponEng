@@ -23,10 +23,14 @@ static componeng::ecs::ComponentRegistry makeRegistry() {
   return reg;
 }
 
+// Number of archetypes makeArchetypes() actually initialises.
+static constexpr std::size_t ARCHETYPE_COUNT = 3;
+
 static std::array<componeng::ecs::Archetype, componeng::ecs::MAX_ARCHETYPES>
 makeArchetypes(componeng::ecs::ComponentRegistry &reg) {
   std::array<componeng::ecs::Archetype, componeng::ecs::MAX_ARCHETYPES> archs;
 
+  // NOTE: keep ARCHETYPE_COUNT in sync with the archetypes built below.
   // Archetype 0: Pos only
   componeng::ecs::Signature sig0;
   sig0.set(reg.getComponentID<Pos>());
@@ -57,7 +61,7 @@ TEST(QueryTest, MatchesRequiredComponents) {
   componeng::ecs::ComponentRegistry reg = makeRegistry();
   auto archs = makeArchetypes(reg);
 
-  componeng::ecs::Query<Pos> q(archs, reg);
+  componeng::ecs::Query<Pos> q(archs, ARCHETYPE_COUNT, reg);
 
   // Archetype 0 has Pos
   EXPECT_TRUE(q.matches(archs[0]));
@@ -71,7 +75,7 @@ TEST(QueryTest, MatchesMultipleRequiredComponents) {
   componeng::ecs::ComponentRegistry reg = makeRegistry();
   auto archs = makeArchetypes(reg);
 
-  componeng::ecs::Query<Pos, Vel> q(archs, reg);
+  componeng::ecs::Query<Pos, Vel> q(archs, ARCHETYPE_COUNT, reg);
 
   // Archetype 0 only has Pos, missing Vel
   EXPECT_FALSE(q.matches(archs[0]));
@@ -85,7 +89,7 @@ TEST(QueryTest, ExcludeFiltersCorrectly) {
   componeng::ecs::ComponentRegistry reg = makeRegistry();
   auto archs = makeArchetypes(reg);
 
-  componeng::ecs::Query<Pos, Vel> q(archs, reg);
+  componeng::ecs::Query<Pos, Vel> q(archs, ARCHETYPE_COUNT, reg);
   q.exclude<Mass>();
 
   // Archetype 2 has Mass, should be excluded
@@ -99,7 +103,7 @@ TEST(QueryTest, EachIteratesMatchingArchetypes) {
   auto archs = makeArchetypes(reg);
 
   int count = 0;
-  componeng::ecs::Query<Pos> q(archs, reg);
+  componeng::ecs::Query<Pos> q(archs, ARCHETYPE_COUNT, reg);
   q.each([&](Pos &p) { ++count; });
 
   // Archetype 0: 2 entities, Archetype 1: 2 entities, Archetype 2: 1 entity
@@ -112,7 +116,7 @@ TEST(QueryTest, EachWithEntityProvidesEntityID) {
   auto archs = makeArchetypes(reg);
 
   std::vector<componeng::ecs::EntityID> entities;
-  componeng::ecs::Query<Pos> q(archs, reg);
+  componeng::ecs::Query<Pos> q(archs, ARCHETYPE_COUNT, reg);
   q.eachWithEntity([&](componeng::ecs::EntityID entity, Pos &p) {
     entities.push_back(entity);
   });
@@ -127,7 +131,7 @@ TEST(QueryTest, ExcludeReturnsReference) {
   componeng::ecs::ComponentRegistry reg = makeRegistry();
   auto archs = makeArchetypes(reg);
 
-  componeng::ecs::Query<Pos, Vel> q(archs, reg);
+  componeng::ecs::Query<Pos, Vel> q(archs, ARCHETYPE_COUNT, reg);
   componeng::ecs::Query<Pos, Vel> &ref = q.exclude<Mass>();
 
   // Should return the same object
@@ -141,7 +145,7 @@ TEST(QueryTest, EachWithExclude) {
   auto archs = makeArchetypes(reg);
 
   int count = 0;
-  componeng::ecs::Query<Pos, Vel> q(archs, reg);
+  componeng::ecs::Query<Pos, Vel> q(archs, ARCHETYPE_COUNT, reg);
   q.exclude<Mass>();
   q.each([&](Pos &p, Vel &v) { ++count; });
 

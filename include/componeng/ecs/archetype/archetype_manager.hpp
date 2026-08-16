@@ -57,6 +57,11 @@ public:
   std::array<Archetype, MAX_ARCHETYPES> &getArchetypes() {
     return m_archetypes;
   }
+
+  /** Live archetypes occupy [0, count); the rest of the array is unused. */
+  std::size_t count() const {
+    return m_archetypeCount;
+  }
 };
 
 } // namespace componeng::ecs

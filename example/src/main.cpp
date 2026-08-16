@@ -28,6 +28,13 @@ bool saveToFile = true;
 class Game : public IGame {
 public:
   void init(World &world) override {
+    constexpr float positionRange = 10000.0f;
+    constexpr float scaleMin = 1.0f;
+    constexpr float scaleMax = 5.0f;
+    constexpr float massMin = 0.5f;
+    constexpr float massMax = 5.0f;
+    constexpr int count = 1000;
+
     auto &assetManager = world.getResource<AssetManager>();
     assetManager.loadAudio(Utils::getAssetPath("assets/audio/boop.wav").c_str(),
                            "boop");
@@ -40,11 +47,11 @@ public:
       return;
     }
     std::default_random_engine generator;
-    std::uniform_real_distribution<float> randPosition(-500.0f, 500.0f);
-    std::uniform_real_distribution<float> randScale(1.0f, 5.0f);
+    std::uniform_real_distribution<float> randPosition(-positionRange,
+                                                       positionRange);
+    std::uniform_real_distribution<float> randScale(scaleMin, scaleMax);
     std::uniform_real_distribution<float> randColor(0.0f, 1.0f);
-    std::uniform_real_distribution<float> randMass(0.5f, 5.0f);
-    std::uniform_int_distribution<int> randVelocity(-5.0f, 5.0f);
+    std::uniform_real_distribution<float> randMass(massMin, massMax);
 
     EntityID soundEntity = world.createEntity();
     world.addComponents(
@@ -67,12 +74,10 @@ public:
         ColorComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f)},
         MeshComponent{.meshName = "cube"});
 
-    const int count = 100;
-
     for (int i = 0; i < count; ++i) {
-      componeng::ecs::EntityID entity = world.createEntity();
-
+      EntityID entity = world.createEntity();
       float scale = randScale(generator);
+
       world.addComponents(
           entity, componeng::renderer::MeshComponent{.meshName = "cube"},
           componeng::core::TransformComponent{
@@ -92,12 +97,10 @@ public:
                                 TransformComponent{.position = Vec3(0.0f),
                                                    .rotation = Vec3(0.0f),
                                                    .scale = Vec3(1.0f)}});
-    }
 
-    for (int i = 0; i < count; ++i) {
-      EntityID entity = world.createEntity();
+      entity = world.createEntity();
+      scale = randScale(generator);
 
-      float scale = randScale(generator);
       world.addComponents(
           entity, MeshComponent{.meshName = "sphere"},
           TransformComponent{.position = Vec3(randPosition(generator),
@@ -106,8 +109,7 @@ public:
                              .rotation = Vec3(0.0f),
                              .scale = Vec3(scale)},
           RigidBodyComponent{.type = RigidBodyComponent::Type::Dynamic,
-                             .velocity =
-                                 Vec3(0.0f, randVelocity(generator), 0.0f),
+                             .velocity = Vec3(0.0f, 0.0f, 0.0f),
                              .mass = randMass(generator),
                              .restitution = 1.0f},
           MaterialComponent{.materialName = "default_diffuse"},

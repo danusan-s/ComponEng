@@ -81,6 +81,7 @@ public:
 template <typename... Req> class Query {
 private:
   std::array<Archetype, MAX_ARCHETYPES> &m_archetypes;
+  std::size_t m_archetypeCount = 0;
   std::vector<Archetype *> m_matchingArchetypes;
   bool m_dirty = true;
   ComponentRegistry &m_registry;
@@ -110,17 +111,21 @@ public:
       return;
 
     m_matchingArchetypes.clear();
-    for (Archetype &archetype : m_archetypes) {
-      if (matches(archetype)) {
-        m_matchingArchetypes.push_back(&archetype);
+    // Only [0, m_archetypeCount) has been initialised; scanning the whole
+    // MAX_ARCHETYPES array would cost the ceiling rather than the actual
+    // number of archetypes, on every query.
+    for (std::size_t i = 0; i < m_archetypeCount; ++i) {
+      if (matches(m_archetypes[i])) {
+        m_matchingArchetypes.push_back(&m_archetypes[i]);
       }
     }
     m_dirty = false;
   }
 
   Query(std::array<Archetype, MAX_ARCHETYPES> &archetypes,
-        ComponentRegistry &registry)
-      : m_archetypes(archetypes), m_registry(registry) {
+        std::size_t archetypeCount, ComponentRegistry &registry)
+      : m_archetypes(archetypes), m_archetypeCount(archetypeCount),
+        m_registry(registry) {
     desc.required = m_registry.makeSignature<Req...>();
   }
 

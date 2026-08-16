@@ -261,7 +261,8 @@ public:
   template <typename... Ts> Query<Ts...> query() {
     std::array<Archetype, MAX_ARCHETYPES> &archetypes =
         m_archetypeManager.getArchetypes();
-    return Query<Ts...>(archetypes, m_componentRegistry);
+    return Query<Ts...>(archetypes, m_archetypeManager.count(),
+                        m_componentRegistry);
   }
 
   template <typename T>
