@@ -44,9 +44,8 @@ private:
   void *m_windowHandle = nullptr;
   renderer::api::IRenderDevice *m_renderDevice = nullptr;
 
-  void migrateEntityToArchetype(EntityID entity, std::size_t oldRow,
-                                Signature oldSig, Signature newSig,
-                                Archetype *oldArchetype,
+  void migrateEntityToArchetype(std::size_t oldRow, Signature oldSig,
+                                Signature newSig, Archetype *oldArchetype,
                                 Archetype &newArchetype, std::size_t newRow) {
     if (!oldArchetype)
       return;
@@ -60,7 +59,7 @@ private:
       std::memcpy(dst.at(newRow), src.at(oldRow), src.m_stride);
     }
 
-    EntityID moved = oldArchetype->removeEntity(entity);
+    EntityID moved = oldArchetype->removeEntityAtRow(oldRow);
     if (moved != INVALID_ENTITY) {
       m_entityManager.getRecord(moved).row = oldRow;
     }
@@ -127,9 +126,7 @@ public:
 
     Archetype &newArchetype =
         m_archetypeManager.getOrCreate(newSig, m_componentRegistry);
-    newArchetype.addEntity(entity);
-
-    std::size_t newRow = newArchetype.getRowForEntity(entity);
+    std::size_t newRow = newArchetype.addEntity(entity);
 
     if (oldArchetype == nullptr) {
       LOG_INFO("Adding first component to entity %llu",
@@ -140,7 +137,7 @@ public:
                newSig.to_string().c_str(), oldSig.to_string().c_str());
     }
 
-    migrateEntityToArchetype(entity, record.row, oldSig, newSig, oldArchetype,
+    migrateEntityToArchetype(record.row, oldSig, newSig, oldArchetype,
                              newArchetype, newRow);
 
     (new (newArchetype.getColumn(m_componentRegistry.getComponentID<Ts>())
@@ -167,14 +164,12 @@ public:
 
     Archetype &newArchetype =
         m_archetypeManager.getOrCreate(newSig, m_componentRegistry);
-    newArchetype.addEntity(entity);
-
-    std::size_t newRow = newArchetype.getRowForEntity(entity);
+    std::size_t newRow = newArchetype.addEntity(entity);
 
     const ComponentInfo &info =
         m_componentRegistry.getComponentInfo(componentID);
 
-    migrateEntityToArchetype(entity, record.row, oldSig, newSig, oldArchetype,
+    migrateEntityToArchetype(record.row, oldSig, newSig, oldArchetype,
                              newArchetype, newRow);
 
     std::memcpy(newArchetype.getColumn(componentID).at(newRow), componentData,
@@ -200,10 +195,9 @@ public:
 
     Archetype &newArchetype =
         m_archetypeManager.getOrCreate(newSig, m_componentRegistry);
-    newArchetype.addEntity(entity);
-    std::size_t newRow = newArchetype.getRowForEntity(entity);
+    std::size_t newRow = newArchetype.addEntity(entity);
 
-    migrateEntityToArchetype(entity, record.row, oldSig, newSig, oldArchetype,
+    migrateEntityToArchetype(record.row, oldSig, newSig, oldArchetype,
                              newArchetype, newRow);
 
     record.signature = newSig;

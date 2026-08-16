@@ -118,7 +118,7 @@ TEST(SerializationTest, ArchetypeMigrationPreservesLongStrings) {
   arch2.addEntity(1);
   std::memcpy(arch2.getColumn(meshCID).at(0), arch1.getColumn(meshCID).at(0),
               arch1.getColumn(meshCID).m_stride);
-  arch1.removeEntity(1);
+  arch1.removeEntityAtRow(0);
 
   auto &moved =
       static_cast<MeshComponent *>(arch2.getColumn(meshCID).at(0))->meshName;
@@ -147,7 +147,7 @@ TEST(SerializationTest, MultipleEntityMigrations) {
         ("entity_" + std::to_string(i) + "_with_a_long_name_to_test").c_str());
   }
 
-  // Migrate using memcpy + removeEntity (the archetype swap pattern)
+  // Migrate using memcpy + removeEntityAtRow (the archetype swap pattern)
   Signature sig2 = sig1;
   Archetype arch2;
   arch2.init(sig2, reg);
@@ -155,14 +155,14 @@ TEST(SerializationTest, MultipleEntityMigrations) {
   arch2.addEntity(10);
   std::memcpy(arch2.getColumn(meshCID).at(0), arch1.getColumn(meshCID).at(0),
               arch1.getColumn(meshCID).m_stride);
-  arch1.removeEntity(10);
+  arch1.removeEntityAtRow(0);
 
   // entity 11 is now at row 0 (entity 10 was at 0, removed, entity 12
   // was at row 2 and got swapped to row 0). entity 11 remains at row 1.
   arch2.addEntity(11);
   std::memcpy(arch2.getColumn(meshCID).at(1), arch1.getColumn(meshCID).at(1),
               arch1.getColumn(meshCID).m_stride);
-  arch1.removeEntity(11);
+  arch1.removeEntityAtRow(1);
 
   auto &moved =
       static_cast<MeshComponent *>(arch2.getColumn(meshCID).at(0))->meshName;

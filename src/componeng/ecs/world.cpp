@@ -31,7 +31,7 @@ void World::destroyEntity(EntityID entity) {
     // last row is moved into the freed row, so its record must be repointed
     // or every later access reads the wrong (or an out-of-bounds) row.
     std::size_t freedRow = record.row;
-    EntityID moved = currArchetype->removeEntity(entity);
+    EntityID moved = currArchetype->removeEntityAtRow(freedRow);
     if (moved != INVALID_ENTITY) {
       m_entityManager.getRecord(moved).row = freedRow;
     }

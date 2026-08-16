@@ -17,16 +17,23 @@ namespace componeng::ecs {
  * over entities touches contiguous memory for each component — this is the
  * core cache-friendly data layout of the ECS.
  *
- * Entity-to-row mappings (m_entityToRow / m_rowToEntity) allow O(1) lookup
- * in both directions.
  */
 class Archetype {
 private:
   std::vector<ComponentColumn> m_columns;
+  std::vector<EntityID> m_rowToEntity;
 
-  uint8_t m_indexMap[MAX_COMPONENTS] = {0};
-  std::unordered_map<EntityID, size_t> m_entityToRow;
-  std::unordered_map<size_t, EntityID> m_rowToEntity;
+  /**
+   * Column index of a component: how many components with a lower id this
+   * archetype holds. Costs a popcount instead of a MAX_COMPONENTS-sized map.
+   */
+  std::size_t columnOf(ComponentID c) const {
+    static_assert(MAX_COMPONENTS <= 64,
+                  "columnOf builds its mask from a 64-bit word; going wider "
+                  "needs a Signature type that exposes its words");
+    const Signature below(c == 0 ? 0ull : (~0ull >> (64 - c)));
+    return (m_signature & below).count();
+  }
 
 public:
   Signature m_signature;
@@ -34,86 +41,82 @@ public:
   void init(Signature signature, ComponentRegistry &registry) {
     this->m_signature = signature;
 
-    // build columns for each component in signature
+    // Ascending order matters: columnOf() depends on it.
     for (size_t i = 0; i < MAX_COMPONENTS; ++i) {
       if (signature.test(i)) {
         ComponentInfo &info = registry.getComponentInfo(i);
-        m_indexMap[i] = m_columns.size();
         m_columns.emplace_back(info.size, info.alignment, info.destructor);
       }
     }
   }
 
-  void addEntity(EntityID entity) {
-    size_t row = m_columns.empty() ? 0 : m_columns[0].m_count;
+  /**
+   * @return the row the entity was placed in.
+   * caller responsible for copying data into the row
+   */
+  std::size_t addEntity(EntityID entity) {
+    const std::size_t row = m_rowToEntity.size();
     for (auto &col : m_columns) {
       col.pushBackEmpty();
     }
-    m_entityToRow[entity] = row;
-    m_rowToEntity[row] = entity;
+    m_rowToEntity.push_back(entity);
+    return row;
   }
 
   /**
-   * Swap and remove to last row for each component column, then erase the
-   * entity from mappings.
-   * @return the EntityID of the entity that was swapped into the removed
-   * entity's row, or INVALID_ENTITY if no swap occurred.
+   * Swap-removes the given row from every component column.
+   *
+   * Takes a row rather than an EntityID because the caller already holds the
+   * row in the entity's record; looking it up again would mean keeping a
+   * second copy of that mapping here.
+   *
+   * @return the EntityID swapped into the freed row, or INVALID_ENTITY if the
+   * removed row was the last one. The caller must repoint that entity's
+   * record, otherwise every later access reads the wrong row.
    */
-  EntityID removeEntity(EntityID entity) {
-    auto it = m_entityToRow.find(entity);
-    if (it == m_entityToRow.end()) {
-      throw std::runtime_error("Archetype: Entity not found in archetype");
+  EntityID removeEntityAtRow(std::size_t row) {
+    if (row >= m_rowToEntity.size()) {
+      throw std::runtime_error("Archetype: Invalid row index");
     }
-    size_t row = it->second;
-    size_t lastRow = m_columns[0].m_count - 1;
+    const std::size_t lastRow = m_rowToEntity.size() - 1;
 
-    if (row == lastRow) {
-      for (auto &col : m_columns) {
-        col.remove(row);
-      }
-      m_rowToEntity.erase(lastRow);
-      m_entityToRow.erase(it);
-      return INVALID_ENTITY;
-    }
-
-    EntityID lastRowEntity = m_rowToEntity[lastRow];
     for (auto &col : m_columns) {
       col.remove(row);
     }
-    m_entityToRow[lastRowEntity] = row;
-    m_rowToEntity.erase(lastRow);
-    m_rowToEntity[row] = lastRowEntity;
-    m_entityToRow.erase(it);
-    return lastRowEntity;
+
+    if (row == lastRow) {
+      m_rowToEntity.pop_back();
+      return INVALID_ENTITY;
+    }
+
+    const EntityID moved = m_rowToEntity[lastRow];
+    m_rowToEntity[row] = moved;
+    m_rowToEntity.pop_back();
+    return moved;
   }
 
   ComponentColumn &getColumn(ComponentID c) {
     if (!m_signature.test(c)) {
       throw std::runtime_error("Archetype: Component not in archetype");
     }
-    return m_columns[m_indexMap[c]];
+    return m_columns[columnOf(c)];
   }
 
   template <typename T> T &get(ComponentID c, std::size_t row) {
     return getColumn(c).get<T>(row);
   }
 
-  size_t getRowForEntity(EntityID id) {
-    if (m_entityToRow.find(id) == m_entityToRow.end()) {
-      throw std::runtime_error("Archetype: Entity not found in archetype");
-    }
-    return m_entityToRow[id];
-  }
-
-  EntityID getEntityForRow(size_t row) {
-    if (m_rowToEntity.find(row) == m_rowToEntity.end()) {
+  EntityID getEntityForRow(std::size_t row) const {
+    if (row >= m_rowToEntity.size()) {
       throw std::runtime_error("Archetype: Row index out of bounds");
     }
     return m_rowToEntity[row];
   }
 
-  size_t getEntityCount() const {
-    return m_columns.empty() ? 0 : m_columns[0].m_count;
+  // Tracks rows, not columns, so this stays correct for an archetype whose
+  // signature is empty (entities with no components still occupy rows).
+  std::size_t getEntityCount() const {
+    return m_rowToEntity.size();
   }
 };
 

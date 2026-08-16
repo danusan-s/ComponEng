@@ -85,7 +85,7 @@ TEST(ArchetypeTest, RemoveEntityDecreasesCount) {
   arch.addEntity(1);
   arch.addEntity(2);
 
-  arch.removeEntity(1);
+  arch.removeEntityAtRow(1);
   EXPECT_EQ(arch.getEntityCount(), 2u);
 }
 
@@ -99,24 +99,24 @@ TEST(ArchetypeTest, RemoveEntityReturnsSwappedEntity) {
   arch.addEntity(10);
   arch.addEntity(20);
 
-  // Removing entity 10 should swap entity 20 into its slot
-  componeng::ecs::EntityID swapped = arch.removeEntity(10);
+  // Removing row 0 (entity 10) should swap entity 20 into its slot
+  componeng::ecs::EntityID swapped = arch.removeEntityAtRow(0);
   EXPECT_EQ(swapped, 20u);
   EXPECT_EQ(arch.getEntityForRow(0), 20u);
 }
 
-TEST(ArchetypeTest, GetRowForEntity) {
+TEST(ArchetypeTest, AddEntityReturnsDenseRows) {
   componeng::ecs::ComponentRegistry reg = makeRegistry();
   componeng::ecs::Signature sig;
   sig.set(reg.getComponentID<Pos>());
 
   componeng::ecs::Archetype arch;
   arch.init(sig, reg);
-  arch.addEntity(5);
-  arch.addEntity(10);
 
-  EXPECT_EQ(arch.getRowForEntity(5), 0u);
-  EXPECT_EQ(arch.getRowForEntity(10), 1u);
+  EXPECT_EQ(arch.addEntity(5), 0u);
+  EXPECT_EQ(arch.addEntity(10), 1u);
+  EXPECT_EQ(arch.getEntityForRow(0), 5u);
+  EXPECT_EQ(arch.getEntityForRow(1), 10u);
 }
 
 TEST(ArchetypeTest, ThrowsOnInvalidColumn) {
