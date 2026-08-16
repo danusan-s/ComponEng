@@ -21,33 +21,30 @@ private:
   size_t m_archetypeCount = 0;
 
 public:
-  Archetype &getOrCreate(const Signature &signature,
-                         ComponentRegistry &componentRegistry) {
+  /**
+   * @return the id of the archetype for this signature, creating it if this
+   * signature has not been seen before. Callers keep the id rather than the
+   * reference, so it stays valid as archetypes are added.
+   */
+  ArchetypeID getOrCreate(const Signature &signature,
+                          ComponentRegistry &componentRegistry) {
     if (signature == Signature(0)) {
       throw std::runtime_error("ArchetypeManager: signature cannot be empty");
     }
 
     auto it = m_signatureToArchetypeID.find(signature);
     if (it != m_signatureToArchetypeID.end()) {
-      return m_archetypes[it->second];
+      return it->second;
     }
 
     if (m_archetypeCount >= MAX_ARCHETYPES) {
       throw std::runtime_error("ArchetypeManager: MAX_ARCHETYPES exceeded");
     }
 
-    ArchetypeID newID = m_archetypeCount++;
+    ArchetypeID newID = static_cast<ArchetypeID>(m_archetypeCount++);
     m_archetypes[newID].init(signature, componentRegistry);
     m_signatureToArchetypeID[signature] = newID;
-    return m_archetypes[newID];
-  }
-
-  Archetype *getBySignature(const Signature &signature) {
-    auto it = m_signatureToArchetypeID.find(signature);
-    if (it != m_signatureToArchetypeID.end()) {
-      return &m_archetypes[it->second];
-    }
-    return nullptr;
+    return newID;
   }
 
   Archetype &getByID(ArchetypeID id) {

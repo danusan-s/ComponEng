@@ -12,9 +12,9 @@ namespace componeng::ecs {
  * @brief Metadata stored per entity: its archetype row and component signature.
  */
 struct EntityRecord {
-  std::size_t row = 0;
-  Signature signature;
-  uint32_t generation = 0;
+  std::uint32_t row = 0;
+  std::uint32_t generation = 0;
+  ArchetypeID archetypeId = INVALID_ARCHETYPE;
 };
 
 /**
@@ -46,7 +46,7 @@ public:
 
     EntityRecord &record = m_entityRecords[id];
     record.row = 0;
-    record.signature.reset();
+    record.archetypeId = INVALID_ARCHETYPE;
     record.generation++;
 
     return id;
@@ -57,7 +57,7 @@ public:
 
     EntityRecord &record = m_entityRecords[id];
     record.row = 0;
-    record.signature.reset();
+    record.archetypeId = INVALID_ARCHETYPE;
     m_freeIDs.push(id);
     --m_livingEntityCount;
   }

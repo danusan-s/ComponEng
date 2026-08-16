@@ -43,7 +43,7 @@ TEST(EntityManagerTest, TracksLivingEntityCount) {
   em.destroyEntity(2u);
 
   auto &rec = em.getRecord(2u);
-  EXPECT_EQ(rec.signature.count(), 0u);
+  EXPECT_EQ(rec.archetypeId, componeng::ecs::INVALID_ARCHETYPE);
   EXPECT_EQ(rec.row, 0u);
 }
 
@@ -52,7 +52,7 @@ TEST(EntityManagerTest, GetRecordReturnsCorrectData) {
   componeng::ecs::EntityID id = em.createEntity(); // 1
   componeng::ecs::EntityRecord &rec = em.getRecord(id);
   EXPECT_EQ(rec.row, 0u);
-  EXPECT_EQ(rec.signature.count(), 0u);
+  EXPECT_EQ(rec.archetypeId, componeng::ecs::INVALID_ARCHETYPE);
 }
 
 TEST(EntityManagerTest, DestroyedEntityRecordIsCleared) {
@@ -61,5 +61,5 @@ TEST(EntityManagerTest, DestroyedEntityRecordIsCleared) {
   em.destroyEntity(id);
   componeng::ecs::EntityRecord &rec = em.getRecord(id);
   EXPECT_EQ(rec.row, 0u);
-  EXPECT_TRUE(rec.signature.none());
+  EXPECT_EQ(rec.archetypeId, componeng::ecs::INVALID_ARCHETYPE);
 }

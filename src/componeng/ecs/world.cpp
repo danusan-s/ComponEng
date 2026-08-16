@@ -24,8 +24,7 @@ EntityID World::createEntity() {
 void World::destroyEntity(EntityID entity) {
   m_eventBus.emit<events::EntityDestroyEvent>({.entity = entity});
   EntityRecord &record = m_entityManager.getRecord(entity);
-  Archetype *currArchetype =
-      m_archetypeManager.getBySignature(record.signature);
+  Archetype *currArchetype = archetypeOf(record);
   if (currArchetype) {
     // Archetype storage is swap-remove: the entity previously occupying the
     // last row is moved into the freed row, so its record must be repointed

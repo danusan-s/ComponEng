@@ -44,6 +44,19 @@ private:
   void *m_windowHandle = nullptr;
   renderer::api::IRenderDevice *m_renderDevice = nullptr;
 
+  /** @return the entity's archetype, or nullptr if it has no components. */
+  Archetype *archetypeOf(const EntityRecord &record) {
+    return record.archetypeId == INVALID_ARCHETYPE
+               ? nullptr
+               : &m_archetypeManager.getByID(record.archetypeId);
+  }
+
+  /** @return the entity's component signature; empty if it has none. */
+  Signature signatureOf(const EntityRecord &record) {
+    Archetype *archetype = archetypeOf(record);
+    return archetype ? archetype->m_signature : Signature{};
+  }
+
   void migrateEntityToArchetype(std::size_t oldRow, Signature oldSig,
                                 Signature newSig, Archetype *oldArchetype,
                                 Archetype &newArchetype, std::size_t newRow) {
@@ -98,11 +111,11 @@ public:
     EntityRecord &record = m_entityManager.getRecord(entity);
     ComponentID componentID = m_componentRegistry.getComponentID<T>();
 
-    if (!record.signature.test(componentID)) {
+    Archetype *archetype = archetypeOf(record);
+    if (!archetype || !archetype->m_signature.test(componentID)) {
       throw std::runtime_error("Entity does not have component");
     }
 
-    Archetype *archetype = m_archetypeManager.getBySignature(record.signature);
     return archetype->get<T>(componentID, record.row);
   }
 
@@ -114,18 +127,18 @@ public:
   void addComponents(EntityID entity, Ts &&...components) {
     EntityRecord &record = m_entityManager.getRecord(entity);
 
-    Signature oldSig = record.signature;
-    Archetype *oldArchetype = m_archetypeManager.getBySignature(oldSig);
+    Archetype *oldArchetype = archetypeOf(record);
+    Signature oldSig = oldArchetype ? oldArchetype->m_signature : Signature{};
 
     if ((oldSig & m_componentRegistry.makeSignature<Ts...>()).any()) {
       throw std::runtime_error("Entity already has component");
     }
 
-    Signature newSig = oldSig;
-    newSig = oldSig | m_componentRegistry.makeSignature<Ts...>();
+    Signature newSig = oldSig | m_componentRegistry.makeSignature<Ts...>();
 
-    Archetype &newArchetype =
+    ArchetypeID newArchetypeId =
         m_archetypeManager.getOrCreate(newSig, m_componentRegistry);
+    Archetype &newArchetype = m_archetypeManager.getByID(newArchetypeId);
     std::size_t newRow = newArchetype.addEntity(entity);
 
     if (oldArchetype == nullptr) {
@@ -144,16 +157,16 @@ public:
               .at(newRow)) Ts(std::forward<Ts>(components)),
      ...);
 
-    record.signature = newSig;
-    record.row = newRow;
+    record.archetypeId = newArchetypeId;
+    record.row = static_cast<std::uint32_t>(newRow);
   }
 
   void addComponentById(EntityID entity, ComponentID componentID,
                         const void *componentData) {
     EntityRecord &record = m_entityManager.getRecord(entity);
 
-    Signature oldSig = record.signature;
-    Archetype *oldArchetype = m_archetypeManager.getBySignature(oldSig);
+    Archetype *oldArchetype = archetypeOf(record);
+    Signature oldSig = oldArchetype ? oldArchetype->m_signature : Signature{};
 
     if (oldSig.test(componentID)) {
       throw std::runtime_error("Entity already has component");
@@ -162,8 +175,9 @@ public:
     Signature newSig = oldSig;
     newSig.set(componentID);
 
-    Archetype &newArchetype =
+    ArchetypeID newArchetypeId =
         m_archetypeManager.getOrCreate(newSig, m_componentRegistry);
+    Archetype &newArchetype = m_archetypeManager.getByID(newArchetypeId);
     std::size_t newRow = newArchetype.addEntity(entity);
 
     const ComponentInfo &info =
@@ -175,16 +189,16 @@ public:
     std::memcpy(newArchetype.getColumn(componentID).at(newRow), componentData,
                 info.size);
 
-    record.signature = newSig;
-    record.row = newRow;
+    record.archetypeId = newArchetypeId;
+    record.row = static_cast<std::uint32_t>(newRow);
   }
 
   template <typename T> void removeComponent(EntityID entity) {
     ComponentID componentID = m_componentRegistry.getComponentID<T>();
     EntityRecord &record = m_entityManager.getRecord(entity);
 
-    Signature oldSig = record.signature;
-    Archetype *oldArchetype = m_archetypeManager.getBySignature(oldSig);
+    Archetype *oldArchetype = archetypeOf(record);
+    Signature oldSig = oldArchetype ? oldArchetype->m_signature : Signature{};
 
     if (!oldSig.test(componentID)) {
       throw std::runtime_error("Entity does not have component");
@@ -193,21 +207,35 @@ public:
     Signature newSig = oldSig;
     newSig.reset(componentID);
 
-    Archetype &newArchetype =
+    // Dropping the last component leaves no signature, and an empty signature
+    // has no archetype -- the entity simply stops belonging to one.
+    if (newSig.none()) {
+      EntityID moved = oldArchetype->removeEntityAtRow(record.row);
+      if (moved != INVALID_ENTITY) {
+        m_entityManager.getRecord(moved).row = record.row;
+      }
+      record.archetypeId = INVALID_ARCHETYPE;
+      record.row = 0;
+      return;
+    }
+
+    ArchetypeID newArchetypeId =
         m_archetypeManager.getOrCreate(newSig, m_componentRegistry);
+    Archetype &newArchetype = m_archetypeManager.getByID(newArchetypeId);
     std::size_t newRow = newArchetype.addEntity(entity);
 
     migrateEntityToArchetype(record.row, oldSig, newSig, oldArchetype,
                              newArchetype, newRow);
 
-    record.signature = newSig;
-    record.row = newRow;
+    record.archetypeId = newArchetypeId;
+    record.row = static_cast<std::uint32_t>(newRow);
   }
 
   template <typename T> bool hasComponent(EntityID entity) {
     ComponentID componentID = m_componentRegistry.getComponentID<T>();
     EntityRecord &record = m_entityManager.getRecord(entity);
-    return record.signature.test(componentID);
+    Archetype *archetype = archetypeOf(record);
+    return archetype && archetype->m_signature.test(componentID);
   }
 
   template <typename T> void setResource(T &&value) {
