@@ -74,7 +74,9 @@ private:
 
     EntityID moved = oldArchetype->removeEntityAtRow(oldRow);
     if (moved != INVALID_ENTITY) {
-      m_entityManager.getRecord(moved).row = oldRow;
+      EntityRecord movedRecord = m_entityManager.getRecord(moved);
+      movedRecord.row = oldRow;
+      m_entityManager.setRecord(moved, movedRecord);
     }
   }
 
@@ -108,7 +110,7 @@ public:
   }
 
   template <typename T> T &getComponent(EntityID entity) {
-    EntityRecord &record = m_entityManager.getRecord(entity);
+    EntityRecord record = m_entityManager.getRecord(entity);
     ComponentID componentID = m_componentRegistry.getComponentID<T>();
 
     Archetype *archetype = archetypeOf(record);
@@ -125,7 +127,7 @@ public:
 
   template <typename... Ts>
   void addComponents(EntityID entity, Ts &&...components) {
-    EntityRecord &record = m_entityManager.getRecord(entity);
+    EntityRecord record = m_entityManager.getRecord(entity);
 
     Archetype *oldArchetype = archetypeOf(record);
     Signature oldSig = oldArchetype ? oldArchetype->m_signature : Signature{};
@@ -159,11 +161,12 @@ public:
 
     record.archetypeId = newArchetypeId;
     record.row = static_cast<std::uint32_t>(newRow);
+    m_entityManager.setRecord(entity, record);
   }
 
   void addComponentById(EntityID entity, ComponentID componentID,
                         const void *componentData) {
-    EntityRecord &record = m_entityManager.getRecord(entity);
+    EntityRecord record = m_entityManager.getRecord(entity);
 
     Archetype *oldArchetype = archetypeOf(record);
     Signature oldSig = oldArchetype ? oldArchetype->m_signature : Signature{};
@@ -191,11 +194,12 @@ public:
 
     record.archetypeId = newArchetypeId;
     record.row = static_cast<std::uint32_t>(newRow);
+    m_entityManager.setRecord(entity, record);
   }
 
   template <typename T> void removeComponent(EntityID entity) {
     ComponentID componentID = m_componentRegistry.getComponentID<T>();
-    EntityRecord &record = m_entityManager.getRecord(entity);
+    EntityRecord record = m_entityManager.getRecord(entity);
 
     Archetype *oldArchetype = archetypeOf(record);
     Signature oldSig = oldArchetype ? oldArchetype->m_signature : Signature{};
@@ -212,10 +216,13 @@ public:
     if (newSig.none()) {
       EntityID moved = oldArchetype->removeEntityAtRow(record.row);
       if (moved != INVALID_ENTITY) {
-        m_entityManager.getRecord(moved).row = record.row;
+        EntityRecord movedRecord = m_entityManager.getRecord(moved);
+        movedRecord.row = record.row;
+        m_entityManager.setRecord(moved, movedRecord);
       }
       record.archetypeId = INVALID_ARCHETYPE;
       record.row = 0;
+      m_entityManager.setRecord(entity, record);
       return;
     }
 
@@ -229,11 +236,12 @@ public:
 
     record.archetypeId = newArchetypeId;
     record.row = static_cast<std::uint32_t>(newRow);
+    m_entityManager.setRecord(entity, record);
   }
 
   template <typename T> bool hasComponent(EntityID entity) {
     ComponentID componentID = m_componentRegistry.getComponentID<T>();
-    EntityRecord &record = m_entityManager.getRecord(entity);
+    EntityRecord record = m_entityManager.getRecord(entity);
     Archetype *archetype = archetypeOf(record);
     return archetype && archetype->m_signature.test(componentID);
   }

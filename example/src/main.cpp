@@ -28,7 +28,7 @@ bool saveToFile = true;
 class Game : public IGame {
 public:
   void init(World &world) override {
-    constexpr float positionRange = 10000.0f;
+    constexpr float positionRange = 1000.0f;
     constexpr float scaleMin = 1.0f;
     constexpr float scaleMax = 5.0f;
     constexpr float massMin = 0.5f;

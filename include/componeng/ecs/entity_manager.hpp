@@ -2,7 +2,6 @@
 
 #include "componeng/ecs/entity.hpp"
 
-#include <array>
 #include <assert.h>
 #include <queue>
 
@@ -13,7 +12,7 @@ namespace componeng::ecs {
  */
 struct EntityRecord {
   std::uint32_t row = 0;
-  std::uint32_t generation = 0;
+  std::uint32_t generation = 0; // Even = destroyed, Odd = alive
   ArchetypeID archetypeId = INVALID_ARCHETYPE;
 };
 
@@ -26,52 +25,68 @@ struct EntityRecord {
 class EntityManager {
 private:
   std::queue<EntityID> m_freeIDs;
-  std::array<EntityRecord, MAX_ENTITIES> m_entityRecords;
-  uint32_t m_livingEntityCount = 0;
+  std::vector<EntityRecord> m_entityRecords;
+
+  bool isInBounds(EntityID id) const {
+    return id < m_entityRecords.size();
+  }
 
 public:
   EntityManager() {
-    for (EntityID id = 1; id < MAX_ENTITIES; ++id) {
-      m_freeIDs.push(id);
-    }
+    m_entityRecords.push_back(
+        EntityRecord{}); // Reserve index 0 for INVALID_ENTITY
   }
 
   EntityID createEntity() {
-    assert(m_livingEntityCount < MAX_ENTITIES &&
+    assert(getLivingEntityCount() < MAX_ENTITIES &&
            "Too many entities in existence.");
 
-    EntityID id = m_freeIDs.front();
-    m_freeIDs.pop();
-    ++m_livingEntityCount;
+    EntityID newID{};
 
-    EntityRecord &record = m_entityRecords[id];
+    if (m_freeIDs.empty()) {
+      m_entityRecords.push_back(EntityRecord{});
+      newID = static_cast<EntityID>(m_entityRecords.size() - 1);
+    } else {
+      newID = m_freeIDs.front();
+      m_freeIDs.pop();
+    }
+
+    EntityRecord &record = m_entityRecords[newID];
     record.row = 0;
     record.archetypeId = INVALID_ARCHETYPE;
     record.generation++;
 
-    return id;
+    return newID;
   }
 
   void destroyEntity(EntityID id) {
-    assert(id < MAX_ENTITIES && "Entity out of range.");
+    assert(isInBounds(id) && "Entity out of range.");
 
     EntityRecord &record = m_entityRecords[id];
+
+    if (record.generation % 2 == 0) {
+      // Already destroyed
+      return;
+    }
+
     record.row = 0;
+    record.generation++;
     record.archetypeId = INVALID_ARCHETYPE;
     m_freeIDs.push(id);
-    --m_livingEntityCount;
   }
 
-  EntityRecord &getRecord(EntityID id) {
-    assert(id < MAX_ENTITIES && "Entity out of range.");
-
+  EntityRecord getRecord(EntityID id) {
+    assert(isInBounds(id) && "Entity out of range.");
     return m_entityRecords[id];
   }
 
-  const EntityRecord &getRecord(EntityID id) const {
-    assert(id < MAX_ENTITIES && "Entity out of range.");
+  void setRecord(EntityID id, const EntityRecord &record) {
+    assert(isInBounds(id) && "Entity out of range.");
+    m_entityRecords[id] = record;
+  }
 
-    return m_entityRecords[id];
+  size_t getLivingEntityCount() const {
+    return m_entityRecords.size() - m_freeIDs.size();
   }
 };
 

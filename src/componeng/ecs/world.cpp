@@ -23,7 +23,7 @@ EntityID World::createEntity() {
 
 void World::destroyEntity(EntityID entity) {
   m_eventBus.emit<events::EntityDestroyEvent>({.entity = entity});
-  EntityRecord &record = m_entityManager.getRecord(entity);
+  EntityRecord record = m_entityManager.getRecord(entity);
   Archetype *currArchetype = archetypeOf(record);
   if (currArchetype) {
     // Archetype storage is swap-remove: the entity previously occupying the
@@ -32,7 +32,9 @@ void World::destroyEntity(EntityID entity) {
     std::size_t freedRow = record.row;
     EntityID moved = currArchetype->removeEntityAtRow(freedRow);
     if (moved != INVALID_ENTITY) {
-      m_entityManager.getRecord(moved).row = freedRow;
+      EntityRecord movedRecord = m_entityManager.getRecord(moved);
+      movedRecord.row = freedRow;
+      m_entityManager.setRecord(moved, movedRecord);
     }
   }
   m_entityManager.destroyEntity(entity);

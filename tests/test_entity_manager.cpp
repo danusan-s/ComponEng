@@ -20,21 +20,6 @@ TEST(EntityManagerTest, RecyclesDestroyedIDs) {
   EXPECT_EQ(em.createEntity(), 1u);
 }
 
-TEST(EntityManagerTest, RecycledIDsGoToBackOfQueue) {
-  componeng::ecs::EntityManager em;
-  componeng::ecs::EntityID a = em.createEntity(); // 1
-  componeng::ecs::EntityID b = em.createEntity(); // 2
-
-  em.destroyEntity(a);
-  // Queue front still has 3, 4, ... so next create returns 3, not 1
-  EXPECT_EQ(em.createEntity(), 3u);
-  // After exhausting unused IDs, recycled 1 comes back
-  for (componeng::ecs::EntityID i = 4; i < componeng::ecs::MAX_ENTITIES; ++i) {
-    em.createEntity();
-  }
-  EXPECT_EQ(em.createEntity(), 1u);
-}
-
 TEST(EntityManagerTest, TracksLivingEntityCount) {
   componeng::ecs::EntityManager em;
   em.createEntity(); // 1
@@ -42,7 +27,7 @@ TEST(EntityManagerTest, TracksLivingEntityCount) {
   em.createEntity(); // 3
   em.destroyEntity(2u);
 
-  auto &rec = em.getRecord(2u);
+  auto rec = em.getRecord(2u);
   EXPECT_EQ(rec.archetypeId, componeng::ecs::INVALID_ARCHETYPE);
   EXPECT_EQ(rec.row, 0u);
 }
@@ -50,7 +35,7 @@ TEST(EntityManagerTest, TracksLivingEntityCount) {
 TEST(EntityManagerTest, GetRecordReturnsCorrectData) {
   componeng::ecs::EntityManager em;
   componeng::ecs::EntityID id = em.createEntity(); // 1
-  componeng::ecs::EntityRecord &rec = em.getRecord(id);
+  componeng::ecs::EntityRecord rec = em.getRecord(id);
   EXPECT_EQ(rec.row, 0u);
   EXPECT_EQ(rec.archetypeId, componeng::ecs::INVALID_ARCHETYPE);
 }
@@ -59,7 +44,9 @@ TEST(EntityManagerTest, DestroyedEntityRecordIsCleared) {
   componeng::ecs::EntityManager em;
   componeng::ecs::EntityID id = em.createEntity(); // 1
   em.destroyEntity(id);
-  componeng::ecs::EntityRecord &rec = em.getRecord(id);
+  componeng::ecs::EntityRecord rec = em.getRecord(id);
   EXPECT_EQ(rec.row, 0u);
+  EXPECT_EQ(rec.generation % 2,
+            0u); // Generation should be even after destruction
   EXPECT_EQ(rec.archetypeId, componeng::ecs::INVALID_ARCHETYPE);
 }
