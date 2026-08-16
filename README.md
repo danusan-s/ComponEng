@@ -24,7 +24,10 @@ Well the project initially started for a really silly reason. I was kinda tired 
 - **Frustum Culling** - View-frustum culling to skip off-screen objects before rendering
 - **Physics System** - Fixed-timestep physics with gravity, velocity integration, and impulse-based collision resolution
 - **Collision Detection** - AABB vs AABB, Sphere vs Sphere, and AABB vs Sphere collision tests with proper contact normal and penetration depth calculation
-- **Diffuse Lighting** - Ambient + lambertian diffuse shading
+- **Lighting** - Ambient + lambertian diffuse shading, with directional and point light components
+- **Audio** - Sound playback driven by an `AudioComponent`, backed by miniaudio
+- **Scene Serialization** - Save/load whole scenes to JSON, with reflection-driven component (de)serialization
+- **Multi-threaded Systems** - A `ThreadPool` powers parallel query iteration (`eachParallel`) in physics and culling
 - **Debug UI** - ImGui overlay showing real-time FPS and average FPS
 
 https://github.com/user-attachments/assets/9a45ef11-346c-4247-b8d2-d867f22ae4d3
@@ -40,13 +43,15 @@ The ECS is built from scratch with no external dependencies. Key design decision
 - **Type-Safe Queries**: The query system uses variadic templates and `std::index_sequence` for compile-time type resolution. Systems declare exactly which components they need, and the query engine iterates only matching archetypes.
 - **Entity Movement**: Adding or removing components moves entities between archetypes via `memcpy` of raw component bytes, with swap-remove to maintain dense storage.
 - **Resource Manager**: Singleton or shared resources such as main camera entity or input state are stored in a `ResourceManager` accessible by systems during updates.
+- **Interned Names**: Because entities are relocated with `memcpy`, components must be trivially copyable -- an owning member like `std::string` would double-free. `core::Name` is therefore a 4-byte handle into a process-wide string table: no length limit, integer comparison instead of `strcmp`, and it keeps `MeshComponent` at 12 bytes instead of 72 so archetype columns stay cache-dense.
 
 ### Rendering Pipeline
 
 - **Batch Grouping**: Draw calls are grouped by (mesh, texture, shader) tuple with a custom hash function. Each batch creates a single instance VBO and uses `glDrawElementsInstanced`.
 - **Frustum Culling**: The view-projection matrix is decomposed into 6 frustum planes. Each entity's AABB is tested against all planes before being added to a batch.
 - **Matrix Upload**: Instance model matrices are uploaded as 4 `vec4` attributes with `glVertexAttribDivisor(1)` for per-instance data.
-- **Asset Management**: Shaders, textures, and meshes are loaded on demand and cached in a `ResourceManager` to avoid redundant loading.
+- **Asset Management**: Shaders, textures, meshes and audio are loaded on demand and cached in an `AssetManager`, keyed by interned `core::Name` so lookups allocate nothing.
+- **Backend Abstraction**: Rendering goes through an `IRenderDevice` interface with an OpenGL implementation behind it, leaving room for a second backend.
 
 ### Physics
 
@@ -63,6 +68,8 @@ The ECS is built from scratch with no external dependencies. Key design decision
 - **GLM** - Vector/matrix math
 - **Dear ImGui** - Debug overlay UI
 - **stb_image** - Texture loading
+- **miniaudio** - Audio playback
+- **nlohmann/json** - Scene serialization
 - **CMake 3.10+** - Build system
 
 ## C++ Techniques Demonstrated
@@ -92,8 +99,7 @@ Ensure these are available before building:
 - `OpenGL` 3.3+
 - `GLFW` 3.3
 - `GLM` installed system-wide
-- `GLAD` included in `include/glad`
-- `stb_image` included in `include/stb_image.h`
+- `GLAD`, `Dear ImGui`, `stb_image`, `miniaudio` and `nlohmann/json` are vendored under `include/third_party/` and `src/third_party/`
 
 ## Build Instructions
 
@@ -108,7 +114,7 @@ make build
 You can run the executable from any directory. For example, from the project root:
 
 ```bash
-./build/example/ComponEx
+./build/example/Demo
 ```
 
 ## Running Tests
@@ -124,6 +130,8 @@ cd build
 ./test_archetype
 ./test_query
 ./test_collision
+./test_serialization
+./test_world
 ```
 
 Or via CMake's test runner:
@@ -133,12 +141,24 @@ cd build
 ctest --output-on-failure
 ```
 
+### Test Coverage
+
+| Test Suite | What It Tests |
+|------------|--------------|
+| `EntityManagerTest` | Entity ID allocation, recycling, record management |
+| `ComponentRegistryTest` | Type-to-ID mapping, signature generation, destructor storage for non-trivial types |
+| `ArchetypeTest` | Component column storage, entity add/remove, swap-remove behavior, multi-component archetypes |
+| `QueryTest` | Required/excluded component matching, iteration over matching archetypes, `exclude()` returning reference |
+| `CollisionTest` | AABB-AABB, Sphere-Sphere, AABB-Sphere overlap detection, collision normals, edge cases |
+| `WorldTest` | Entity lifecycle, add/remove components, archetype migration, swap-remove record repointing |
+| `SerializationTest` | Component round-tripping through JSON, scene save/load |
+
 For testing the graphical parts, run the example scene:
 
 ```bash
-cd build
-./example/ComponEx
+./build/example/Demo
 ```
+
 ## Controls for Example
 
 | Input | Action |
@@ -150,17 +170,6 @@ cd build
 | `F11` | Toggle mouse cursor lock |
 | `Escape` | Close window |
 
-### Test Coverage
-
-| Test Suite | What It Tests |
-|------------|--------------|
-| `EntityManagerTest` | Entity ID allocation, recycling, record management |
-| `ComponentRegistryTest` | Type-to-ID mapping, signature generation, destructor storage for non-trivial types |
-| `ArchetypeTest` | Component column storage, entity add/remove, swap-remove behavior, multi-component archetypes |
-| `QueryTest` | Required/excluded component matching, iteration over matching archetypes, `exclude()` returning reference |
-| `CollisionTest` | AABB-AABB, Sphere-Sphere, AABB-Sphere overlap detection, collision normals, edge cases |
-
-
 ## Components and Systems
 
 You can create your own game or world by defining components and systems (extends System class) and registering them with the ECS in game init.
@@ -170,49 +179,103 @@ The following are the components and systems along with the example scene that a
 | Component | Description |
 |-----------|-------------|
 | TransformComponent | Position, rotation (Euler), scale |
-| MeshComponent | Model reference |
-| MaterialComponent | Color, texture, shader |
-| CameraComponent | FOV, aspect ratio, near/far planes |
-| InputComponent | Keyboard state (WASD, jump, crouch) |
-| MouseInputComponent | Mouse delta and button state |
+| MeshComponent | Mesh name and resolved handle |
+| MaterialComponent | Material name, texture and shader handles |
+| ColorComponent | Per-instance tint |
+| CameraComponent | FOV, aspect ratio, near/far planes, view-projection matrix |
 | RigidBodyComponent | Type (Static/Dynamic/Kinematic), velocity, mass, restitution |
 | ColliderComponent | Shape type (Box, Sphere) |
+| AudioComponent | Sound name and playback state |
+| DirectionalLightComponent | Direction, colour, intensity |
+| PointLightComponent | Position, colour, attenuation |
+
+Input is not a component: raw keyboard/mouse state and the mapped action state
+live in the `ResourceManager` as `InputState` and `ActionState`, since they are
+per-world singletons rather than per-entity data.
 
 ### ECS Systems
-| System | Description |
-|--------|-------------|
-| InputSystem | Reads raw input into InputComponent |
-| CameraSystem | WASD movement, mouse look, view/projection matrices |
-| PhysicsSystem | Velocity/acceleration integration with gravity |
-| RenderSystem | Instanced rendering with batching and frustum culling |
+Systems are assigned to a `SystemGroup` (`Initialization`, `Simulation`,
+`Presentation`) and run in that order each frame.
+
+| System | Group | Description |
+|--------|-------|-------------|
+| InputSystem | Initialization | Maps raw input into the action state |
+| PhysicsSystem | Simulation | Fixed-timestep integration, collision detection and resolution |
+| CameraSystem | Simulation | WASD movement, mouse look, view/projection matrices |
+| AudioSystem | Simulation | Resolves and plays sounds for AudioComponents |
+| CullingSystem | Presentation | Frustum-culls entities, marks visibility |
+| BatchingSystem | Presentation | Groups visible entities into instanced draw batches |
+| RenderSystem | Presentation | Issues the instanced draw calls |
 
 ## Project Structure
+
+Headers under `include/componeng/` mirror sources under `src/componeng/`,
+grouped by subsystem. Vendored dependencies live in their own `third_party`
+trees so they can be excluded from formatting, linting and warning flags.
 
 ```
 ComponEng/
 ├── include/
-│   ├── components/     # Component structs (POD data)
-│   ├── core/           # Engine, window, logger, utils, debug UI
-│   ├── ecs/            # Entity, archetype, query, registry, systems
-│   ├── physics/        # Collision detection, physics system
-│   ├── renderer/       # Shader, mesh, texture, resource manager
-│   └── systems/        # Input, camera system headers
-├── src/
-│   ├── core/           # Core implementations
-│   ├── physics/        # Physics and collision implementations
-│   ├── renderer/       # Rendering implementations
-│   └── systems/        # System implementations
-├── assets/             # Shaders, textures, models
-└── CMakeLists.txt      # Build configuration
+│   ├── componeng/
+│   │   ├── audio/       # Audio engine and audio system
+│   │   ├── camera/      # Camera component and system
+│   │   ├── core/        # Engine, window, types, string interner, debug UI
+│   │   ├── ecs/         # World, entity, query, registry, systems, serializer
+│   │   │   └── archetype/   # Archetype storage, component columns
+│   │   ├── events/      # Event bus
+│   │   ├── input/       # Raw input and action state
+│   │   ├── physics/     # Collision detection, physics system
+│   │   ├── renderer/    # Asset manager, render/culling/batching systems
+│   │   │   ├── asset/       # Mesh, shader, texture, material
+│   │   │   ├── backend/     # IRenderDevice interface + OpenGL backend
+│   │   │   ├── batching/    # Draw-call batching
+│   │   │   ├── component/   # Render-related components
+│   │   │   └── culling/     # Frustum culling
+│   │   └── utils/       # Logger, path helpers
+│   └── third_party/     # glad, imgui, stb, miniaudio, nlohmann/json
+├── src/                 # Mirrors include/, same layout
+├── tests/               # GoogleTest suites
+├── example/             # Demo game built on the engine
+├── assets/              # Shaders, textures, models, audio, scenes
+└── CMakeLists.txt
 ```
+
+## Development
+
+The engine builds warning-clean and is checked by three CI jobs: build+test,
+`clang-format`, and `clang-tidy`.
+
+```sh
+make build                    # Release by default
+make BUILD_TYPE=Debug build   # adds -g and AddressSanitizer
+make run_tests                # build + ctest
+make lint                     # clang-format check + clang-tidy
+make format                   # apply clang-format in place
+```
+
+- **Warnings as errors**: first-party sources compile with `-Wall -Wextra
+  -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror`. These are `PRIVATE`
+  to the engine target, and vendored code is compiled with `-w`, so third-party
+  warnings never mask ours.
+- **Static analysis**: `.clang-tidy` enables a curated check set (resource
+  ownership, `override`/`nullptr` consistency, unnecessary copies) rather than a
+  blanket one; the file documents what is deliberately disabled and why.
+- **Editor support**: configuring generates `build/compile_commands.json`, and
+  `.clangd` points at it -- so clangd sees the exact per-file flags the build
+  uses. Just run `cmake -S . -B build` once.
+
+Conventions and the reasoning behind them are in [CONTRIBUTING.md](CONTRIBUTING.md).
+Deeper architecture notes are in [docs/DESIGN.md](docs/DESIGN.md), and usage
+documentation in [docs/USER.md](docs/USER.md).
 
 ## Future Plans
 
 - [ ] Replace GLM with custom math library
 - [ ] Vulkan renderer backend (alongside OpenGL)
 - [ ] Spatial partitioning (BVH, octree) for physics broad phase
-- [ ] Serialization system for saving/loading scenes
+- [x] Serialization system for saving/loading scenes
 - [ ] Animation system with skeletal animation
 - [ ] Scripting language integration (Lua or custom DSL)
-- [ ] Multi-threaded system execution
+- [x] Multi-threaded system execution (thread pool + parallel queries)
 - [ ] Material system with PBR shading
+- [ ] Scene editor
