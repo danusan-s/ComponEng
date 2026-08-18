@@ -173,11 +173,13 @@ public:
       if (n == 0)
         continue;
 
+      constexpr size_t minChunkSize = 50;
+
       // If less than 50 running non parallel is faster as there is a
       // overhead when we create task and then the pool unlocks and runs
       // it. For small number of entities, that overhead is more than the
       // time it takes to just run the loop in the current thread.
-      if (n < 50) {
+      if (n < minChunkSize) {
         ComponentColumn *reqCols[] = {
             &archetype->getColumn(m_registry.getComponentID<Req>())...};
         for (size_t i = 0; i < n; ++i) {
@@ -186,12 +188,13 @@ public:
         continue;
       }
 
-      size_t numChunks = std::min(n, pool.threadCount());
-      size_t chunkSize = std::max(size_t(1), n / numChunks);
+      size_t maxChunks = n + minChunkSize - 1 / minChunkSize;
+      size_t numThreads = std::min(pool.threadCount(), maxChunks);
+      size_t chunkSize = n / numThreads;
 
-      for (size_t c = 0; c < numChunks; ++c) {
+      for (size_t c = 0; c < numThreads; ++c) {
         size_t start = c * chunkSize;
-        size_t end = (c == numChunks - 1) ? n : start + chunkSize;
+        size_t end = (c == numThreads - 1) ? n : start + chunkSize;
 
         futures.push_back(pool.submit([this, a, start, end, fn]() {
           Archetype *chunkArchetype = m_matchingArchetypes[a];
