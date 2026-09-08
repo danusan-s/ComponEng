@@ -63,7 +63,7 @@ The `World` class is the central coordinator that provides the public API for al
 | `ArchetypeManager` | Creates/stores archetypes by signature |
 | `SystemManager` | System registration and execution ordering |
 | `ThreadPool` | Parallel task execution for systems |
-| `EventBus` | Systems can emit and retreive events |
+| `EventBus` | Systems can emit and retrieve events |
 | `ResourceManager` | Singleton resources (InputState, MainCamera) |
 
 **Key Template Methods**:
@@ -622,6 +622,38 @@ include/componeng/
     ├── camera_system.hpp
     └── input_system.hpp
 ```
+
+---
+
+## C++ Techniques Demonstrated
+
+| Technique | Where Used |
+|-----------|-----------|
+| **Variadic Templates** | `World::registerComponents<Ts...>()`, `Query<Req...>`, `World::addComponents<Ts...>()` |
+| **Fold Expressions** | Component registration `(this->registerComponent<Components>(), ...)` |
+| **`std::index_sequence`** | Query iteration with compile-time tuple unpacking |
+| **`std::unique_ptr`** | RAII management of registry, entity manager, system manager, archetype manager |
+| **Placement `new`** | Component construction in pre-allocated archetype memory |
+| **`std::type_index`** | Runtime type-to-ID mapping in `ComponentRegistry` |
+| **`std::bitset`** | Component signature tracking and archetype matching |
+| **Template Metaprogramming** | Signature generation, query type resolution, exclude patterns |
+| **Move Semantics** | Component forwarding with `std::forward<T>` |
+| **CRTP-like Patterns** | System registration with type name deduplication |
+| **Custom Hash Functions** | `DrawKeyHash` for batch grouping in render system |
+
+---
+
+## Test Coverage
+
+| Test Suite | What It Tests |
+|------------|--------------|
+| `EntityManagerTest` | Entity ID allocation, recycling, record management |
+| `ComponentRegistryTest` | Type-to-ID mapping, signature generation, destructor storage for non-trivial types |
+| `ArchetypeTest` | Component column storage, entity add/remove, swap-remove behavior, multi-component archetypes |
+| `QueryTest` | Required/excluded component matching, iteration over matching archetypes, `exclude()` returning reference |
+| `CollisionTest` | AABB-AABB, Sphere-Sphere, AABB-Sphere overlap detection, collision normals, edge cases |
+| `WorldTest` | Entity lifecycle, add/remove components, archetype migration, swap-remove record repointing |
+| `SerializationTest` | Component round-tripping through JSON, scene save/load |
 
 ---
 

@@ -433,15 +433,18 @@ void init(ecs::World& world) override {
 ```cpp
 using namespace componeng::renderer;
 
+// Get the AssetManager from the world
+auto& assetManager = world.getResource<AssetManager>();
+
 // Get asset IDs by name
-ShaderID shaderID = AssetManager::getShaderID("my_shader");
-TextureID textureID = AssetManager::getTextureID("player");
-MeshID meshID = AssetManager::getMeshID("player");
+core::HandleID shaderID = assetManager.getShaderID("my_shader");
+core::HandleID textureID = assetManager.getTextureID("player");
+core::HandleID meshID = assetManager.getMeshID("player");
 
 // Get const references to use
-const Shader& shader = AssetManager.getShader(shaderID);
-const Texture2D& texture = AssetManager.getTexture(textureID);
-const Mesh& mesh = AssetManager.getMesh(meshID);
+const Shader& shader = assetManager.getShader(shaderID);
+const Texture2D& texture = assetManager.getTexture(textureID);
+const Mesh& mesh = assetManager.getMesh(meshID);
 ```
 
 ### Using Assets with Components
