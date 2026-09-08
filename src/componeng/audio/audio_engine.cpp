@@ -45,7 +45,11 @@ std::unique_ptr<ma_sound> AudioEngine::createSound(const char *filePath) {
                               nullptr, nullptr, sound.get());
 
   if (result != MA_SUCCESS) {
-    LOG_ERROR("Failed to create sound from file: %s", filePath);
+    if (filePath) {
+      LOG_ERROR("Failed to create sound from file: %s", filePath);
+    } else {
+      LOG_ERROR("Failed to create sound from file: (null)");
+    }
     return nullptr;
   }
   return sound;

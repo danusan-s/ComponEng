@@ -175,13 +175,14 @@ public:
 
       constexpr size_t minChunkSize = 50;
 
+      ComponentColumn *reqCols[] = {
+          &archetype->getColumn(m_registry.getComponentID<Req>())...};
+
       // If less than 50 running non parallel is faster as there is a
       // overhead when we create task and then the pool unlocks and runs
       // it. For small number of entities, that overhead is more than the
       // time it takes to just run the loop in the current thread.
       if (n < minChunkSize) {
-        ComponentColumn *reqCols[] = {
-            &archetype->getColumn(m_registry.getComponentID<Req>())...};
         for (size_t i = 0; i < n; ++i) {
           invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
         }
@@ -196,13 +197,10 @@ public:
         size_t start = c * chunkSize;
         size_t end = (c == numThreads - 1) ? n : start + chunkSize;
 
-        futures.push_back(pool.submit([this, a, start, end, fn]() {
-          Archetype *chunkArchetype = m_matchingArchetypes[a];
-          ComponentColumn *reqCols[] = {
-              &chunkArchetype->getColumn(m_registry.getComponentID<Req>())...};
-
+        futures.push_back(pool.submit([this, start, end, fn, reqCols]() {
+          auto cols = const_cast<ComponentColumn **>(reqCols);
           for (size_t i = start; i < end; ++i) {
-            invokeCallback(fn, reqCols, i, std::index_sequence_for<Req...>{});
+            invokeCallback(fn, cols, i, std::index_sequence_for<Req...>{});
           }
         }));
       }
