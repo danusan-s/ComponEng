@@ -39,8 +39,16 @@ A personal learning project built because existing engine documentation was over
 - **Dear ImGui** – debug UI
 - **stb_image** – texture loading
 - **miniaudio** – audio playback
-- **nlohmann/json** – scene serialization
+- **nlohmann/json** – json lib used in scene serialization
 - **CMake 3.10+** – build system
+
+## Dependencies
+
+Most dependencies are included in the repository under third_party.
+However, you will need to have the following installed on your system:
+- GLM
+- GLFW
+- OpenGL (Mac should work as 3.3 is used)
 
 ## Building
 
