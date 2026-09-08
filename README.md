@@ -30,7 +30,7 @@ Well the project initially started for a really silly reason. I was kinda tired 
 - **Multi-threaded Systems** - A `ThreadPool` powers parallel query iteration (`eachParallel`) in physics and culling
 - **Debug UI** - ImGui overlay showing real-time FPS and average FPS
 
-https://github.com/user-attachments/assets/9a45ef11-346c-4247-b8d2-d867f22ae4d3
+https://github.com/user-attachments/assets/2e074537-c737-4367-95d1-6cd4d009cc22
 
 ## Architecture Highlights
 
