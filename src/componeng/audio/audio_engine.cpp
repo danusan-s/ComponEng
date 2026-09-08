@@ -95,6 +95,33 @@ bool AudioEngine::playSound(core::HandleID id,
   return true;
 }
 
+bool AudioEngine::playSoundFree(std::unique_ptr<ma_sound> sound) {
+  ma_result result = ma_sound_start(sound.get());
+  if (result != MA_SUCCESS) {
+    LOG_ERROR("Failed to play free sound");
+    return false;
+  }
+  m_freeSounds.push_back(std::move(sound));
+  return true;
+}
+
+bool AudioEngine::playSoundFromFile(const char *filePath, float x, float y,
+                                    float z, float volume, float pitch,
+                                    bool loop, float minDistance,
+                                    float maxDistance) {
+  std::unique_ptr<ma_sound> sound = createSound(filePath);
+  if (!sound) {
+    LOG_ERROR("Failed to create sound for free play");
+    return false;
+  }
+
+  setSoundPosition(sound.get(), x, y, z);
+  setSoundSettings(sound.get(), volume, pitch, loop);
+  setSound3D(sound.get(), minDistance, maxDistance);
+
+  return playSoundFree(std::move(sound));
+}
+
 void AudioEngine::cleanupFinishedSounds() {
   for (auto i = m_activeSounds.begin(); i != m_activeSounds.end();) {
     auto &sound = i->second;
@@ -102,6 +129,16 @@ void AudioEngine::cleanupFinishedSounds() {
     if (!ma_sound_is_playing(sound.get())) {
       ma_sound_uninit(sound.get());
       m_activeSounds.erase(i);
+    } else {
+      ++i;
+    }
+  }
+
+  for (auto i = m_freeSounds.begin(); i != m_freeSounds.end();) {
+    auto &sound = *i;
+    if (!ma_sound_is_playing(sound.get())) {
+      ma_sound_uninit(sound.get());
+      i = m_freeSounds.erase(i);
     } else {
       ++i;
     }

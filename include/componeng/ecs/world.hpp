@@ -93,6 +93,7 @@ public:
   renderer::api::IRenderDevice &getRenderDevice();
   void setWindowHandle(void *handle);
   void *getWindowHandle() const;
+  double getTime() const;
 
   void swapInputBuffers() {
     auto &inputState = getResource<input::InputState>();

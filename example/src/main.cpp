@@ -1,5 +1,6 @@
-#include "collision_sounds.hpp"
 #include "componeng/audio/audio_component.hpp"
+#include "componeng/camera/camera_component.hpp"
+#include "componeng/camera/main_camera.hpp"
 #include "componeng/core/engine.hpp"
 #include "componeng/core/game.hpp"
 #include "componeng/core/transform_component.hpp"
@@ -11,6 +12,7 @@
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
 #include "componeng/utils/utils.hpp"
+#include "orbiting_sound.hpp"
 #include "player_controller.hpp"
 
 #include <random>
@@ -21,6 +23,7 @@ using namespace componeng::physics;
 using namespace componeng::ecs;
 using namespace componeng::renderer;
 using namespace componeng::utils;
+using namespace componeng::camera;
 
 bool loadFromFile = false;
 bool saveToFile = true;
@@ -39,40 +42,20 @@ public:
     assetManager.loadAudio(Utils::getAssetPath("assets/audio/boop.wav").c_str(),
                            "boop");
     world.registerSystem<PlayerController>(SystemGroup::Simulation);
-    world.registerSystem<CollisionSounds>(SystemGroup::Simulation);
+    world.registerSystem<OrbitingSound>(SystemGroup::Simulation);
 
     if (loadFromFile) {
       SceneSerializer::load(
           world, Utils::getAssetPath("assets/scenes/test_scene.json"));
       return;
     }
-    std::default_random_engine generator;
+    std::default_random_engine generator{static_cast<unsigned int>(
+        std::chrono::system_clock::now().time_since_epoch().count())};
     std::uniform_real_distribution<float> randPosition(-positionRange,
                                                        positionRange);
     std::uniform_real_distribution<float> randScale(scaleMin, scaleMax);
     std::uniform_real_distribution<float> randColor(0.0f, 1.0f);
     std::uniform_real_distribution<float> randMass(massMin, massMax);
-
-    EntityID soundEntity = world.createEntity();
-    world.addComponents(
-        soundEntity,
-        TransformComponent{.position = glm::vec3(0, 0, 0),
-                           .rotation = glm::vec3(0, 0, 0),
-                           .scale = glm::vec3(1, 1, 1)},
-        AudioComponent{.audioName = "boop",
-                       .playOnAwake = true,
-                       .loop = true,
-                       .volume = 0.8f,
-                       .is3D = true,
-                       .minDistance = 1.0f,
-                       .maxDistance = 300.0f},
-        RigidBodyComponent{.type = RigidBodyComponent::Type::Dynamic,
-                           .mass = 1.0f,
-                           .restitution = 1.0f},
-        ColliderComponent{.type = ColliderType::Box},
-        MaterialComponent{.materialName = "default_diffuse"},
-        ColorComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f)},
-        MeshComponent{.meshName = "cube"});
 
     for (int i = 0; i < count; ++i) {
       EntityID entity = world.createEntity();
@@ -139,6 +122,34 @@ public:
                               TransformComponent{.position = Vec3(0.0f),
                                                  .rotation = Vec3(0.0f),
                                                  .scale = Vec3(1.0f)}});
+
+    EntityID audioEntity = world.createEntity();
+    world.addComponents(
+        audioEntity,
+        TransformComponent{.position = Vec3(0.0f, 0.0f, 0.0f),
+                           .rotation = Vec3(0.0f),
+                           .scale = Vec3(1.0f)},
+        MaterialComponent{.materialName = "default_diffuse"},
+        MeshComponent{.meshName = "cube"},
+        ColorComponent{.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f)},
+        ColliderComponent{.type = ColliderType::Box,
+                          .transform =
+                              TransformComponent{.position = Vec3(0.0f),
+                                                 .rotation = Vec3(0.0f),
+                                                 .scale = Vec3(1.0f)}},
+        AudioComponent{.audioName = "boop",
+                       .loop = true,
+                       .isPlaying = false,
+                       .is3D = true,
+                       .minDistance = 1.0f,
+                       .maxDistance = 100.0f});
+
+    auto &camera = world.getResource<MainCamera>();
+    EntityID cameraEntity = camera.entity;
+    TransformComponent &playerPos =
+        world.getComponent<TransformComponent>(cameraEntity);
+    playerPos.position = Vec3(-2250.0f, -600.0f, 0.0f);
+    playerPos.rotation = Vec3(0.0f, 0.0f, 0.0f);
   }
 
   void shutdown(World &world) override {

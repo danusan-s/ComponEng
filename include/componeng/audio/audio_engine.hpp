@@ -3,6 +3,7 @@
 #include "componeng/core/types.hpp"
 #include <miniaudio.h>
 
+#include <list>
 #include <memory>
 #include <unordered_map>
 
@@ -35,16 +36,19 @@ public:
   void setSound3D(ma_sound *sound, float minDistance, float maxDistance);
 
   bool playSound(core::HandleID id, std::unique_ptr<ma_sound> sound);
+  bool playSoundFree(std::unique_ptr<ma_sound> sound);
 
   bool playSoundFromFile(const char *filePath, float x, float y, float z,
-                         float volume, float pitch, bool loop,
-                         float minDistance, float maxDistance);
+                         float volume = 1.0f, float pitch = 1.0f,
+                         bool loop = false, float minDistance = 1.0f,
+                         float maxDistance = 100.0f);
 
   void cleanupFinishedSounds();
 
 private:
   ma_engine m_audioEngine;
   std::unordered_map<core::HandleID, std::unique_ptr<ma_sound>> m_activeSounds;
+  std::list<std::unique_ptr<ma_sound>> m_freeSounds;
 };
 
 } // namespace componeng::audio

@@ -69,4 +69,8 @@ renderer::api::IRenderDevice &World::getRenderDevice() {
   return *getResource<std::unique_ptr<renderer::api::IRenderDevice>>().get();
 }
 
+double World::getTime() const {
+  return time;
+}
+
 } // namespace componeng::ecs
