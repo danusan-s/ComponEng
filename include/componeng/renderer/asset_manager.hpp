@@ -1,6 +1,5 @@
 #pragma once
 
-#include "componeng/audio/audio_engine.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset/mesh.hpp"
@@ -8,7 +7,6 @@
 #include "componeng/renderer/asset/texture.hpp"
 
 #include <memory>
-#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -32,8 +30,6 @@ public:
 
   AssetManager(AssetManager &&) = default;
   AssetManager &operator=(AssetManager &&) = default;
-
-  audio::AudioEngine *m_audioEngine = nullptr;
 
   void loadShader(const char *vShaderFile, const char *fShaderFile,
                   const char *gShaderFile, core::Name name);
@@ -69,9 +65,6 @@ public:
   const Mesh &getMesh(core::HandleID id) const;
   core::HandleID getMeshID(core::Name name) const;
 
-  void loadAudio(const char *file, core::Name name);
-  core::HandleID getAudioID(core::Name name) const;
-  const char *getAudio(core::HandleID id) const;
   void clear();
 
 private:
@@ -79,13 +72,11 @@ private:
   std::unordered_map<core::Name, core::HandleID> m_textures;
   std::unordered_map<core::Name, core::HandleID> m_materials;
   std::unordered_map<core::Name, core::HandleID> m_meshes;
-  std::unordered_map<core::Name, core::HandleID> m_audios;
 
   std::vector<std::unique_ptr<Shader>> m_shaderResources;
   std::vector<std::unique_ptr<Texture2D>> m_textureResources;
   std::vector<std::unique_ptr<IMaterial>> m_materialResources;
   std::vector<std::unique_ptr<Mesh>> m_meshResources;
-  std::vector<std::string> m_audioPaths;
 
   std::unique_ptr<Shader> loadShaderFromFile(const char *vShaderFile,
                                              const char *fShaderFile,

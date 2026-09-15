@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gtest/gtest.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -82,6 +83,7 @@ template <> struct hash<componeng::core::Name> {
 namespace componeng::core {
 
 using HandleID = uint32_t;
+constexpr HandleID INVALID_HANDLE = UINT32_MAX;
 
 // Type aliases for cleaner code
 using Vec2 = glm::vec2;

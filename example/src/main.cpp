@@ -1,5 +1,5 @@
 #include "componeng/audio/audio_component.hpp"
-#include "componeng/camera/camera_component.hpp"
+#include "componeng/audio/audio_manager.hpp"
 #include "componeng/camera/main_camera.hpp"
 #include "componeng/core/engine.hpp"
 #include "componeng/core/game.hpp"
@@ -8,7 +8,6 @@
 #include "componeng/ecs/world.hpp"
 #include "componeng/physics/collider_component.hpp"
 #include "componeng/physics/rigidbody_component.hpp"
-#include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
 #include "componeng/utils/utils.hpp"
@@ -38,9 +37,9 @@ public:
     constexpr float massMax = 5.0f;
     constexpr int count = 1000;
 
-    auto &assetManager = world.getResource<AssetManager>();
-    assetManager.loadAudio(Utils::getAssetPath("assets/audio/boop.wav").c_str(),
-                           "boop");
+    auto &audioManager = world.getResource<AudioManager>();
+    audioManager.registerSound(
+        Utils::getAssetPath("assets/audio/boop.wav").c_str(), "boop");
     world.registerSystem<PlayerController>(SystemGroup::Simulation);
     world.registerSystem<OrbitingSound>(SystemGroup::Simulation);
 

@@ -1,7 +1,7 @@
 #include "orbiting_sound.hpp"
 
 #include "componeng/audio/audio_component.hpp"
-#include "componeng/audio/audio_engine.hpp"
+#include "componeng/audio/audio_manager.hpp"
 #include "componeng/camera/main_camera.hpp"
 #include "componeng/core/transform_component.hpp"
 #include "componeng/ecs/world.hpp"
@@ -12,7 +12,8 @@ void OrbitingSound::onUpdate(const componeng::ecs::SystemState &state) {
   auto &camTransform =
       state.world->getComponent<componeng::core::TransformComponent>(
           mainCamEntity);
-  auto &audioEngine = state.world->getResource<componeng::audio::AudioEngine>();
+  auto &audioEngine =
+      state.world->getResource<componeng::audio::AudioManager>();
 
   double time = state.world->getTime();
   state.world

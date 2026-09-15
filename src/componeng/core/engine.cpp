@@ -1,7 +1,7 @@
 #include "componeng/core/engine.hpp"
 
 #include "componeng/audio/audio_component.hpp"
-#include "componeng/audio/audio_engine.hpp"
+#include "componeng/audio/audio_manager.hpp"
 #include "componeng/audio/audio_system.hpp"
 #include "componeng/camera/camera_component.hpp"
 #include "componeng/camera/camera_system.hpp"
@@ -14,7 +14,6 @@
 #include "componeng/physics/physics_system.hpp"
 #include "componeng/physics/rigidbody_component.hpp"
 #include "componeng/renderer/asset/diffuse.hpp"
-#include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 #include "componeng/renderer/batching/batching_system.hpp"
@@ -43,9 +42,9 @@ void Engine::init() {
 
   DebugUI::init();
 
-  m_world.setResource<audio::AudioEngine>(audio::AudioEngine());
-  auto &audioEngine = m_world.getResource<audio::AudioEngine>();
-  audioEngine.init();
+  m_world.setResource<audio::AudioManager>(audio::AudioManager());
+  auto &audioManager = m_world.getResource<audio::AudioManager>();
+  audioManager.init();
 
   LOG_INFO("Initialized audio engine");
 
@@ -174,7 +173,7 @@ void Engine::run(IGame &game) {
 void Engine::shutdown() {
   DebugUI::shutdown();
   auto &assetManager = m_world.getResource<renderer::AssetManager>();
-  auto &audioEngine = m_world.getResource<audio::AudioEngine>();
+  auto &audioEngine = m_world.getResource<audio::AudioManager>();
   assetManager.clear();
   audioEngine.shutdown();
   m_window.shutdown();

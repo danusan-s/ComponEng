@@ -156,28 +156,9 @@ std::unique_ptr<Mesh> AssetManager::loadMeshFromFile(const char *file) {
   return mesh;
 }
 
-void AssetManager::loadAudio(const char *file, core::Name name) {
-  LOG_INFO("Loading Audio: %s", name.c_str());
-
-  m_audioPaths.push_back(file);
-  core::HandleID id = m_audioPaths.size();
-  m_audios[name] = id;
-  LOG_INFO("Audio loaded successfully: %s (ID: %u)", name.c_str(), id);
-}
-
-core::HandleID AssetManager::getAudioID(core::Name name) const {
-  return m_audios.at(name);
-}
-
-const char *AssetManager::getAudio(core::HandleID id) const {
-  return m_audioPaths.at(id - 1).c_str();
-}
-
 void AssetManager::clear() {
   LOG_INFO("Deleting loaded resources");
 
-  m_audios.clear();
-  m_audioPaths.clear();
   m_shaders.clear();
   m_shaderResources.clear();
   m_textures.clear();

@@ -10,7 +10,7 @@
 using namespace componeng;
 
 static constexpr float DEFAULT_MOVE_SPEED = 100.0f;
-static constexpr float MOUSE_SENSITIVITY = 0.1f;
+static constexpr float MOUSE_SENSITIVITY = 0.05f;
 static constexpr float PITCH_LIMIT = 89.0f;
 
 static void getCameraVectors(const core::TransformComponent &transform,

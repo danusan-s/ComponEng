@@ -19,7 +19,7 @@ struct AudioComponent {
   float maxDistance = 100.0f;
 
   // Runtime data (not serialized)
-  core::HandleID audioID = 0;
+  core::HandleID audioID = core::INVALID_HANDLE;
 };
 
 } // namespace componeng::audio
