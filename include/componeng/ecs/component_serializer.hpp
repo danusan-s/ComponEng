@@ -26,7 +26,7 @@ template <typename T> struct ComponentSerializer {
   }
 };
 
-static inline std::array<float, 16> SerializeMat4(const glm::mat4 &m) {
+static inline std::array<float, 16> SerializeMat4(const core::Mat4 &m) {
   std::array<float, 16> data;
   const float *ptr = &m[0][0]; // GLM guarantees contiguous storage
   for (int i = 0; i < 16; i++)
@@ -34,10 +34,10 @@ static inline std::array<float, 16> SerializeMat4(const glm::mat4 &m) {
   return data;
 }
 
-static inline glm::mat4 DeserializeMat4(const std::vector<float> &data) {
+static inline core::Mat4 DeserializeMat4(const std::vector<float> &data) {
   if (data.size() != 16)
     throw std::runtime_error("Invalid data size for deserializing glm::mat4");
-  glm::mat4 m;
+  core::Mat4 m;
   float *ptr = &m[0][0];
   for (int i = 0; i < 16; i++)
     ptr[i] = data[i];
@@ -45,14 +45,17 @@ static inline glm::mat4 DeserializeMat4(const std::vector<float> &data) {
 }
 
 // --- Type detection traits ---
+template <typename T> struct is_vec2 : std::false_type {};
+template <> struct is_vec2<core::Vec2> : std::true_type {};
+
 template <typename T> struct is_vec3 : std::false_type {};
-template <> struct is_vec3<glm::vec3> : std::true_type {};
+template <> struct is_vec3<core::Vec3> : std::true_type {};
 
 template <typename T> struct is_vec4 : std::false_type {};
-template <> struct is_vec4<glm::vec4> : std::true_type {};
+template <> struct is_vec4<core::Vec4> : std::true_type {};
 
 template <typename T> struct is_mat4 : std::false_type {};
-template <> struct is_mat4<glm::mat4> : std::true_type {};
+template <> struct is_mat4<core::Mat4> : std::true_type {};
 
 // --- Generic field serialization dispatcher (zero macros) ---
 template <typename T, typename M>

@@ -1,9 +1,6 @@
 #pragma once
 
-#include "gtest/gtest.h"
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
+#include "componeng/core/math/ops.hpp"
 
 #include "componeng/core/string_interner.hpp"
 
@@ -84,27 +81,6 @@ namespace componeng::core {
 
 using HandleID = uint32_t;
 constexpr HandleID INVALID_HANDLE = UINT32_MAX;
-
-// Type aliases for cleaner code
-using Vec2 = glm::vec2;
-using Vec3 = glm::vec3;
-using Vec4 = glm::vec4;
-using Mat4 = glm::mat4;
-
-// GLM function aliases
-using glm::cross;
-using glm::degrees;
-using glm::dot;
-using glm::length;
-using glm::lookAt;
-using glm::normalize;
-using glm::ortho;
-using glm::perspective;
-using glm::radians;
-using glm::rotate;
-using glm::scale;
-using glm::translate;
-using glm::value_ptr;
 
 using UniformMap = std::unordered_map<
     Name, std::variant<float, core::Vec2, core::Vec3, core::Vec4, core::Mat4>>;

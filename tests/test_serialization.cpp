@@ -75,10 +75,10 @@ TEST(SerializationTest, RoundTripColorComponent) {
   auto json = ComponentSerializer<ColorComponent>::serialize(orig);
   auto restored = ComponentSerializer<ColorComponent>::deserialize(json);
 
-  EXPECT_FLOAT_EQ(orig.color.r, restored.color.r);
-  EXPECT_FLOAT_EQ(orig.color.g, restored.color.g);
-  EXPECT_FLOAT_EQ(orig.color.b, restored.color.b);
-  EXPECT_FLOAT_EQ(orig.color.a, restored.color.a);
+  EXPECT_FLOAT_EQ(orig.color.x, restored.color.x);
+  EXPECT_FLOAT_EQ(orig.color.y, restored.color.y);
+  EXPECT_FLOAT_EQ(orig.color.z, restored.color.z);
+  EXPECT_FLOAT_EQ(orig.color.w, restored.color.w);
 }
 
 TEST(SerializationTest, RoundTripTransformComponent) {
@@ -217,10 +217,10 @@ TEST(SerializationTest, SceneRoundTripPreservesTransformAndColor) {
         EXPECT_EQ(t.rotation, Vec3(0.0f, 90.0f, 0.0f));
         EXPECT_EQ(t.scale, Vec3(3.0f));
         EXPECT_EQ(m.meshName, "cube");
-        EXPECT_FLOAT_EQ(c.color.r, 0.25f);
-        EXPECT_FLOAT_EQ(c.color.g, 0.5f);
-        EXPECT_FLOAT_EQ(c.color.b, 0.75f);
-        EXPECT_FLOAT_EQ(c.color.a, 1.0f);
+        EXPECT_FLOAT_EQ(c.color.x, 0.25f);
+        EXPECT_FLOAT_EQ(c.color.y, 0.5f);
+        EXPECT_FLOAT_EQ(c.color.z, 0.75f);
+        EXPECT_FLOAT_EQ(c.color.w, 1.0f);
       });
   EXPECT_EQ(count, 1);
 

@@ -95,7 +95,7 @@ public:
         if (std::holds_alternative<core::Mat4>(value)) {
           const core::Mat4 &mat4 = std::get<core::Mat4>(value);
           std::memcpy(base + attr.offset,
-                      glm::value_ptr(mat4) + attr.matrixRow * 4,
+                      core::value_ptr(mat4) + attr.matrixRow * 4,
                       sizeof(float) * 4);
         }
         continue;
@@ -106,19 +106,19 @@ public:
         std::memcpy(base + attr.offset, &f, sizeof(float));
       } else if (std::holds_alternative<core::Vec2>(value)) {
         std::memcpy(base + attr.offset,
-                    glm::value_ptr(std::get<core::Vec2>(value)),
+                    core::value_ptr(std::get<core::Vec2>(value)),
                     sizeof(core::Vec2));
       } else if (std::holds_alternative<core::Vec3>(value)) {
         std::memcpy(base + attr.offset,
-                    glm::value_ptr(std::get<core::Vec3>(value)),
+                    core::value_ptr(std::get<core::Vec3>(value)),
                     sizeof(core::Vec3));
       } else if (std::holds_alternative<core::Vec4>(value)) {
         std::memcpy(base + attr.offset,
-                    glm::value_ptr(std::get<core::Vec4>(value)),
+                    core::value_ptr(std::get<core::Vec4>(value)),
                     sizeof(core::Vec4));
       } else if (std::holds_alternative<core::Mat4>(value)) {
         std::memcpy(base + attr.offset,
-                    glm::value_ptr(std::get<core::Mat4>(value)),
+                    core::value_ptr(std::get<core::Mat4>(value)),
                     sizeof(core::Mat4));
       }
     }
