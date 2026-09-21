@@ -56,17 +56,17 @@ target_include_directories(ComponEng
         ${CMAKE_CURRENT_SOURCE_DIR}/include/third_party/imgui
 )
 
-# GLM experimental
-target_compile_definitions(ComponEng PUBLIC GLM_ENABLE_EXPERIMENTAL)
-
 target_compile_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-g>
     $<$<CONFIG:Debug>:-fsanitize=address>
+    $<$<CONFIG:Release>:-ffast-math>
+    $<$<CONFIG:Release>:-flto>
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Release>:-march=native>
 )
 target_link_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-fsanitize=address>
+    $<$<CONFIG:Release>:-flto>
 )
 
 # PRIVATE: don't force these diagnostics onto example/ and tests
@@ -148,6 +148,7 @@ set(TEST_SOURCES
     tests/test_query.cpp
     tests/test_collision.cpp
     tests/test_serialization.cpp
+    tests/test_math.cpp
     tests/test_world.cpp
 )
 
@@ -155,6 +156,5 @@ foreach(TEST_SRC ${TEST_SOURCES})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
     add_executable(${TEST_NAME} ${TEST_SRC})
     target_link_libraries(${TEST_NAME} PRIVATE ComponEng gtest_main)
-    target_compile_definitions(${TEST_NAME} PRIVATE GLM_ENABLE_EXPERIMENTAL)
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()

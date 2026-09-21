@@ -52,8 +52,11 @@ Frustum::Frustum(const core::Mat4 &m) {
 
   for (int i = 0; i < 6; i++) {
     float len = core::length(m_planes[i].normal);
-    m_planes[i].normal /= len;
-    m_planes[i].distance /= len;
+    float inv = 1.0f / len;
+    m_planes[i].normal.x *= inv;
+    m_planes[i].normal.y *= inv;
+    m_planes[i].normal.z *= inv;
+    m_planes[i].distance *= inv;
   }
 }
 

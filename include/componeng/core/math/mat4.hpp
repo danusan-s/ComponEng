@@ -2,7 +2,7 @@
 
 namespace componeng::core {
 
-struct Mat4 {
+struct alignas(16) Mat4 {
   float m[4][4];
 
   constexpr Mat4()

@@ -22,7 +22,8 @@ inline float dot(const Vec3 &a, const Vec3 &b) {
 inline Vec3 normalize(const Vec3 &v) {
   float len = length(v);
   if (len > 0.0f) {
-    return Vec3(v.x / len, v.y / len, v.z / len);
+    float inv = 1.0f / len;
+    return Vec3(v.x * inv, v.y * inv, v.z * inv);
   }
   return Vec3(std::nanf(""), std::nanf(""), std::nanf(""));
 }
@@ -54,10 +55,10 @@ inline Mat4 lookAt(const Vec3 &eye, const Vec3 &center, const Vec3 &up) {
 }
 
 inline Mat4 perspective(float fov, float aspect, float near, float far) {
-  float tanHalfFov = std::tan(fov / 2.0f);
+  float invTan = 1.0f / std::tan(fov / 2.0f);
   Mat4 result(0.0f);
-  result[0][0] = 1.0f / (aspect * tanHalfFov);
-  result[1][1] = 1.0f / (tanHalfFov);
+  result[0][0] = invTan / aspect;
+  result[1][1] = invTan;
   result[2][2] = -(far + near) / (far - near);
   result[2][3] = -1.0f;
   result[3][2] = -(2.0f * far * near) / (far - near);
@@ -66,42 +67,60 @@ inline Mat4 perspective(float fov, float aspect, float near, float far) {
 
 inline Mat4 translate(const Mat4 &matrix, const Vec3 &translation) {
   Mat4 result = matrix;
-  result[3][0] += translation.x;
-  result[3][1] += translation.y;
-  result[3][2] += translation.z;
+  result[3][0] = matrix[0][0] * translation.x + matrix[1][0] * translation.y +
+                 matrix[2][0] * translation.z + matrix[3][0];
+  result[3][1] = matrix[0][1] * translation.x + matrix[1][1] * translation.y +
+                 matrix[2][1] * translation.z + matrix[3][1];
+  result[3][2] = matrix[0][2] * translation.x + matrix[1][2] * translation.y +
+                 matrix[2][2] * translation.z + matrix[3][2];
+  result[3][3] = matrix[0][3] * translation.x + matrix[1][3] * translation.y +
+                 matrix[2][3] * translation.z + matrix[3][3];
   return result;
 }
 
 inline Mat4 rotate(const Mat4 &matrix, float angle, const Vec3 &axis) {
   float c = std::cos(angle);
   float s = std::sin(angle);
-  Vec3 normAxis = normalize(axis);
+  float t = 1.0f - c;
+  float x = axis.x, y = axis.y, z = axis.z;
+  if (x * x + y * y + z * z != 1.0f) {
+    Vec3 n = normalize(axis);
+    x = n.x;
+    y = n.y;
+    z = n.z;
+  }
+  float r00 = c + t * x * x;
+  float r01 = t * x * y + s * z;
+  float r02 = t * x * z - s * y;
+  float r10 = t * y * x - s * z;
+  float r11 = c + t * y * y;
+  float r12 = t * y * z + s * x;
+  float r20 = t * z * x + s * y;
+  float r21 = t * z * y - s * x;
+  float r22 = c + t * z * z;
 
-  Mat4 rotation(1.0f);
-  rotation[0][0] = c + (1 - c) * normAxis.x * normAxis.x;
-  rotation[0][1] = (1 - c) * normAxis.x * normAxis.y + s * normAxis.z;
-  rotation[0][2] = (1 - c) * normAxis.x * normAxis.z - s * normAxis.y;
-
-  rotation[1][0] = (1 - c) * normAxis.y * normAxis.x - s * normAxis.z;
-  rotation[1][1] = c + (1 - c) * normAxis.y * normAxis.y;
-  rotation[1][2] = (1 - c) * normAxis.y * normAxis.z + s * normAxis.x;
-
-  rotation[2][0] = (1 - c) * normAxis.z * normAxis.x + s * normAxis.y;
-  rotation[2][1] = (1 - c) * normAxis.z * normAxis.y - s * normAxis.x;
-  rotation[2][2] = c + (1 - c) * normAxis.z * normAxis.z;
-
-  return matrix * rotation;
+  Mat4 result;
+  for (int row = 0; row < 4; ++row) {
+    float m0 = matrix[0][row], m1 = matrix[1][row], m2 = matrix[2][row];
+    result[0][row] = m0 * r00 + m1 * r01 + m2 * r02;
+    result[1][row] = m0 * r10 + m1 * r11 + m2 * r12;
+    result[2][row] = m0 * r20 + m1 * r21 + m2 * r22;
+    result[3][row] = matrix[3][row];
+  }
+  return result;
 }
 
 inline Mat4 scale(const Mat4 &matrix, const Vec3 &scale) {
   Mat4 result = matrix;
-  result[0][0] *= scale.x;
-  result[1][1] *= scale.y;
-  result[2][2] *= scale.z;
+  for (int r = 0; r < 4; ++r) {
+    result[0][r] *= scale.x;
+    result[1][r] *= scale.y;
+    result[2][r] *= scale.z;
+  }
   return result;
 }
 
-inline float radians(float degrees) {
+inline constexpr float radians(float degrees) {
   return degrees * (PI / 180.0f);
 }
 
