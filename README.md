@@ -10,6 +10,8 @@ An ECS-based game engine built in C++ with modern OpenGL, featuring an ImGui deb
 
 https://github.com/user-attachments/assets/2e074537-c737-4367-95d1-6cd4d009cc22
 
+Other examples are featured in [ComponEx](https://www.github.com/danusan-s/ComponEx).
+
 ## Overview
 
 ComponEng is a learning project demonstrating core game engine architecture through an **Entity-Component-System (ECS)** pattern. It features archetype-based ECS design, instanced rendering, and a debug overlay.
