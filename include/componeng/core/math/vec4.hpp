@@ -1,5 +1,7 @@
 #pragma once
 
+#include "vec3.hpp"
+
 namespace componeng::core {
 
 struct Vec4 {
@@ -14,6 +16,9 @@ struct Vec4 {
       : x(x_), y(y_), z(z_), w(w_) {
   }
   constexpr Vec4(float value) : x(value), y(value), z(value), w(value) {
+  }
+
+  Vec4(const Vec3 &vec3, float w_) : x(vec3.x), y(vec3.y), z(vec3.z), w(w_) {
   }
 
   Vec4 operator+(const Vec4 &other) const {
