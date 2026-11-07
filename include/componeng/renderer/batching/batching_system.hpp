@@ -1,18 +1,21 @@
 #pragma once
 
 #include "componeng/ecs/system.hpp"
-#include "componeng/renderer/batching/batch_map.hpp"
+#include "componeng/renderer/batching/draw_key.hpp"
+#include "componeng/renderer/batching/instance_data.hpp"
 
-#include <memory>
+#include <cstdint>
+#include <unordered_map>
 
 namespace componeng::renderer {
 
 /**
- * @brief Presentation-phase system that renders all entities with MeshComponent
- * and MaterialComponent.
+ * @brief Presentation-phase system that turns every visible entity with a
+ * Transform, MeshComponent and MaterialComponent into instance data.
  *
- * Performs builds draw batches, and issues draw calls
- * using instanced rendering through the render device abstraction.
+ * One pass over the query: each entity's instance data is written by its
+ * material directly into the flat buffer of its (mesh, material) batch in the
+ * RenderQueue, then the queue is sorted for the RenderSystem to draw.
  */
 class BatchingSystem final : public ecs::ISystem {
 public:
@@ -21,7 +24,9 @@ public:
   void onDestroy(const ecs::SystemState &state) override;
 
 private:
-  std::unique_ptr<BatchMap> m_batches;
+  // (mesh, material) -> index of its batch in this frame's RenderQueue.
+  std::unordered_map<DrawKey, uint32_t, DrawKeyHash> m_batchIndex;
+  TransformMatrixCache m_matrixCache;
 };
 
 } // namespace componeng::renderer

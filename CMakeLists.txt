@@ -149,6 +149,7 @@ set(TEST_SOURCES
     tests/test_collision.cpp
     tests/test_serialization.cpp
     tests/test_math.cpp
+    tests/test_instance_data.cpp
     tests/test_world.cpp
 )
 

@@ -2,7 +2,7 @@
 
 #include "componeng/ecs/system.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
-#include "componeng/renderer/batching/batch_map.hpp"
+#include "componeng/renderer/batching/draw_key.hpp"
 
 #include <memory>
 #include <unordered_map>

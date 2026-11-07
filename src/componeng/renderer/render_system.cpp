@@ -113,52 +113,73 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
   int instancesRendered = 0;
   auto &renderQueue = state.world->getResource<RenderQueue>();
+  const auto &assetManager = state.world->getResource<AssetManager>();
 
-  for (const auto &batch : renderQueue.getBatches()) {
+  // The queue is sorted by shader, then texture, so consecutive batches often
+  // share GPU state. Track what is currently bound and skip redundant work.
+  // GL state is only trusted within this loop: ImGui or anything else may have
+  // changed it between frames.
+  core::HandleID boundShader = core::INVALID_HANDLE;
+  core::HandleID boundAlbedo = core::INVALID_HANDLE;
+  // A material's own uniforms can overwrite a frame-wide one (e.g. its own
+  // fogColor). The shader keeps that value, so after such a material the
+  // frame-wide uniforms must be sent again even on the same shader.
+  bool materialOverrodeUniforms = false;
+
+  for (std::size_t batchIndex = 0; batchIndex < renderQueue.size();
+       ++batchIndex) {
+    const RenderBatch &batch = renderQueue.sorted(batchIndex);
     const core::HandleID meshID = batch.meshID;
     const core::HandleID materialID = batch.materialID;
-    const auto &data = batch;
-    const api::VertexLayout &layout = data.vertexLayout;
-
-    const auto &assetManager = state.world->getResource<AssetManager>();
 
     auto &material = assetManager.getMaterial(materialID);
+    const api::VertexLayout &layout = material.getVertexLayout();
     const Mesh &model = assetManager.getMesh(meshID);
     const Shader &shader = assetManager.getShader(material.getShaderID());
     const Texture2D &albedoTex = assetManager.getTexture(material.getTextureID());
 
-    shader.use();
-    shader.setMatrix4("viewProj", viewProj);
-    shader.setVector3f("lightDir", lightDir);
-    shader.setVector3f("lightColor", lightColor);
-    shader.setVector3f("cameraPos", cameraPos.x, cameraPos.y, cameraPos.z);
-    shader.setFloat("time", state.world->time);
+    const bool shaderChanged = material.getShaderID() != boundShader;
+    if (shaderChanged) {
+      shader.use();
+      boundShader = material.getShaderID();
+    }
 
-    // Fog uniforms
-    shader.setVector4f("fogColor", fog.color.x, fog.color.y, fog.color.z,
-                       fog.color.w);
-    shader.setFloat("fogDensity", fog.density);
-    shader.setFloat("fogStart", fog.start);
-    shader.setFloat("fogEnd", fog.end);
+    if (shaderChanged || materialOverrodeUniforms) {
+      shader.setMatrix4("viewProj", viewProj);
+      shader.setVector3f("lightDir", lightDir);
+      shader.setVector3f("lightColor", lightColor);
+      shader.setVector3f("cameraPos", cameraPos.x, cameraPos.y, cameraPos.z);
+      shader.setFloat("time", state.world->time);
 
-    // Ambient / environment
-    shader.setVector3f("ambientColor", 0.3f, 0.4f, 0.6f); // sky-like
-    shader.setFloat("ambientStrength", 0.4f);
+      // Fog uniforms
+      shader.setVector4f("fogColor", fog.color.x, fog.color.y, fog.color.z,
+                         fog.color.w);
+      shader.setFloat("fogDensity", fog.density);
+      shader.setFloat("fogStart", fog.start);
+      shader.setFloat("fogEnd", fog.end);
+
+      // Ambient / environment
+      shader.setVector3f("ambientColor", 0.3f, 0.4f, 0.6f); // sky-like
+      shader.setFloat("ambientStrength", 0.4f);
+
+      shader.setInteger("albedoMap", 0);
+    }
 
     // Texture toggles (PBR materials use textures; diffuse may not)
-    bool isPbr = dynamic_cast<const PbrMaterial *>(&material) != nullptr;
+    const auto *pbr = dynamic_cast<const PbrMaterial *>(&material);
+    const bool isPbr = pbr != nullptr;
     shader.setInteger("useTextures", isPbr ? 1 : 0);
     shader.setInteger("useNormalMap", isPbr ? 1 : 0);
 
     // Bind albedo to texture unit 0
-    renderDevice.setActiveTextureUnit(0);
-    albedoTex.bind();
-    shader.setInteger("albedoMap", 0);
+    if (material.getTextureID() != boundAlbedo) {
+      renderDevice.setActiveTextureUnit(0);
+      albedoTex.bind();
+      boundAlbedo = material.getTextureID();
+    }
 
     // Bind PBR textures to units 1-4 if available
     if (isPbr) {
-      const auto *pbr = dynamic_cast<const PbrMaterial *>(&material);
-
       renderDevice.setActiveTextureUnit(1);
       if (pbr->getNormalMapID() != 0) {
         const Texture2D &normalTex = assetManager.getTexture(pbr->getNormalMapID());
@@ -194,20 +215,18 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
         albedoTex.bind();
       }
       shader.setInteger("aoMap", 4);
+
+      // Back to unit 0 so the albedo binding tracked above stays the one that
+      // later binds and draws see.
+      renderDevice.setActiveTextureUnit(0);
     }
 
     // Set material uniforms (fogColor etc. from PbrMaterial constructor)
     setShaderUniforms(shader, material);
 
-    model.getImpl().bind();
+    materialOverrodeUniforms = !material.getUniforms().empty();
 
-    std::vector<float> flatInstanceData;
-    flatInstanceData.reserve(data.instanceDatas.size() *
-                             (layout.stride / sizeof(float)));
-    for (const auto &instance : data.instanceDatas) {
-      flatInstanceData.insert(flatInstanceData.end(), instance.begin(),
-                              instance.end());
-    }
+    model.getImpl().bind();
 
     // Reuse one GPU buffer per (mesh,material) combo across frames instead of
     // creating/destroying one every draw call; only reallocate (setData) when
@@ -218,29 +237,26 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     if (!buf) {
       buf = renderDevice.createBuffer();
     }
-    size_t requiredBytes = flatInstanceData.size() * sizeof(float);
+    const size_t requiredBytes = batch.instanceData.size() * sizeof(float);
     if (requiredBytes > buf->size()) {
-      buf->setData(flatInstanceData.data(), requiredBytes,
+      buf->setData(batch.instanceData.data(), requiredBytes,
                    api::IBuffer::Usage::Dynamic);
     } else if (requiredBytes > 0) {
-      buf->setSubData(0, flatInstanceData.data(), requiredBytes);
+      buf->setSubData(0, batch.instanceData.data(), requiredBytes);
     }
 
-    renderDevice.setupInstanceAttributes(*buf, material.getVertexLayout());
+    renderDevice.setupInstanceAttributes(*buf, layout);
 
-    renderDevice.drawIndexedInstanced(model.indexCount(),
-                                      data.instanceDatas.size());
+    renderDevice.drawIndexedInstanced(model.indexCount(), batch.instanceCount);
 
-    renderDevice.unbindInstanceAttributes(material.getVertexLayout());
-
-    // Reset active texture unit to 0
-    renderDevice.setActiveTextureUnit(0);
+    renderDevice.unbindInstanceAttributes(layout);
 
     ++drawCalls;
-    instancesRendered += batch.instanceDatas.size();
+    instancesRendered += batch.instanceCount;
   }
 
-  renderQueue.clear();
+  // The queue is cleared by BatchingSystem at the start of next frame, which
+  // lets its batch storage be reused instead of freed.
 
   core::DebugUI::addValue("Instances Rendered", instancesRendered);
   core::DebugUI::addValue("Draw Calls", drawCalls);

@@ -1,14 +1,11 @@
 #include "componeng/renderer/batching/batching_system.hpp"
 
-#include "componeng/camera/camera_component.hpp"
-#include "componeng/camera/main_camera.hpp"
 #include "componeng/core/transform_component.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
@@ -16,17 +13,29 @@
 namespace componeng::renderer {
 
 void BatchingSystem::onCreate(const ecs::SystemState &state) {
-  m_batches = std::make_unique<BatchMap>();
   state.world->setResource(RenderQueue());
 }
 
 void BatchingSystem::onUpdate(const ecs::SystemState &state) {
   const AssetManager &assetManager = state.world->getResource<AssetManager>();
+  RenderQueue &renderQueue = state.world->getResource<RenderQueue>();
+
+  renderQueue.clear();
+  m_batchIndex.clear();
+
+  // Entities of one archetype tend to arrive in runs sharing a mesh and
+  // material (a forest of identical trees), so remember the last batch and
+  // skip the hash lookup while the run lasts.
+  constexpr uint32_t kNoBatch = UINT32_MAX;
+  DrawKey lastKey;
+  uint32_t lastBatch = kNoBatch;
+  const IMaterial *lastMaterial = nullptr;
 
   state.world
       ->query<core::TransformComponent, renderer::MeshComponent,
               renderer::MaterialComponent>()
-      .eachWithEntity([&](ecs::EntityID entity, core::TransformComponent &,
+      .eachWithEntity([&](ecs::EntityID entity,
+                          core::TransformComponent &transform,
                           renderer::MeshComponent &m,
                           renderer::MaterialComponent &mat) {
         if (mat.materialID == 0) {
@@ -44,35 +53,44 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
               m.meshName.empty() ? core::Name("cube") : m.meshName);
         }
 
-        if (m.visible)
-          m_batches->add(m.meshID, mat.materialID, ecs::EntityID{entity});
+        if (!m.visible) {
+          return;
+        }
+
+        const DrawKey key{m.meshID, mat.materialID};
+        if (lastBatch == kNoBatch || !(key == lastKey)) {
+          auto [it, inserted] = m_batchIndex.try_emplace(key, kNoBatch);
+          if (inserted) {
+            it->second = renderQueue.openBatch(
+                key.meshID, key.materialID, material.getShaderID(),
+                material.getTextureID());
+          }
+          lastKey = key;
+          lastBatch = it->second;
+          lastMaterial = &material;
+        }
+
+        RenderBatch &batch = renderQueue.batch(lastBatch);
+        const api::VertexLayout &layout = lastMaterial->getVertexLayout();
+        const std::size_t strideFloats = layout.stride / sizeof(float);
+
+        // resize() zero-fills the new instance, so any attribute the material
+        // does not write reads as 0.
+        const std::size_t base = batch.instanceData.size();
+        batch.instanceData.resize(base + strideFloats);
+
+        InstanceWriter writer(layout, batch.instanceData.data() + base);
+        InstanceContext ctx(*state.world, entity, transform, m_matrixCache);
+        lastMaterial->writeInstanceData(ctx, writer);
+        ++batch.instanceCount;
       });
 
-  auto &renderQueue = state.world->getResource<RenderQueue>();
-
-  for (const auto &[key, entities] : m_batches->getMap()) {
-    RenderBatch batch;
-    batch.meshID = key.meshID;
-    batch.materialID = key.materialID;
-
-    IMaterial &material = assetManager.getMaterial(batch.materialID);
-    batch.vertexLayout = material.getVertexLayout();
-    batch.instanceDatas.reserve(entities.size());
-
-    for (ecs::EntityID entity : entities) {
-      std::vector<float> instanceData =
-          material.buildInstanceDataFloats(*state.world, entity);
-      batch.instanceDatas.push_back(std::move(instanceData));
-    }
-
-    renderQueue.addBatch(std::move(batch));
-  }
-
-  m_batches->clear();
+  renderQueue.sort();
 }
 
 void BatchingSystem::onDestroy(const ecs::SystemState &) {
-  m_batches.reset();
+  m_batchIndex.clear();
+  m_matrixCache.clear();
 }
 
 } // namespace componeng::renderer

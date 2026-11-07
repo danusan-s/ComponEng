@@ -122,6 +122,20 @@ public:
     return archetype->get<T>(componentID, record.row);
   }
 
+  /** Like getComponent, but returns nullptr instead of throwing when the
+   *  entity lacks T. One lookup, where hasComponent + getComponent is two. */
+  template <typename T> T *tryGetComponent(EntityID entity) {
+    EntityRecord record = m_entityManager.getRecord(entity);
+    ComponentID componentID = m_componentRegistry.getComponentID<T>();
+
+    Archetype *archetype = archetypeOf(record);
+    if (!archetype || !archetype->m_signature.test(componentID)) {
+      return nullptr;
+    }
+
+    return &archetype->get<T>(componentID, record.row);
+  }
+
   template <typename T> void addComponent(EntityID entity, T component) {
     addComponents(entity, std::move(component));
   }

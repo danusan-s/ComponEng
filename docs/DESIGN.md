@@ -333,18 +333,27 @@ const auto& events = world.get_events<CollisionEvent>();
 ### Architecture
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      RenderSystem                           │
+│                      BatchingSystem                         │
+│  one pass over Transform + Mesh + Material entities         │
 ├─────────────────────────────────────────────────────────────┤
-│  m_batches: unique_ptr<BatchMap>                           │
+│  material->writeInstanceData() writes each entity straight  │
+│  into the flat buffer of its (mesh, material) batch         │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                       BatchMap                              │
-│  map<DrawKey, BatchData>                                    │
+│                       RenderQueue                           │
+│  pooled RenderBatch { mesh, material, shader, texture,      │
+│                       instanceCount, instanceData[] }       │
 ├─────────────────────────────────────────────────────────────┤
-│  DrawKey = { meshID, textureID, shaderID }                  │
-│  BatchData = { instanceBuffer, instanceDatas[] }            │
+│  sorted by shader, texture, material, mesh                  │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       RenderSystem                          │
+│  skips redundant shader / uniform / texture binds between   │
+│  consecutive batches, uploads each batch, draws instanced   │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -368,31 +377,32 @@ const auto& events = world.get_events<CollisionEvent>();
 ### Rendering Flow
 1. **Query**: Query all entities with TransformComponent, MeshComponent, MaterialComponent
 2. **Culling**: Test each entity's AABB against view frustum planes
-3. **Batching**: Group visible entities by (meshID, textureID, shaderID)
-4. **Instance Data**: For each batch, upload model matrices and colors to instance buffer
-5. **Draw**: Use glDrawElementsInstanced for single-draw-call rendering
+3. **Batching**: Group visible entities by (meshID, materialID); each entity's
+   instance data is written directly into its batch's flat buffer, with the model
+   matrix built by `TransformComponent::toMatrix()` and cached per entity while
+   the transform is unchanged
+4. **Sorting**: Order batches by (shaderID, textureID, materialID, meshID) so
+   draws sharing GPU state are adjacent
+5. **Draw**: Upload each batch's buffer and use glDrawElementsInstanced for
+   single-draw-call rendering, skipping shader/texture rebinds that did not change
 
-### BatchMap (`renderer/batch_map.hpp`)
+### RenderQueue (`renderer/batching/render_queue.hpp`)
 
 ```cpp
-struct DrawKey {
-    MeshID meshID;
-    TextureID textureID;
-    ShaderID shaderID;
-};
-
-struct InstanceData {
-    Mat4 modelMatrix;  // Per-instance model transform
-    Vec3 color;        // Per-instance color
-};
-
-class BatchMap {
-    unordered_map<DrawKey, BatchData, DrawKeyHash> map_;
+struct RenderBatch {
+    HandleID meshID, materialID, shaderID, textureID;
+    uint32_t instanceCount;
+    std::vector<float> instanceData;  // instanceCount * stride floats, packed
 };
 ```
 
+The queue's batches live in a pool that survives `clear()`, so a steady scene
+builds its queue without allocating. Only batches that received at least one
+instance this frame exist.
+
 ### Instance Buffer Layout
-Instance data is uploaded as 4 vec4 attributes (model matrix) + 1 vec3 (color):
+The layout is reflected from the shader's instance attributes (location >= 3).
+For the built-in diffuse shader that is 4 vec4 (model matrix) + 1 vec4 (color):
 - stride = 80 bytes
 - vertexAttribDivisor = 1 (per-instance)
 
@@ -556,7 +566,7 @@ OpenGL 3.3 Core Profile implementation. Creates OpenGL-backed resources, manages
 | `ResourceManager` | `World` | `IResource` |
 | `Window` | `Engine` | `GLFW`, `IRenderDevice` |
 | `GLRenderDevice` | `Engine` | OpenGL 3.3 |
-| `RenderSystem` | `World` | `BatchMap` |
+| `RenderSystem` | `World` | `RenderQueue` |
 | `PhysicsSystem` | `World` | `CollisionDetection` |
 
 ---

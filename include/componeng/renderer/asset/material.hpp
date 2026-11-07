@@ -4,6 +4,7 @@
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/batching/instance_data.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <unordered_map>
@@ -64,71 +65,28 @@ public:
     return m_vertexLayout;
   }
 
-  /** Populates outInstanceData with this material's per-entity attribute
-   *  values, keyed by the shader's own attribute names (see
-   *  reflectInstanceLayout). Writes into a caller-owned map rather than
-   *  returning one, since buildInstanceDataFloats calls this once per entity
-   *  every frame and reuses a single scratch map across those calls. */
-  virtual void buildInstanceData(ecs::World &world, ecs::EntityID entity,
-                                 core::UniformMap &outInstanceData) const = 0;
-
-  std::vector<float> buildInstanceDataFloats(ecs::World &world,
-                                             ecs::EntityID entity) const {
-    api::VertexLayout layout = getVertexLayout();
-    std::vector<float> instanceDataFloats(layout.stride / sizeof(float), 0.0f);
-
-    if (layout.attributes.empty()) {
-      return instanceDataFloats;
-    }
-
-    // Reused across calls (BatchingSystem drives this sequentially per
-    // material via eachWithEntity, never in parallel) to avoid rebuilding an
-    // unordered_map's bucket array from scratch for every entity every frame.
+  /** Writes one entity's per-instance attributes into `out`, keyed by the
+   *  shader's own attribute names (see IShader::reflectInstanceLayout).
+   *
+   *  This is the hot path: it runs once per rendered entity per frame, writing
+   *  straight into the batch's flat instance buffer. Override it and avoid
+   *  heap allocation; build Names once rather than per call.
+   *
+   *  The default implementation adapts the legacy buildInstanceData() below so
+   *  existing materials keep working, at the cost of a map per entity. */
+  virtual void writeInstanceData(const InstanceContext &ctx,
+                                 InstanceWriter &out) const {
     m_scratchInstanceData.clear();
-    buildInstanceData(world, entity, m_scratchInstanceData);
-    auto *base = reinterpret_cast<uint8_t *>(instanceDataFloats.data());
-
-    for (const auto &attr : layout.attributes) {
-      auto it = m_scratchInstanceData.find(attr.name);
-      if (it == m_scratchInstanceData.end()) {
-        continue;
-      }
-      const auto &value = it->second;
-
-      // attr.matrixRow >= 0 means this slot is one row of a mat4-typed
-      // value shared by name across its 4 rows (see reflectInstanceLayout).
-      if (attr.matrixRow >= 0) {
-        if (std::holds_alternative<core::Mat4>(value)) {
-          const core::Mat4 &mat4 = std::get<core::Mat4>(value);
-          std::memcpy(base + attr.offset,
-                      core::value_ptr(mat4) + attr.matrixRow * 4,
-                      sizeof(float) * 4);
-        }
-        continue;
-      }
-
-      if (std::holds_alternative<float>(value)) {
-        float f = std::get<float>(value);
-        std::memcpy(base + attr.offset, &f, sizeof(float));
-      } else if (std::holds_alternative<core::Vec2>(value)) {
-        std::memcpy(base + attr.offset,
-                    core::value_ptr(std::get<core::Vec2>(value)),
-                    sizeof(core::Vec2));
-      } else if (std::holds_alternative<core::Vec3>(value)) {
-        std::memcpy(base + attr.offset,
-                    core::value_ptr(std::get<core::Vec3>(value)),
-                    sizeof(core::Vec3));
-      } else if (std::holds_alternative<core::Vec4>(value)) {
-        std::memcpy(base + attr.offset,
-                    core::value_ptr(std::get<core::Vec4>(value)),
-                    sizeof(core::Vec4));
-      } else if (std::holds_alternative<core::Mat4>(value)) {
-        std::memcpy(base + attr.offset,
-                    core::value_ptr(std::get<core::Mat4>(value)),
-                    sizeof(core::Mat4));
-      }
+    buildInstanceData(ctx.world, ctx.entity, m_scratchInstanceData);
+    for (const auto &[name, value] : m_scratchInstanceData) {
+      out.set(name, value);
     }
-    return instanceDataFloats;
+  }
+
+  /** @deprecated Override writeInstanceData() instead. Kept so materials
+   *  written against the old map-based API still compile and run. */
+  virtual void buildInstanceData(ecs::World &, ecs::EntityID,
+                                 core::UniformMap &) const {
   }
 
 private:

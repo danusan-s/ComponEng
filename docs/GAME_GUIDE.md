@@ -358,7 +358,34 @@ time the engine resolves it to a shader + texture + vertex layout.
 - `uniform vec3 lightColor`
 
 Write a custom `IMaterial` subclass to add more per-instance attributes or uniforms
-(e.g., wind speed for grass, normal maps, PBR parameters).
+(e.g., wind speed for grass, normal maps, PBR parameters). Override
+`writeInstanceData`, which runs once per rendered entity per frame and writes
+straight into the batch's instance buffer:
+
+```cpp
+class GrassMaterial : public renderer::IMaterial {
+public:
+  using IMaterial::IMaterial;
+
+  void writeInstanceData(const renderer::InstanceContext &ctx,
+                         renderer::InstanceWriter &out) const override {
+    const auto &grass = ctx.world.getComponent<GrassComponent>(ctx.entity);
+    out.set(m_position, grass.position);   // matches `in vec3 instancePosition`
+    out.set(m_wind, grass.windStrength);   // matches `in float instanceWind`
+  }
+
+private:
+  // Build Names once; constructing one from a literal interns a string.
+  const core::Name m_position{"instancePosition"};
+  const core::Name m_wind{"instanceWind"};
+};
+```
+
+`InstanceContext` carries the world, the entity, its `TransformComponent` and a
+cached `modelMatrix()`. Attribute names must match the shader's instance
+attributes; names the shader does not declare are ignored. The older
+`buildInstanceData(world, entity, UniformMap&)` override still works but
+allocates a map per entity; prefer `writeInstanceData`.
 
 ### Attaching assets to an entity
 
