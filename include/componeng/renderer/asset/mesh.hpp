@@ -2,6 +2,7 @@
 
 #include "componeng/core/types.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/culling/bounds.hpp"
 
 #include <memory>
 #include <string>
@@ -19,7 +20,9 @@ class Mesh {
 public:
   Mesh() = default;
 
-  void uploadToGPU();
+  /** Uploads the parsed data through `device`, which owns how the GPU
+   *  resource is created. */
+  void uploadToGPU(api::IRenderDevice &device);
 
   // Helper to generate mesh data from Wavefront OBJ format (vertices, normals,
   // texcoords)
@@ -35,12 +38,20 @@ public:
 
   size_t indexCount() const;
 
+  /** Local-space bounds of the uploaded vertices; used for frustum culling. */
+  const Aabb &bounds() const {
+    return m_bounds;
+  }
+
   // Raw vertex/index data (used during parsing before GPU upload)
   std::vector<float> m_vertices;
   std::vector<unsigned int> m_indices;
 
 private:
+  void computeBounds();
+
   std::unique_ptr<api::IMesh> m_impl;
+  Aabb m_bounds;
 };
 
 } // namespace componeng::renderer

@@ -86,6 +86,10 @@ target_link_libraries(ComponEng
         OpenGL::GL
 )
 
+# GLFW must not pull in the system GL header: glad provides the GL API, and only
+# the OpenGL backend includes it. Public so games that include GLFW agree.
+target_compile_definitions(ComponEng PUBLIC GLFW_INCLUDE_NONE)
+
 # Vulkan backend setup - TEMPORARILY DISABLED as GLSL to SPIR-V conversion is buggy
 # and Vulkan support is not yet implemented
 # if(RENDERER_BACKEND STREQUAL "vulkan")
@@ -150,6 +154,8 @@ set(TEST_SOURCES
     tests/test_serialization.cpp
     tests/test_math.cpp
     tests/test_instance_data.cpp
+    tests/test_render_pipeline.cpp
+    tests/test_culling.cpp
     tests/test_world.cpp
 )
 

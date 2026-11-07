@@ -387,6 +387,122 @@ attributes; names the shader does not declare are ignored. The older
 `buildInstanceData(world, entity, UniformMap&)` override still works but
 allocates a map per entity; prefer `writeInstanceData`.
 
+#### Per-frame values in custom shaders
+
+Camera, light, fog and time are uploaded once per frame to a uniform buffer. A
+shader opts in by declaring this block (identically in its vertex and fragment
+stages) and then uses the members by bare name:
+
+```glsl
+layout(std140) uniform FrameData {
+    mat4 viewProj;
+    vec3 cameraPos;      float time;
+    vec3 lightDir;       float fogDensity;   // lightDir points towards the light
+    vec3 lightColor;     float fogStart;
+    vec3 ambientColor;   float ambientStrength;
+    vec4 fogColor;
+    float fogEnd;
+};
+```
+
+The layout must match `renderer/frame_data.hpp`; the engine logs an error at
+shader load if the sizes disagree. A shader that does not declare the block
+keeps working: it receives the same values as loose uniforms with the same
+names (`uniform mat4 viewProj;` and so on).
+
+#### Render state
+
+Each material carries a `RenderState` (culling, depth test/write/function and
+blending) that the renderer applies before drawing it. The default is back-face
+culling, depth test and write, and alpha blending.
+
+```cpp
+renderer::api::RenderState state;
+state.cull = renderer::api::CullMode::None;     // double-sided
+state.blend = renderer::api::BlendMode::None;   // opaque, no blending cost
+assetManager.getMaterial(assetManager.getMaterialID("leaf")).setRenderState(state);
+```
+
+#### Texture options
+
+`loadTexture` takes an optional `TextureDesc`. The defaults are the engine's
+original behaviour (clamped, trilinear, linear colour), so existing code is
+unchanged.
+
+```cpp
+renderer::api::TextureDesc desc;
+desc.wrap = renderer::api::TextureWrap::Repeat;   // tile instead of clamping
+desc.anisotropy = 8.0f;                           // sharper at grazing angles
+assets.loadTexture(path, /*alpha=*/false, "ground", desc);
+```
+
+| Field | Values | Notes |
+|---|---|---|
+| `wrap` | `ClampToEdge` (default), `Repeat`, `MirroredRepeat` | applies to both axes |
+| `minFilter`, `magFilter` | `Linear` (default), `Nearest` | `Nearest` gives crisp pixels |
+| `mipmaps` | `true` (default) | with `false`, minification does not blend levels |
+| `anisotropy` | `1` = off (default) | clamped to the GPU's limit, ignored if unsupported |
+| `srgb` | `false` (default) | see below |
+
+Set `srgb = true` only for colour images that a shader reads and then lights in
+linear space and encodes itself, as `pbr.frag` does. Normal, roughness, metallic
+and AO maps are data and stay linear. With a shader that uses the sampled value
+directly as the output colour (the diffuse shader), an sRGB texture comes out
+too dark. A file that cannot be read becomes a 1x1 magenta texture and an error
+is logged.
+
+#### Culling
+
+`CullingSystem` tests every renderable entity's bounding box (the mesh's own
+bounds under its transform) against the camera frustum, whether or not it has a
+physics collider, and sets `MeshComponent::culled`. Culled entities are skipped
+before any instance data is written. `MeshComponent::visible` is yours: the
+engine never changes it, so hiding an entity and culling one are independent.
+
+An entity's ids are resolved during its first frame, so it is drawn
+unconditionally that frame and culled from the next.
+
+If a vertex shader moves geometry outside the mesh's own bounds (billboards,
+wind sway, waves), widen the box so such entities are not culled while still
+partly on screen:
+
+```cpp
+material.setBoundsPadding(2.0f);   // metres, on every side
+```
+
+#### The sky
+
+Add a `SkyboxComponent` to any entity. The first one found is drawn behind
+everything as a full-screen triangle; it needs no mesh.
+
+```cpp
+world.addComponents(sky, renderer::SkyboxComponent{
+    .color = Vec3(0.25f, 0.5f, 0.9f),    // overhead
+    .horizonFromFog = true});            // horizon follows the fog colour
+```
+
+| Field | Default | Meaning |
+|---|---|---|
+| `shaderName` | `"skybox"` | shader to draw the sky with |
+| `color` | (0.5, 0.7, 1.0) | colour straight overhead (`skyColor` in the shader) |
+| `horizonColor` | (0.7, 0.8, 0.95) | horizon colour, used when `horizonFromFog` is false |
+| `horizonFromFog` | `true` | use the `Fog` colour at the horizon so fogged ground fades into the sky |
+
+A custom sky shader is loaded like any other (`loadShader`, then set
+`shaderName`). Its contract:
+
+- The vertex shader gets no vertex data and derives its three positions from
+  `gl_VertexID`. Copy `assets/shaders/skybox_procedural.vert` and change only
+  what you need; keep `gl_Position = vec4(ndc, 1.0, 1.0)` so the sky sits at the
+  far plane.
+- Loose uniforms set every frame: `mat4 invSkyViewProj` (inverse of projection
+  times rotation-only view; unprojecting a pixel gives its view direction),
+  `vec3 skyColor`, `vec3 horizonColor`.
+- Per-frame values (`lightDir`, `lightColor`, fog, camera, time) come from the
+  `FrameData` block if the shader declares it, otherwise as loose uniforms with
+  the same names.
+- Drawn with culling off, depth test `<=`, and depth writes off.
+
 ### Attaching assets to an entity
 
 ```cpp

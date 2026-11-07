@@ -29,8 +29,8 @@ public:
   void setViewport(int x, int y, int w, int h) override;
   void setScissor(int x, int y, int w, int h) override;
   void setActiveTextureUnit(uint32_t unit) override;
-  void setCullEnabled(bool enabled) override;
-  void setDepthFunc(api::DepthFunc func) override;
+  void setRenderState(const api::RenderState &state) override;
+  void bindUniformBuffer(uint32_t binding, api::IBuffer &buffer) override;
   void clear(float r, float g, float b, float a) override;
   void present(void *windowHandle) override;
   int checkErrors() const override;
@@ -45,6 +45,18 @@ public:
   void unbindInstanceAttributes(const api::VertexLayout &layout) override;
 
   void drawIndexedInstanced(size_t indexCount, uint32_t instanceCount) override;
+  void drawFullscreenTriangle() override;
+
+private:
+  /** Issues GL calls for the parts of `state` that differ from m_state (all of
+   *  it when `force`), then records it as current. */
+  void applyRenderState(const api::RenderState &state, bool force);
+
+  api::RenderState m_state;
+
+  // Core-profile GL refuses to draw without a VAO bound, even one with no
+  // attributes. Created once in init() and kept for the life of the context.
+  unsigned int m_fullscreenVao = 0;
 };
 
 } // namespace componeng::renderer::opengl

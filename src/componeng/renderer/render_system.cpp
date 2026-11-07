@@ -9,6 +9,7 @@
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset/pbr.hpp"
+#include "componeng/renderer/frame_data.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
@@ -18,10 +19,14 @@
 #include "componeng/resources/fog.hpp"
 #include "componeng/renderer/component/skybox_component.hpp"
 
+#include <algorithm>
+
 namespace componeng::renderer {
 
 static constexpr core::Vec3 DEFAULT_LIGHT_DIR = core::Vec3(-0.2f, 1.0f, -0.3f);
 static constexpr core::Vec3 DEFAULT_LIGHT_COLOR = core::Vec3(1.0f, 1.0f, 1.0f);
+static constexpr core::Vec3 AMBIENT_COLOR = core::Vec3(0.3f, 0.4f, 0.6f);
+static constexpr float AMBIENT_STRENGTH = 0.4f;
 
 static void setShaderUniforms(const Shader &shader, const IMaterial &material) {
   // Set material uniforms
@@ -46,8 +51,34 @@ static void setShaderUniforms(const Shader &shader, const IMaterial &material) {
   }
 }
 
+// Sends FrameData's values as loose uniforms, for shaders that predate the
+// FrameData block. The values come from the same struct that is uploaded to
+// the uniform buffer, so both paths always agree.
+static void setLooseFrameUniforms(const Shader &shader, const FrameData &frame,
+                                  const core::Mat4 &viewProj) {
+  shader.setMatrix4("viewProj", viewProj);
+  shader.setVector3f("lightDir", frame.lightDir[0], frame.lightDir[1],
+                     frame.lightDir[2]);
+  shader.setVector3f("lightColor", frame.lightColor[0], frame.lightColor[1],
+                     frame.lightColor[2]);
+  shader.setVector3f("cameraPos", frame.cameraPos[0], frame.cameraPos[1],
+                     frame.cameraPos[2]);
+  shader.setFloat("time", frame.time);
+
+  shader.setVector4f("fogColor", frame.fogColor[0], frame.fogColor[1],
+                     frame.fogColor[2], frame.fogColor[3]);
+  shader.setFloat("fogDensity", frame.fogDensity);
+  shader.setFloat("fogStart", frame.fogStart);
+  shader.setFloat("fogEnd", frame.fogEnd);
+
+  shader.setVector3f("ambientColor", frame.ambientColor[0],
+                     frame.ambientColor[1], frame.ambientColor[2]);
+  shader.setFloat("ambientStrength", frame.ambientStrength);
+}
+
 void RenderSystem::onUpdate(const ecs::SystemState &state) {
   api::IRenderDevice &renderDevice = state.world->getRenderDevice();
+  renderDevice.setRenderState(api::RenderState{});
   renderDevice.clear(0.0f, 0.0f, 0.0f, 1.0f);
 
   ecs::EntityID mainCameraID =
@@ -74,41 +105,77 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
         lightColor = l.color;
       });
 
-  // ------------------------------------------------------------------
-  // Skybox pass: procedural sky drawn first, behind everything.
-  // The cube is viewed from the inside, so culling is off, and the shader
-  // pins depth to exactly 1.0, so the depth test must accept equal depth.
-  // The horizon colour follows the fog so distant geometry blends into it.
-  // ------------------------------------------------------------------
-  state.world->query<renderer::SkyboxComponent>().each(
-      [&](renderer::SkyboxComponent &skybox) {
-        const auto &assetManager = state.world->getResource<AssetManager>();
-        const Shader &shader =
-            assetManager.getShader(assetManager.getShaderID("skybox"));
-        const Mesh &model =
-            assetManager.getMesh(assetManager.getMeshID("cube"));
+  // Per-frame values shared by every shader that declares the FrameData block.
+  FrameData frame{};
+  std::copy_n(core::value_ptr(viewProj), 16, frame.viewProj);
+  std::copy_n(core::value_ptr(cameraPos), 3, frame.cameraPos);
+  frame.time = static_cast<float>(state.world->time);
+  std::copy_n(core::value_ptr(lightDir), 3, frame.lightDir);
+  std::copy_n(core::value_ptr(lightColor), 3, frame.lightColor);
+  std::copy_n(core::value_ptr(AMBIENT_COLOR), 3, frame.ambientColor);
+  frame.ambientStrength = AMBIENT_STRENGTH;
+  std::copy_n(core::value_ptr(fog.color), 4, frame.fogColor);
+  frame.fogDensity = fog.density;
+  frame.fogStart = fog.start;
+  frame.fogEnd = fog.end;
 
+  if (!m_frameBuffer) {
+    m_frameBuffer = renderDevice.createBuffer();
+  }
+  if (m_frameBuffer->size() < sizeof(FrameData)) {
+    m_frameBuffer->setData(&frame, sizeof(FrameData),
+                           api::IBuffer::Usage::Dynamic);
+  } else {
+    m_frameBuffer->setSubData(0, &frame, sizeof(FrameData));
+  }
+  renderDevice.bindUniformBuffer(kFrameDataBinding, *m_frameBuffer);
+
+  // ------------------------------------------------------------------
+  // Sky pass: drawn first, behind everything, as a full-screen triangle.
+  // The shader pins depth to exactly 1.0, so the depth test must accept equal
+  // depth, and there is nothing behind it to protect so it does not write
+  // depth. Only the first SkyboxComponent is drawn.
+  // ------------------------------------------------------------------
+  bool skyDrawn = false;
+  state.world->query<renderer::SkyboxComponent>().each(
+      [&](renderer::SkyboxComponent &sky) {
+        if (skyDrawn) {
+          return;
+        }
+        skyDrawn = true;
+
+        const auto &assets = state.world->getResource<AssetManager>();
+        const Shader &shader =
+            assets.getShader(assets.getShaderID(sky.shaderName));
         auto &cam =
             state.world->getComponent<camera::CameraComponent>(mainCameraID);
 
         shader.use();
-        // Projection x rotation-only view: the sky follows the camera's
-        // orientation but not its position.
-        shader.setMatrix4("viewProj", cam.projectionMatrix * cam.viewMatrix);
-        shader.setVector3f("skyColor", skybox.color.x, skybox.color.y,
-                           skybox.color.z);
-        shader.setVector3f("horizonColor", fog.color.x, fog.color.y,
-                           fog.color.z);
-        shader.setVector3f("sunDir", lightDir.x, lightDir.y, lightDir.z);
-        shader.setVector3f("sunColor", lightColor.x, lightColor.y,
-                           lightColor.z);
+        if (!shader.usesFrameData()) {
+          setLooseFrameUniforms(shader, frame, viewProj);
+        }
 
-        renderDevice.setCullEnabled(false);
-        renderDevice.setDepthFunc(api::DepthFunc::LessEqual);
-        model.getImpl().bind();
-        renderDevice.drawIndexedInstanced(model.indexCount(), 1);
-        renderDevice.setDepthFunc(api::DepthFunc::Less);
-        renderDevice.setCullEnabled(true);
+        // Projection x rotation-only view, inverted: turns a pixel back into
+        // the direction the camera sees through it. No camera translation, so
+        // the sky stays fixed relative to the camera's orientation.
+        shader.setMatrix4("invSkyViewProj",
+                          core::inverse(cam.projectionMatrix * cam.viewMatrix));
+        shader.setVector3f("skyColor", sky.color);
+        // The fog colour as horizon lets fogged ground fade into the sky.
+        shader.setVector3f("horizonColor",
+                           sky.horizonFromFog
+                               ? core::Vec3(fog.color.x, fog.color.y, fog.color.z)
+                               : sky.horizonColor);
+
+        api::RenderState skyState;
+        skyState.cull = api::CullMode::None;
+        skyState.depthFunc = api::DepthFunc::LessEqual;
+        skyState.depthWrite = false;
+        renderDevice.setRenderState(skyState);
+
+        renderDevice.drawFullscreenTriangle();
+
+        renderDevice.setRenderState(api::RenderState{});
       });
 
   int instancesRendered = 0;
@@ -144,24 +211,12 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
       boundShader = material.getShaderID();
     }
 
+    renderDevice.setRenderState(material.getRenderState());
+
     if (shaderChanged || materialOverrodeUniforms) {
-      shader.setMatrix4("viewProj", viewProj);
-      shader.setVector3f("lightDir", lightDir);
-      shader.setVector3f("lightColor", lightColor);
-      shader.setVector3f("cameraPos", cameraPos.x, cameraPos.y, cameraPos.z);
-      shader.setFloat("time", state.world->time);
-
-      // Fog uniforms
-      shader.setVector4f("fogColor", fog.color.x, fog.color.y, fog.color.z,
-                         fog.color.w);
-      shader.setFloat("fogDensity", fog.density);
-      shader.setFloat("fogStart", fog.start);
-      shader.setFloat("fogEnd", fog.end);
-
-      // Ambient / environment
-      shader.setVector3f("ambientColor", 0.3f, 0.4f, 0.6f); // sky-like
-      shader.setFloat("ambientStrength", 0.4f);
-
+      if (!shader.usesFrameData()) {
+        setLooseFrameUniforms(shader, frame, viewProj);
+      }
       shader.setInteger("albedoMap", 0);
     }
 

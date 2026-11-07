@@ -1,7 +1,6 @@
 #pragma once
 
 #include "componeng/renderer/backend/api/irender_device.hpp"
-#include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
 namespace componeng::core {
@@ -30,13 +29,14 @@ public:
     return m_handle;
   }
 
+  // Letterbox the render area to 16:9 inside a w x h framebuffer.
+  void setViewport(int w, int h);
+
 private:
   GLFWwindow *m_handle = nullptr;
   componeng::renderer::api::IRenderDevice *m_renderDevice = nullptr;
   int m_width = 0;
   int m_height = 0;
-
-  void setViewport(int w, int h);
 };
 
 } // namespace componeng::core

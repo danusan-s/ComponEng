@@ -8,6 +8,11 @@
 
 namespace componeng::core {
 
+// The add* calls only mean something between beginFrame() and endFrame();
+// outside that window (headless runs, tests) they are ignored instead of
+// reaching ImGui without a frame in progress.
+static bool s_frameActive = false;
+
 void DebugUI::init() {
   LOG_INFO("Initializing UI System...");
 
@@ -35,28 +40,38 @@ void DebugUI::beginFrame() {
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
   ImGui::Begin("Debug Info");
+  s_frameActive = true;
 }
 
 void DebugUI::endFrame() {
+  s_frameActive = false;
   ImGui::End();
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void DebugUI::addText(const std::string &label, const std::string &value) {
+  if (!s_frameActive)
+    return;
   ImGui::Text("%s: %s", label.c_str(), value.c_str());
 }
 
 void DebugUI::addValue(const std::string &label, float v) {
+  if (!s_frameActive)
+    return;
   ImGui::Text("%s: %.2f", label.c_str(), v);
 }
 
 void DebugUI::addVec3(const std::string &label, const Vec3 &v) {
+  if (!s_frameActive)
+    return;
   ImGui::Text("%s: (%.2f, %.2f, %.2f)", label.c_str(), v.x, v.y, v.z);
 }
 
 void DebugUI::addSlider(const std::string &label, float *v, float min,
                         float max) {
+  if (!s_frameActive)
+    return;
   ImGui::SliderFloat(label.c_str(), v, min, max);
 }
 

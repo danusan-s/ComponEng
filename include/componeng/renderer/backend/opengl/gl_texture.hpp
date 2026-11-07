@@ -17,7 +17,7 @@ public:
   GLTexture &operator=(GLTexture &&) = delete;
 
   void generate(uint32_t width, uint32_t height, const unsigned char *data,
-                bool alpha) override;
+                bool alpha, const api::TextureDesc &desc) override;
   void bind() const override;
   void release() override;
 

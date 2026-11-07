@@ -12,7 +12,12 @@ struct MeshComponent {
 
   // Runtime data (not serialized)
   core::HandleID meshID = 0;
+  // Set by the application to hide an entity; never touched by the engine.
   bool visible = true;
+  // Set every frame by CullingSystem when the entity is outside the camera
+  // frustum. Kept apart from `visible` so culling cannot un-hide (or hide)
+  // anything the application decided.
+  bool culled = false;
 };
 
 } // namespace componeng::renderer

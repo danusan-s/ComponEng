@@ -399,7 +399,13 @@ void ExpectPlanes(const std::array<FrustumPlane, 6> &a,
     EXPECT_NEAR(a[i].normal.x, b[i].normal.x, kEps) << "plane " << i;
     EXPECT_NEAR(a[i].normal.y, b[i].normal.y, kEps) << "plane " << i;
     EXPECT_NEAR(a[i].normal.z, b[i].normal.z, kEps) << "plane " << i;
-    EXPECT_NEAR(a[i].distance, b[i].distance, kEps) << "plane " << i;
+    // The far plane's distance is ~1e3, where one float ulp is ~6e-5, so an
+    // absolute 1e-5 is below the precision of the value itself (and Release
+    // builds use -ffast-math/FMA, which reorders the arithmetic). Compare
+    // relatively once the magnitude exceeds 1.
+    EXPECT_NEAR(a[i].distance, b[i].distance,
+                kEps * std::max(1.0f, std::fabs(b[i].distance)))
+        << "plane " << i;
   }
 }
 
@@ -424,4 +430,54 @@ TEST(MathVsGlm, FrustumPlaneExtraction) {
   const Mat4 view = lookAt(Vec3(0, 2, 8), Vec3(0, 0, 0), Vec3(0, 1, 0));
   componeng::renderer::Frustum customPipeline(proj * view);
   ExpectPlanes(customPipeline.getPlanes(), ref);
+}
+
+// --- transpose / inverse -----------------------------------------------------
+
+TEST(MathVsGlm, TransposeMatchesGlm) {
+  const glm::mat4 g = glm::perspective(1.0f, 1.7f, 0.1f, 100.0f) *
+                      glm::lookAt(glm::vec3(1, 2, 3), glm::vec3(0, 0, 0),
+                                  glm::vec3(0, 1, 0));
+  EXPECT_TRUE(SameMat4(transpose(FromGlm(g)), glm::transpose(g)));
+}
+
+TEST(MathVsGlm, InverseMatchesGlmOnEngineMatrices) {
+  const glm::mat4 cases[] = {
+      glm::mat4(1.0f),
+      glm::translate(glm::mat4(1.0f), glm::vec3(3, -4, 5)),
+      glm::scale(glm::mat4(1.0f), glm::vec3(2, 0.5f, 4)),
+      glm::rotate(glm::mat4(1.0f), 0.7f, glm::vec3(0, 1, 0)),
+      glm::perspective(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 1000.0f),
+      glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 10000.0f) *
+          glm::lookAt(glm::vec3(5, 3, 2), glm::vec3(0, 1, 0),
+                      glm::vec3(0, 1, 0)),
+  };
+  for (const glm::mat4 &g : cases) {
+    // Perspective inverses have large entries; compare relatively.
+    const Mat4 mine = inverse(FromGlm(g));
+    const glm::mat4 ref = glm::inverse(g);
+    float worst = 0.0f;
+    for (int c = 0; c < 4; ++c)
+      for (int r = 0; r < 4; ++r)
+        worst = std::max(worst, std::fabs(mine[c][r] - ref[c][r]) /
+                                    std::max(1.0f, std::fabs(ref[c][r])));
+    EXPECT_LE(worst, 1e-4f);
+  }
+}
+
+TEST(Math, InverseTimesOriginalIsIdentity) {
+  const Mat4 m = perspective(radians(60.0f), 1.5f, 0.1f, 500.0f) *
+                 lookAt(Vec3(4, 2, 7), Vec3(0, 0, 0), Vec3(0, 1, 0));
+  const Mat4 id = inverse(m) * m;
+  for (int c = 0; c < 4; ++c)
+    for (int r = 0; r < 4; ++r)
+      EXPECT_NEAR(id[c][r], c == r ? 1.0f : 0.0f, 1e-3f) << c << "," << r;
+}
+
+TEST(Math, InverseOfSingularMatrixIsIdentity) {
+  const Mat4 zero(0.0f);
+  const Mat4 inv = inverse(zero);
+  for (int c = 0; c < 4; ++c)
+    for (int r = 0; r < 4; ++r)
+      EXPECT_EQ(inv[c][r], c == r ? 1.0f : 0.0f);
 }

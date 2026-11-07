@@ -57,6 +57,29 @@ public:
     }
   }
 
+  /** Pipeline state (culling, depth, blending) this material draws with.
+   *  Defaults to the engine baseline: back-face culling, depth test and
+   *  write, alpha blending. */
+  void setRenderState(const api::RenderState &state) {
+    m_renderState = state;
+  }
+
+  const api::RenderState &getRenderState() const {
+    return m_renderState;
+  }
+
+  /** Metres added on every side of an entity's bounding box when culling it.
+   *  Needed when the vertex shader moves geometry outside the mesh's own
+   *  bounds (billboards, wind sway, waves); otherwise such entities would be
+   *  culled while part of them is still on screen. Default 0. */
+  void setBoundsPadding(float metres) {
+    m_boundsPadding = metres;
+  }
+
+  float getBoundsPadding() const {
+    return m_boundsPadding;
+  }
+
   void setVertexLayout(const api::VertexLayout &layout) {
     m_vertexLayout = layout;
   }
@@ -93,6 +116,8 @@ private:
   core::HandleID m_shaderID = 0;
   core::HandleID m_textureID = 0;
   api::VertexLayout m_vertexLayout;
+  api::RenderState m_renderState;
+  float m_boundsPadding = 0.0f;
   core::UniformMap m_uniforms;
   std::unordered_set<core::Name> m_knownUniforms;
   mutable core::UniformMap m_scratchInstanceData;

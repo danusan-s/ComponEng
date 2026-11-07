@@ -1,12 +1,8 @@
 #include "componeng/renderer/asset/shader.hpp"
 
-#include "componeng/renderer/backend/opengl/gl_render_device.hpp"
-
 namespace componeng::renderer {
 
-Shader::Shader() {
-  opengl::GLRenderDevice tempDevice;
-  m_impl = tempDevice.createShader();
+Shader::Shader(api::IRenderDevice &device) : m_impl(device.createShader()) {
 }
 
 void Shader::use() const {
@@ -16,6 +12,9 @@ void Shader::use() const {
 void Shader::compile(const char *vertexSource, const char *fragmentSource,
                      const char *geometrySource) {
   m_impl->loadGLSL(vertexSource, fragmentSource, geometrySource);
+  m_usesFrameData = m_impl->bindUniformBlock(kFrameDataBlockName,
+                                             kFrameDataBinding,
+                                             sizeof(FrameData));
 }
 
 void Shader::setFloat(const char *name, float value) const {

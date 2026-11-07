@@ -53,7 +53,7 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
               m.meshName.empty() ? core::Name("cube") : m.meshName);
         }
 
-        if (!m.visible) {
+        if (!m.visible || m.culled) {
           return;
         }
 

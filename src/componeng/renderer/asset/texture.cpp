@@ -1,13 +1,12 @@
 #include "componeng/renderer/asset/texture.hpp"
 
-#include "componeng/renderer/backend/opengl/gl_texture.hpp"
-
 namespace componeng::renderer {
 
-void Texture2D::generate(uint32_t width, uint32_t height, unsigned char *data,
-                         bool alpha) {
-  m_impl = std::make_unique<opengl::GLTexture>();
-  m_impl->generate(width, height, data, alpha);
+void Texture2D::generate(api::IRenderDevice &device, uint32_t width,
+                         uint32_t height, unsigned char *data, bool alpha,
+                         const api::TextureDesc &desc) {
+  m_impl = device.createTexture();
+  m_impl->generate(width, height, data, alpha, desc);
 }
 
 void Texture2D::bind() const {

@@ -22,7 +22,10 @@ namespace componeng::renderer {
  */
 class AssetManager {
 public:
-  AssetManager() = default;
+  /** Assets create their GPU resources through `device`, which must outlive
+   *  the manager. */
+  explicit AssetManager(api::IRenderDevice &device) : m_device(&device) {
+  }
   ~AssetManager() = default;
 
   // Non-copyable, Movable
@@ -37,7 +40,13 @@ public:
   const Shader &getShader(core::HandleID id) const;
   core::HandleID getShaderID(core::Name name) const;
 
-  void loadTexture(const char *file, bool alpha, core::Name name);
+  /** Loads an image file as a texture. `alpha` keeps the file's alpha channel
+   *  (RGBA); otherwise it is loaded as RGB. `desc` sets wrapping, filtering,
+   *  mipmaps, anisotropy and colour space; the default matches the engine's
+   *  original fixed behaviour. A file that cannot be read is logged and
+   *  replaced by a 1x1 magenta texture so the failure is visible on screen. */
+  void loadTexture(const char *file, bool alpha, core::Name name,
+                   const api::TextureDesc &desc = {});
   const Texture2D &getTexture(core::HandleID id) const;
   core::HandleID getTextureID(core::Name name) const;
   bool textureExists(core::Name name) const;
@@ -99,6 +108,8 @@ public:
   void clear();
 
 private:
+  api::IRenderDevice *m_device;
+
   std::unordered_map<core::Name, core::HandleID> m_shaders;
   std::unordered_map<core::Name, core::HandleID> m_textures;
   std::unordered_map<core::Name, core::HandleID> m_materials;
@@ -112,7 +123,8 @@ private:
   std::unique_ptr<Shader> loadShaderFromFile(const char *vShaderFile,
                                              const char *fShaderFile,
                                              const char *gShaderFile = nullptr);
-  std::unique_ptr<Texture2D> loadTextureFromFile(const char *file, bool alpha);
+  std::unique_ptr<Texture2D> loadTextureFromFile(const char *file, bool alpha,
+                                                 const api::TextureDesc &desc);
   std::unique_ptr<Mesh> loadMeshFromFile(const char *file);
 };
 

@@ -33,6 +33,9 @@ public:
                    float w) const override;
   void setMatrix4(const char *name, const float *matrix) const override;
 
+  bool bindUniformBlock(const char *blockName, uint32_t binding,
+                        size_t expectedSizeBytes = 0) override;
+
   api::VertexLayout reflectInstanceLayout() const override;
   std::vector<core::Name> reflectActiveUniformNames() const override;
 

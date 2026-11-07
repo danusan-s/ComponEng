@@ -15,8 +15,10 @@ class Texture2D {
 public:
   Texture2D() = default;
 
-  void generate(uint32_t width, uint32_t height, unsigned char *data,
-                bool alpha = false);
+  /** Creates the GPU texture through `device` from 8-bit pixel data. */
+  void generate(api::IRenderDevice &device, uint32_t width, uint32_t height,
+                unsigned char *data, bool alpha = false,
+                const api::TextureDesc &desc = {});
   void bind() const;
 
 private:

@@ -11,7 +11,7 @@
 //   location 1: aNormal (vec3)
 //   location 2: aUV (vec2)
 //
-// Engine-provided uniforms: viewProj, cameraPos, time, lightDir, lightColor
+// Engine-provided values come from the FrameData block below.
 
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNormal;
@@ -20,7 +20,17 @@ layout(location = 2) in vec2 aUV;
 layout(location = 3) in mat4 instanceModel;
 layout(location = 7) in vec4 instanceColor;
 
-uniform mat4 viewProj;
+// Per-frame values, uploaded once per frame by the RenderSystem. Must match
+// renderer/frame_data.hpp exactly, and be declared identically in every stage.
+layout(std140) uniform FrameData {
+    mat4 viewProj;
+    vec3 cameraPos;      float time;
+    vec3 lightDir;       float fogDensity;
+    vec3 lightColor;     float fogStart;
+    vec3 ambientColor;   float ambientStrength;
+    vec4 fogColor;
+    float fogEnd;
+};
 
 out vec3 FragPos;
 out vec3 Normal;

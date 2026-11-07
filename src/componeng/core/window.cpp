@@ -4,7 +4,6 @@
 #include "componeng/input/input_state.hpp"
 #include "componeng/input/raw_input_state.hpp"
 #include "componeng/utils/logger.hpp"
-#include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
 namespace componeng::core {
@@ -13,22 +12,12 @@ static bool isMouseLocked(GLFWwindow *window) {
   return glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
 }
 
-static void framebufferSizeCallback(GLFWwindow *, int width, int height) {
-  float targetAspectRatio = 16.0f / 9.0f;
-  float currentAspectRatio = static_cast<float>(width) / height;
-
-  if (currentAspectRatio > targetAspectRatio) {
-    int newWidth = static_cast<int>(height * targetAspectRatio);
-    int xOffset = (width - newWidth) / 2;
-    glScissor(xOffset, 0, newWidth, height);
-    glViewport(xOffset, 0, newWidth, height);
+static void framebufferSizeCallback(GLFWwindow *window, int width,
+                                    int height) {
+  auto *engine = static_cast<Engine *>(glfwGetWindowUserPointer(window));
+  if (!engine)
     return;
-  }
-
-  int newHeight = static_cast<int>(width / targetAspectRatio);
-  int yOffset = (height - newHeight) / 2;
-  glScissor(0, yOffset, width, newHeight);
-  glViewport(0, yOffset, width, newHeight);
+  engine->m_window.setViewport(width, height);
 }
 
 static void keyCallback(GLFWwindow *window, int key, int /*scancode*/,
@@ -115,7 +104,7 @@ void Window::init(int width, int height, const char *title) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifdef __APPLE__
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 #endif
 
   m_handle = glfwCreateWindow(width, height, title, nullptr, nullptr);

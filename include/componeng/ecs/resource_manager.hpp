@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
 #include <typeindex>
 #include <unordered_map>
 #include <utility>
@@ -13,15 +14,20 @@ struct IResource {
 };
 
 template <typename T> struct ResourceHolder : IResource {
+  // Constructed in place, so a resource only needs to be movable: it does not
+  // have to be default-constructible (e.g. one that holds a reference).
+  template <typename U>
+  explicit ResourceHolder(U &&initial) : value(std::forward<U>(initial)) {
+  }
   T value;
 };
 
 class ResourceManager {
 public:
   template <typename T> void set(T &&value) {
-    auto holder = std::make_unique<ResourceHolder<T>>();
-    holder->value = std::forward<T>(value);
-    m_resources[std::type_index(typeid(T))] = std::move(holder);
+    using Stored = std::remove_cv_t<std::remove_reference_t<T>>;
+    m_resources[std::type_index(typeid(Stored))] =
+        std::make_unique<ResourceHolder<Stored>>(std::forward<T>(value));
   }
 
   template <typename T> T &get() {

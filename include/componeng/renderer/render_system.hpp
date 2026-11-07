@@ -21,6 +21,10 @@ public:
   void onUpdate(const ecs::SystemState &state) override;
 
 private:
+  // Per-frame values (camera, light, fog, time) shared by every shader that
+  // declares the FrameData block; uploaded once per frame and bound once.
+  std::unique_ptr<api::IBuffer> m_frameBuffer;
+
   // One persistent instance-data buffer per (mesh,material) combo, reused
   // across frames via setSubData instead of being recreated every draw call.
   std::unordered_map<DrawKey, std::unique_ptr<api::IBuffer>, DrawKeyHash>

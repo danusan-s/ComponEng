@@ -216,6 +216,28 @@ api::VertexLayout GLShader::reflectInstanceLayout() const {
   return layout;
 }
 
+bool GLShader::bindUniformBlock(const char *blockName, uint32_t binding,
+                                size_t expectedSizeBytes) {
+  const GLuint index = glGetUniformBlockIndex(m_id, blockName);
+  if (index == GL_INVALID_INDEX) {
+    return false;
+  }
+
+  if (expectedSizeBytes != 0) {
+    GLint actualSize = 0;
+    glGetActiveUniformBlockiv(m_id, index, GL_UNIFORM_BLOCK_DATA_SIZE,
+                              &actualSize);
+    if (static_cast<size_t>(actualSize) != expectedSizeBytes) {
+      LOG_ERROR("Uniform block '%s' is %d bytes in the shader but %zu on the "
+                "CPU; the declaration and the C++ struct disagree",
+                blockName, actualSize, expectedSizeBytes);
+    }
+  }
+
+  glUniformBlockBinding(m_id, index, binding);
+  return true;
+}
+
 std::vector<core::Name> GLShader::reflectActiveUniformNames() const {
   GLint activeUniforms = 0;
   glGetProgramiv(m_id, GL_ACTIVE_UNIFORMS, &activeUniforms);
@@ -231,6 +253,17 @@ std::vector<core::Name> GLShader::reflectActiveUniformNames() const {
     GLenum type = 0;
     glGetActiveUniform(m_id, i, static_cast<GLsizei>(nameBuf.size()), &length,
                        &size, &type, nameBuf.data());
+
+    // Members of a uniform block are not set through glUniform*; they live in
+    // a buffer. Leave them out so setUniform() flags an attempt to set one.
+    const GLuint uniformIndex = static_cast<GLuint>(i);
+    GLint blockIndex = -1;
+    glGetActiveUniformsiv(m_id, 1, &uniformIndex, GL_UNIFORM_BLOCK_INDEX,
+                          &blockIndex);
+    if (blockIndex != -1) {
+      continue;
+    }
+
     names.emplace_back(std::string(nameBuf.data(), length));
   }
   return names;

@@ -51,7 +51,8 @@ void Engine::init() {
 
   LOG_INFO("Initialized audio engine");
 
-  m_world.setResource<renderer::AssetManager>(renderer::AssetManager());
+  m_world.setResource<renderer::AssetManager>(
+      renderer::AssetManager(m_world.getRenderDevice()));
   auto &assetManager = m_world.getResource<renderer::AssetManager>();
 
   LOG_INFO("Loading built-in assets...");
@@ -169,16 +170,14 @@ void Engine::run(IGame &game) {
     DebugUI::beginFrame();
     m_world.updateSystems(deltaTime);
     DebugUI::addValue("FPS", 1.0f / deltaTime);
-    DebugUI::addValue("Avg FPS: %.2f", avgFPS);
+    DebugUI::addValue("Avg FPS", avgFPS);
     DebugUI::endFrame();
 
     m_window.swapBuffers();
     m_world.swapInputBuffers();
     m_window.pollEvents();
 
-    while (GLenum err = glGetError()) {
-      LOG_ERROR("OpenGL error: %d", err);
-    }
+    m_world.getRenderDevice().checkErrors();
   }
 
   LOG_INFO("Exiting main loop");

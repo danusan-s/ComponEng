@@ -3,7 +3,6 @@
 #include "componeng/core/game.hpp"
 #include "componeng/core/window.hpp"
 #include "componeng/ecs/world.hpp"
-#include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
 namespace componeng::core {

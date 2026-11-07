@@ -2,6 +2,7 @@
 
 #include "componeng/core/types.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/frame_data.hpp"
 
 #include <memory>
 
@@ -9,7 +10,8 @@ namespace componeng::renderer {
 
 class Shader {
 public:
-  Shader();
+  /** Creates the backend shader through `device`. */
+  explicit Shader(api::IRenderDevice &device);
 
   void use() const;
   void compile(const char *vertexSource, const char *fragmentSource,
@@ -25,11 +27,19 @@ public:
   void setVector4f(const char *name, const core::Vec4 &value) const;
   void setMatrix4(const char *name, const core::Mat4 &matrix) const;
 
+  /** True if the compiled shader declares the FrameData uniform block, in
+   *  which case it reads per-frame values from the shared buffer and the
+   *  RenderSystem does not send them as loose uniforms. */
+  bool usesFrameData() const {
+    return m_usesFrameData;
+  }
+
   api::VertexLayout reflectInstanceLayout() const;
   std::vector<core::Name> reflectActiveUniformNames() const;
 
 private:
   std::unique_ptr<api::IShader> m_impl;
+  bool m_usesFrameData = false;
 };
 
 } // namespace componeng::renderer

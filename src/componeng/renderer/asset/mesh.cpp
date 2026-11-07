@@ -1,22 +1,40 @@
 #include "componeng/renderer/asset/mesh.hpp"
 
-#include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 #include "componeng/utils/logger.hpp"
 
+#include <algorithm>
 #include <array>
 #include <sstream>
 
 namespace componeng::renderer {
 
-void Mesh::uploadToGPU() {
+void Mesh::uploadToGPU(api::IRenderDevice &device) {
   if (m_vertices.empty() || m_indices.empty()) {
     LOG_ERROR("Cannot initialize buffers for an empty mesh.");
     return;
   }
 
-  m_impl = std::make_unique<opengl::GLMesh>();
+  computeBounds();
+  m_impl = device.createMesh();
   m_impl->upload(m_vertices.data(), m_vertices.size() / 8, m_indices.data(),
                  m_indices.size(), api::defaultMeshLayout());
+}
+
+void Mesh::computeBounds() {
+  // Vertices are interleaved position(3) normal(3) uv(2).
+  constexpr size_t kFloatsPerVertex = 8;
+  core::Vec3 lo(m_vertices[0], m_vertices[1], m_vertices[2]);
+  core::Vec3 hi = lo;
+  for (size_t i = 0; i + 2 < m_vertices.size(); i += kFloatsPerVertex) {
+    lo.x = std::min(lo.x, m_vertices[i]);
+    lo.y = std::min(lo.y, m_vertices[i + 1]);
+    lo.z = std::min(lo.z, m_vertices[i + 2]);
+    hi.x = std::max(hi.x, m_vertices[i]);
+    hi.y = std::max(hi.y, m_vertices[i + 1]);
+    hi.z = std::max(hi.z, m_vertices[i + 2]);
+  }
+  m_bounds.min = lo;
+  m_bounds.max = hi;
 }
 
 void Mesh::generateFromWavefrontObj(const std::string &data) {

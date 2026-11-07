@@ -15,20 +15,19 @@ uniform sampler2D metallicMap;    // metallic (0=dielectric, 1=metal)
 uniform sampler2D roughnessMap;   // roughness (0=smooth, 1=rough)
 uniform sampler2D aoMap;          // ambient occlusion
 
-// Lighting
-uniform vec3 lightDir;            // directional light direction (points to light)
-uniform vec3 lightColor;          // light color
-uniform vec3 cameraPos;           // camera position for specular
-
-// Environment / ambient
-uniform vec3 ambientColor;        // sky/environment color
-uniform float ambientStrength;    // how much ambient light
-
-// Fog
-uniform vec4 fogColor;
-uniform float fogDensity;
-uniform float fogStart;
-uniform float fogEnd;
+// Lighting, environment and fog (lightDir points towards the light) come from
+// the FrameData block.
+// Per-frame values, uploaded once per frame by the RenderSystem. Must match
+// renderer/frame_data.hpp exactly, and be declared identically in every stage.
+layout(std140) uniform FrameData {
+    mat4 viewProj;
+    vec3 cameraPos;      float time;
+    vec3 lightDir;       float fogDensity;
+    vec3 lightColor;     float fogStart;
+    vec3 ambientColor;   float ambientStrength;
+    vec4 fogColor;
+    float fogEnd;
+};
 
 // Toggle texture sampling (set to 0 to use solid colors / white textures)
 uniform int useTextures;

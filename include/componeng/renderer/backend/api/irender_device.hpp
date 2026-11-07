@@ -124,10 +124,54 @@ public:
    */
   virtual VertexLayout reflectInstanceLayout() const = 0;
 
-  /** Reflect the linked program's active uniform names (for validating
-   *  setUniform() calls against the shader that will actually consume them).
+  /**
+   * Attach the shader's uniform block `blockName` (if it declares one) to
+   * uniform-buffer binding point `binding`. Returns false when the shader has
+   * no such block. If `expectedSizeBytes` is non-zero and the block's size in
+   * this shader differs, an error is logged: it means the shader's declaration
+   * and the CPU-side struct have drifted apart.
    */
+  virtual bool bindUniformBlock(const char *blockName, uint32_t binding,
+                                size_t expectedSizeBytes = 0) = 0;
+
+  /** Reflect the linked program's active plain uniform names (for validating
+   *  setUniform() calls against the shader that will actually consume them).
+   *  Members of uniform blocks are not included: they cannot be set one by
+   *  one. */
   virtual std::vector<core::Name> reflectActiveUniformNames() const = 0;
+};
+
+/** What a sampler does outside the [0, 1] texture-coordinate range. */
+enum class TextureWrap { ClampToEdge, Repeat, MirroredRepeat };
+
+/** Sampling filter. */
+enum class TextureFilter { Nearest, Linear };
+
+/**
+ * @brief How a texture is stored and sampled.
+ *
+ * The defaults reproduce the engine's original fixed behaviour (clamped,
+ * trilinear-filtered, linear colour), so a texture loaded without a
+ * TextureDesc looks exactly as it always did.
+ */
+struct TextureDesc {
+  TextureWrap wrap = TextureWrap::ClampToEdge;
+  TextureFilter minFilter = TextureFilter::Linear;
+  TextureFilter magFilter = TextureFilter::Linear;
+  /** Build a mip chain and filter between levels when minifying. */
+  bool mipmaps = true;
+  /** Anisotropic filtering, 1 = off. Clamped to what the device supports;
+   *  silently ignored where it is unsupported. */
+  float anisotropy = 1.0f;
+  /**
+   * Treat the pixel data as sRGB-encoded colour, so sampling returns linear
+   * values. Use it for colour images (albedo) read by a shader that does its
+   * lighting in linear space and encodes its own output, as pbr.frag does.
+   * Leave it off for data (normals, roughness, masks) and for shaders that
+   * use the sampled value directly as the final colour, which would come out
+   * too dark.
+   */
+  bool srgb = false;
 };
 
 /**
@@ -139,7 +183,8 @@ public:
 
   /** Create the GPU texture from pixel data (RGBA or RGB, 8-bit). */
   virtual void generate(uint32_t width, uint32_t height,
-                        const unsigned char *data, bool alpha) = 0;
+                        const unsigned char *data, bool alpha,
+                        const TextureDesc &desc) = 0;
 
   /** Bind this texture to the active texture unit / descriptor set. */
   virtual void bind() const = 0;
@@ -183,8 +228,43 @@ public:
   virtual size_t indexCount() const = 0;
 };
 
+/** Which triangle faces are discarded (front faces are counter-clockwise). */
+enum class CullMode { None, Back, Front };
+
 /** Depth comparison used by the depth test. */
 enum class DepthFunc { Less, LessEqual };
+
+/** How a fragment's colour is combined with what is already in the target. */
+enum class BlendMode {
+  None,     // overwrite
+  Alpha,    // src * a + dst * (1 - a)
+  Additive, // src * a + dst
+};
+
+/**
+ * @brief Fixed-function pipeline state for a draw.
+ *
+ * The defaults are the engine's baseline (back-face culling, depth test and
+ * write with GL_LESS, alpha blending). A material carries one of these and
+ * the RenderSystem applies it before drawing; the device only touches the
+ * API for the parts that actually differ from what is currently set.
+ */
+struct RenderState {
+  CullMode cull = CullMode::Back;
+  bool depthTest = true;
+  bool depthWrite = true;
+  DepthFunc depthFunc = DepthFunc::Less;
+  BlendMode blend = BlendMode::Alpha;
+
+  bool operator==(const RenderState &o) const {
+    return cull == o.cull && depthTest == o.depthTest &&
+           depthWrite == o.depthWrite && depthFunc == o.depthFunc &&
+           blend == o.blend;
+  }
+  bool operator!=(const RenderState &o) const {
+    return !(*this == o);
+  }
+};
 
 /**
  * @brief API-agnostic render device interface.
@@ -220,11 +300,13 @@ public:
   virtual std::unique_ptr<IMesh> createMesh() = 0;
   virtual std::unique_ptr<IBuffer> createBuffer() = 0;
 
-  /** Enable or disable back-face culling. */
-  virtual void setCullEnabled(bool enabled) = 0;
+  /** Apply pipeline state. Cheap to call every draw: only the differences
+   *  from the current state reach the graphics API. */
+  virtual void setRenderState(const RenderState &state) = 0;
 
-  /** Set the depth comparison function. */
-  virtual void setDepthFunc(DepthFunc func) = 0;
+  /** Bind `buffer` to uniform-buffer binding point `binding`; shaders that
+   *  declare a matching uniform block read from it. */
+  virtual void bindUniformBuffer(uint32_t binding, IBuffer &buffer) = 0;
 
   /** Set the active texture unit for subsequent texture binds. */
   virtual void setActiveTextureUnit(uint32_t unit) = 0;
@@ -240,6 +322,11 @@ public:
 
   /** Unbind instance vertex attributes. No-op for Vulkan. */
   virtual void unbindInstanceAttributes(const VertexLayout &layout) = 0;
+
+  /** Draw one triangle that covers the whole viewport, with no vertex or
+   *  index data: the vertex shader derives positions from gl_VertexID. Used
+   *  for full-screen effects such as the sky. */
+  virtual void drawFullscreenTriangle() = 0;
 
   /** Issue a draw call: indexed instanced rendering. */
   virtual void drawIndexedInstanced(size_t indexCount,

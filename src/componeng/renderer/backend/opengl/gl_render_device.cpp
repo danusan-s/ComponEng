@@ -16,11 +16,68 @@ void GLRenderDevice::init(void * /*windowHandle*/) {
     return;
   }
 
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_CULL_FACE);
   glEnable(GL_SCISSOR_TEST);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glGenVertexArrays(1, &m_fullscreenVao);
+
+  // Establish the baseline pipeline state and the cache that tracks it.
+  applyRenderState(api::RenderState{}, /*force=*/true);
+}
+
+void GLRenderDevice::setRenderState(const api::RenderState &state) {
+  applyRenderState(state, /*force=*/false);
+}
+
+void GLRenderDevice::applyRenderState(const api::RenderState &state,
+                                      bool force) {
+  const api::RenderState &cur = m_state;
+
+  if (force || state.cull != cur.cull) {
+    if (state.cull == api::CullMode::None) {
+      glDisable(GL_CULL_FACE);
+    } else {
+      glEnable(GL_CULL_FACE);
+      glCullFace(state.cull == api::CullMode::Front ? GL_FRONT : GL_BACK);
+    }
+  }
+
+  if (force || state.depthTest != cur.depthTest) {
+    if (state.depthTest) {
+      glEnable(GL_DEPTH_TEST);
+    } else {
+      glDisable(GL_DEPTH_TEST);
+    }
+  }
+  if (force || state.depthWrite != cur.depthWrite) {
+    glDepthMask(state.depthWrite ? GL_TRUE : GL_FALSE);
+  }
+  if (force || state.depthFunc != cur.depthFunc) {
+    glDepthFunc(state.depthFunc == api::DepthFunc::LessEqual ? GL_LEQUAL
+                                                             : GL_LESS);
+  }
+
+  if (force || state.blend != cur.blend) {
+    switch (state.blend) {
+      case api::BlendMode::None:
+        glDisable(GL_BLEND);
+        break;
+      case api::BlendMode::Alpha:
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        break;
+      case api::BlendMode::Additive:
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        break;
+    }
+  }
+
+  m_state = state;
+}
+
+void GLRenderDevice::bindUniformBuffer(uint32_t binding,
+                                       api::IBuffer &buffer) {
+  glBindBufferBase(GL_UNIFORM_BUFFER, binding,
+                   static_cast<GLBuffer &>(buffer).handle());
 }
 
 void GLRenderDevice::setViewport(int x, int y, int w, int h) {
@@ -35,21 +92,18 @@ void GLRenderDevice::setActiveTextureUnit(uint32_t unit) {
   glActiveTexture(GL_TEXTURE0 + unit);
 }
 
-void GLRenderDevice::setCullEnabled(bool enabled) {
-  if (enabled) {
-    glEnable(GL_CULL_FACE);
-  } else {
-    glDisable(GL_CULL_FACE);
-  }
-}
-
-void GLRenderDevice::setDepthFunc(api::DepthFunc func) {
-  glDepthFunc(func == api::DepthFunc::LessEqual ? GL_LEQUAL : GL_LESS);
-}
-
 void GLRenderDevice::clear(float r, float g, float b, float a) {
+  // glClear honours the depth mask, so a state with depth writes off would
+  // leave last frame's depth in place. Clear with the mask on, then put the
+  // tracked state back.
+  if (!m_state.depthWrite) {
+    glDepthMask(GL_TRUE);
+  }
   glClearColor(r, g, b, a);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  if (!m_state.depthWrite) {
+    glDepthMask(GL_FALSE);
+  }
 }
 
 void GLRenderDevice::present(void *windowHandle) {
@@ -109,6 +163,11 @@ void GLRenderDevice::unbindInstanceAttributes(const api::VertexLayout &layout) {
     glDisableVertexAttribArray(api::kFirstInstanceAttribLocation +
                                static_cast<GLuint>(i));
   }
+}
+
+void GLRenderDevice::drawFullscreenTriangle() {
+  glBindVertexArray(m_fullscreenVao);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
 void GLRenderDevice::drawIndexedInstanced(size_t indexCount,

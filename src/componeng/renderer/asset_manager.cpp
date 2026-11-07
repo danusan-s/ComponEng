@@ -33,9 +33,10 @@ core::HandleID AssetManager::getShaderID(core::Name name) const {
   return m_shaders.at(name);
 }
 
-void AssetManager::loadTexture(const char *file, bool alpha, core::Name name) {
+void AssetManager::loadTexture(const char *file, bool alpha, core::Name name,
+                               const api::TextureDesc &desc) {
   LOG_INFO("Loading Texture: %s", name.c_str());
-  m_textureResources.push_back(loadTextureFromFile(file, alpha));
+  m_textureResources.push_back(loadTextureFromFile(file, alpha, desc));
   core::HandleID id = m_textureResources.size();
   m_textures[name] = id;
 }
@@ -70,7 +71,7 @@ IMaterial &AssetManager::getMaterial(core::HandleID id) const {
 
 void AssetManager::addMesh(core::Name name, std::unique_ptr<Mesh> mesh) {
   LOG_INFO("Adding Mesh: %s", name.c_str());
-  mesh->uploadToGPU();
+  mesh->uploadToGPU(*m_device);
   m_meshResources.push_back(std::move(mesh));
   core::HandleID id = m_meshResources.size();
   m_meshes[name] = id;
@@ -120,20 +121,31 @@ std::unique_ptr<Shader> AssetManager::loadShaderFromFile(
   } catch (const std::exception &e) {
     LOG_ERROR("ERROR::SHADER: Failed to read shader files");
   }
-  auto shader = std::make_unique<Shader>();
+  auto shader = std::make_unique<Shader>(*m_device);
   shader->compile(vertexCode.c_str(), fragmentCode.c_str(),
                   gShaderFile != nullptr ? geometryCode.c_str() : nullptr);
   return shader;
 }
 
-std::unique_ptr<Texture2D> AssetManager::loadTextureFromFile(const char *file,
-                                                             bool alpha) {
+std::unique_ptr<Texture2D>
+AssetManager::loadTextureFromFile(const char *file, bool alpha,
+                                  const api::TextureDesc &desc) {
   LOG_INFO("Loading texture file: %s", file);
-  int width, height, nrChannels;
+  int width = 0, height = 0, nrChannels = 0;
   unsigned char *data =
       stbi_load(file, &width, &height, &nrChannels, alpha ? 4 : 3);
+
   auto texture = std::make_unique<Texture2D>();
-  texture->generate(width, height, data);
+  if (!data) {
+    LOG_ERROR("Failed to load texture '%s': %s", file, stbi_failure_reason());
+    // A bright magenta texel makes a missing file obvious in the scene
+    // instead of sampling uninitialised memory.
+    unsigned char magenta[4] = {255, 0, 255, 255};
+    texture->generate(*m_device, 1, 1, magenta, alpha, desc);
+    return texture;
+  }
+
+  texture->generate(*m_device, width, height, data, alpha, desc);
   stbi_image_free(data);
   return texture;
 }
@@ -152,7 +164,7 @@ std::unique_ptr<Mesh> AssetManager::loadMeshFromFile(const char *file) {
 
   auto mesh = std::make_unique<Mesh>();
   mesh->generateFromWavefrontObj(modelData);
-  mesh->uploadToGPU();
+  mesh->uploadToGPU(*m_device);
   return mesh;
 }
 
