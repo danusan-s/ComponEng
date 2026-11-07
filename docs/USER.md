@@ -475,6 +475,37 @@ void init(ecs::World& world) override {
 }
 ```
 
+### Assets outside the engine tree
+
+`Utils::getAssetPath("assets/...")` resolves against the engine's own source
+tree. A game that keeps its assets elsewhere registers its root once, before
+`Engine::init()`; roots added this way are searched first (newest first), then
+the engine's:
+
+```cpp
+componeng::utils::Utils::addAssetRoot("/path/to/mygame");   // contains assets/...
+std::string shader = componeng::utils::Utils::getAssetPath("assets/shaders/my.vert");
+```
+
+### Level of detail
+
+Give an entity a `renderer::LodComponent` next to its `MeshComponent`. The
+`LodSystem` (registered by the engine) picks the first level whose mesh exists
+and whose range covers the entity's distance to the camera, and hides it beyond
+the last:
+
+```cpp
+renderer::LodComponent lod;
+lod.mesh[0] = assets.getMeshID("tree_lod0");  lod.distance[0] = 40.0f;
+lod.mesh[1] = assets.getMeshID("tree_lod1");  lod.distance[1] = 120.0f;
+// beyond 120 m the entity is hidden
+world.addComponents(e, /* transform, MeshComponent, MaterialComponent, */ std::move(lod));
+```
+
+A `mesh[k]` of 0 means "no mesh at this level", so a part can exist only up
+close. Entities that form one object switch together if they share a position
+and ranges.
+
 ---
 
 ## Emitting and Handling Events

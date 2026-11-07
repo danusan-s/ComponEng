@@ -28,6 +28,7 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/renderer/backend/opengl/*.cpp"
     "src/componeng/renderer/batching/*.cpp"
     "src/componeng/renderer/culling/*.cpp"
+    "src/componeng/renderer/lod/*.cpp"
     "src/componeng/audio/*.cpp"
     "src/componeng/input/*.cpp"
     "src/componeng/camera/*.cpp"
@@ -156,6 +157,8 @@ set(TEST_SOURCES
     tests/test_instance_data.cpp
     tests/test_render_pipeline.cpp
     tests/test_culling.cpp
+    tests/test_lod.cpp
+    tests/test_utils.cpp
     tests/test_world.cpp
 )
 

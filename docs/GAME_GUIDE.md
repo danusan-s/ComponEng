@@ -367,6 +367,13 @@ class GrassMaterial : public renderer::IMaterial {
 public:
   using IMaterial::IMaterial;
 
+  // Called when the material receives its vertex layout. Look the shader's
+  // attributes up here, once, not per entity.
+  void resolveInstanceSlots(const renderer::api::VertexLayout &layout) override {
+    m_position = renderer::findInstanceSlot(layout, m_positionName);
+    m_wind = renderer::findInstanceSlot(layout, m_windName);
+  }
+
   void writeInstanceData(const renderer::InstanceContext &ctx,
                          renderer::InstanceWriter &out) const override {
     const auto &grass = ctx.world.getComponent<GrassComponent>(ctx.entity);
@@ -375,15 +382,22 @@ public:
   }
 
 private:
-  // Build Names once; constructing one from a literal interns a string.
-  const core::Name m_position{"instancePosition"};
-  const core::Name m_wind{"instanceWind"};
+  const core::Name m_positionName{"instancePosition"};
+  const core::Name m_windName{"instanceWind"};
+  renderer::InstanceSlot m_position;
+  renderer::InstanceSlot m_wind;
 };
 ```
 
+Use `findInstanceMatrixSlot` for a `mat4` attribute. A slot is just the
+attribute's offset and width, so writing through one is a plain copy; writing by
+`Name` (`out.set(core::Name("instancePosition"), ...)`) still works but searches
+the layout on every call, which adds up over thousands of entities.
+
 `InstanceContext` carries the world, the entity, its `TransformComponent` and a
 cached `modelMatrix()`. Attribute names must match the shader's instance
-attributes; names the shader does not declare are ignored. The older
+attributes; an attribute the shader does not declare gives an invalid slot, and
+writing to one does nothing. The older
 `buildInstanceData(world, entity, UniformMap&)` override still works but
 allocates a map per entity; prefer `writeInstanceData`.
 

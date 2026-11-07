@@ -23,6 +23,8 @@
 #include "componeng/renderer/component/mesh_component.hpp"
 #include "componeng/renderer/component/skybox_component.hpp"
 #include "componeng/renderer/culling/culling_system.hpp"
+#include "componeng/renderer/lod/lod_component.hpp"
+#include "componeng/renderer/lod/lod_system.hpp"
 #include "componeng/renderer/render_system.hpp"
 #include "componeng/resources/fog.hpp"
 #include "componeng/utils/logger.hpp"
@@ -97,12 +99,13 @@ void Engine::init() {
 }
 
 void Engine::registerComponents() {
-  m_world.registerComponents<
-      core::TransformComponent, renderer::MeshComponent,
-      renderer::MaterialComponent, renderer::ColorComponent,
-      camera::CameraComponent, physics::RigidBodyComponent,
-      physics::ColliderComponent, audio::AudioComponent,
-      renderer::DirectionalLightComponent, renderer::SkyboxComponent>();
+  m_world
+      .registerComponents<core::TransformComponent, renderer::MeshComponent,
+                          renderer::MaterialComponent, renderer::ColorComponent,
+                          camera::CameraComponent, physics::RigidBodyComponent,
+                          physics::ColliderComponent, audio::AudioComponent,
+                          renderer::DirectionalLightComponent,
+                          renderer::SkyboxComponent, renderer::LodComponent>();
 }
 
 void Engine::registerSystems() {
@@ -110,8 +113,11 @@ void Engine::registerSystems() {
   m_world.registerSystem<physics::PhysicsSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<camera::CameraSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<audio::AudioSystem>(ecs::SystemGroup::Simulation);
+  // LOD first: culling tests the bounds of whichever mesh LOD selected.
+  m_world.registerSystem<renderer::LodSystem>(ecs::SystemGroup::Presentation);
   m_world.registerSystem<renderer::CullingSystem>(
       ecs::SystemGroup::Presentation);
+  m_world.addSystemDependencies<renderer::CullingSystem, renderer::LodSystem>();
   m_world.registerSystem<renderer::BatchingSystem>(
       ecs::SystemGroup::Presentation);
   m_world.addSystemDependencies<renderer::BatchingSystem,

@@ -376,14 +376,16 @@ const auto& events = world.get_events<CollisionEvent>();
 
 ### Rendering Flow
 1. **Query**: Query all entities with TransformComponent, MeshComponent, MaterialComponent
-2. **Culling**: Test each entity's AABB against view frustum planes
-3. **Batching**: Group visible entities by (meshID, materialID); each entity's
+2. **LOD**: `LodSystem` picks each `LodComponent` entity's mesh from its distance
+   to the camera (or hides it beyond the last level)
+3. **Culling**: Test each entity's AABB against view frustum planes
+4. **Batching**: Group visible entities by (meshID, materialID); each entity's
    instance data is written directly into its batch's flat buffer, with the model
    matrix built by `TransformComponent::toMatrix()` and cached per entity while
    the transform is unchanged
-4. **Sorting**: Order batches by (shaderID, textureID, materialID, meshID) so
+5. **Sorting**: Order batches by (shaderID, textureID, materialID, meshID) so
    draws sharing GPU state are adjacent
-5. **Draw**: Upload each batch's buffer and use glDrawElementsInstanced for
+6. **Draw**: Upload each batch's buffer and use glDrawElementsInstanced for
    single-draw-call rendering, skipping shader/texture rebinds that did not change
 
 ### RenderQueue (`renderer/batching/render_queue.hpp`)

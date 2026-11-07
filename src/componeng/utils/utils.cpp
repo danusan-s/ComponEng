@@ -1,6 +1,7 @@
 #include "componeng/utils/utils.hpp"
 
 #include <filesystem>
+#include <vector>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -45,6 +46,15 @@ std::string Utils::getExecutableDir() {
   return exePath.parent_path().string();
 }
 
+static std::vector<std::filesystem::path> &extraAssetRoots() {
+  static std::vector<std::filesystem::path> roots;
+  return roots;
+}
+
+void Utils::addAssetRoot(const std::string &root) {
+  extraAssetRoots().push_back(root);
+}
+
 std::string Utils::getAssetPath(const std::string &relativePath) {
   static std::filesystem::path root = [] {
     // This file is at <root>/src/componeng/utils/utils.cpp, so four hops up
@@ -56,6 +66,14 @@ std::string Utils::getAssetPath(const std::string &relativePath) {
     }
     return p;
   }();
+
+  const auto &extra = extraAssetRoots();
+  for (auto it = extra.rbegin(); it != extra.rend(); ++it) {
+    std::filesystem::path candidate = *it / relativePath;
+    if (std::filesystem::exists(candidate)) {
+      return std::filesystem::weakly_canonical(candidate).string();
+    }
+  }
 
   std::filesystem::path assetPath = root / relativePath;
 
