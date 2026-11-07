@@ -23,20 +23,36 @@ namespace componeng::renderer {
  */
 class PbrMaterial : public DiffuseMaterial {
 public:
-  PbrMaterial(core::HandleID shaderID,
-              core::HandleID textureID)
-      : DiffuseMaterial(shaderID, textureID),
-        m_normalMapID(0), m_metallicMapID(0), m_roughnessMapID(0), m_aoMapID(0) {}
+  PbrMaterial(core::HandleID shaderID, core::HandleID textureID)
+      : DiffuseMaterial(shaderID, textureID), m_normalMapID(0),
+        m_metallicMapID(0), m_roughnessMapID(0), m_aoMapID(0) {
+  }
 
-  core::HandleID getNormalMapID() const override { return m_normalMapID; }
-  core::HandleID getMetallicMapID() const override { return m_metallicMapID; }
-  core::HandleID getRoughnessMapID() const override { return m_roughnessMapID; }
-  core::HandleID getAOMapID() const override { return m_aoMapID; }
+  core::HandleID getNormalMapID() const override {
+    return m_normalMapID;
+  }
+  core::HandleID getMetallicMapID() const override {
+    return m_metallicMapID;
+  }
+  core::HandleID getRoughnessMapID() const override {
+    return m_roughnessMapID;
+  }
+  core::HandleID getAOMapID() const override {
+    return m_aoMapID;
+  }
 
-  void setNormalMapID(core::HandleID id) { m_normalMapID = id; }
-  void setMetallicMapID(core::HandleID id) { m_metallicMapID = id; }
-  void setRoughnessMapID(core::HandleID id) { m_roughnessMapID = id; }
-  void setAOMapID(core::HandleID id) { m_aoMapID = id; }
+  void setNormalMapID(core::HandleID id) {
+    m_normalMapID = id;
+  }
+  void setMetallicMapID(core::HandleID id) {
+    m_metallicMapID = id;
+  }
+  void setRoughnessMapID(core::HandleID id) {
+    m_roughnessMapID = id;
+  }
+  void setAOMapID(core::HandleID id) {
+    m_aoMapID = id;
+  }
 
 private:
   core::HandleID m_normalMapID;

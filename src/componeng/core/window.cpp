@@ -12,8 +12,7 @@ static bool isMouseLocked(GLFWwindow *window) {
   return glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
 }
 
-static void framebufferSizeCallback(GLFWwindow *window, int width,
-                                    int height) {
+static void framebufferSizeCallback(GLFWwindow *window, int width, int height) {
   auto *engine = static_cast<Engine *>(glfwGetWindowUserPointer(window));
   if (!engine)
     return;

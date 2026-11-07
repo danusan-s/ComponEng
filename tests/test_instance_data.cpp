@@ -74,7 +74,8 @@ TEST(TransformToMatrix, MatchesComposedTranslateRotateScale) {
   };
   int i = 0;
   for (const auto &t : cases) {
-    EXPECT_TRUE(SameMat4(t.toMatrix(), referenceModelMatrix(t))) << "case " << i++;
+    EXPECT_TRUE(SameMat4(t.toMatrix(), referenceModelMatrix(t)))
+        << "case " << i++;
   }
 }
 
@@ -165,8 +166,8 @@ TEST(InstanceWriter, IgnoresNamesTheShaderDoesNotDeclare) {
   w.set(Name("notAnAttribute"), Vec3(1, 2, 3));
   w.set(Name("notAnAttribute"), Mat4(1.0f));
 
-  EXPECT_TRUE(std::all_of(data.begin(), data.end(),
-                          [](float f) { return f == 0.0f; }));
+  EXPECT_TRUE(
+      std::all_of(data.begin(), data.end(), [](float f) { return f == 0.0f; }));
 }
 
 TEST(InstanceWriter, TruncatesValuesWiderThanTheAttribute) {
@@ -231,8 +232,7 @@ std::unique_ptr<World> makeWorld() {
 class LegacyMaterial : public IMaterial {
 public:
   using IMaterial::IMaterial;
-  void buildInstanceData(World &, EntityID,
-                         UniformMap &out) const override {
+  void buildInstanceData(World &, EntityID, UniformMap &out) const override {
     out["instanceColor"] = Vec4(0.5f, 0.25f, 0.125f, 1.0f);
     out["wind"] = 3.0f;
   }
@@ -266,7 +266,8 @@ TEST(MaterialInstanceData, DiffuseWritesModelAndColor) {
   auto world = makeWorld();
   EntityID e = world->createEntity();
   TransformComponent t{{1, 2, 3}, {0, 30, 0}, {2, 2, 2}};
-  world->addComponents(e, TransformComponent(t), ColorComponent{.color = Vec4(0.1f, 0.2f, 0.3f, 1.0f)});
+  world->addComponents(e, TransformComponent(t),
+                       ColorComponent{.color = Vec4(0.1f, 0.2f, 0.3f, 1.0f)});
 
   DiffuseMaterial material(1, 1);
   const api::VertexLayout layout = modelColorWindLayout();
@@ -376,4 +377,224 @@ TEST(RenderQueue, ClearKeepsStorageForReuse) {
   reused.instanceData.resize(1000);
   EXPECT_EQ(reused.instanceData.data(), storage)
       << "refilling to the previous size must not reallocate";
+}
+
+// --- Slots: names resolved once, writes without searching
+// ---------------------
+
+TEST(InstanceSlots, ResolveOffsetsAndWidthsFromTheLayout) {
+  const api::VertexLayout layout = modelColorWindLayout();
+
+  const InstanceSlot color = findInstanceSlot(layout, Name("instanceColor"));
+  EXPECT_TRUE(color.valid());
+  EXPECT_EQ(color.offset, 16u) << "64 bytes in, expressed in floats";
+  EXPECT_EQ(color.components, 4u);
+
+  const InstanceSlot wind = findInstanceSlot(layout, Name("wind"));
+  EXPECT_EQ(wind.offset, 20u);
+  EXPECT_EQ(wind.components, 1u);
+
+  EXPECT_FALSE(findInstanceSlot(layout, Name("notThere")).valid());
+}
+
+TEST(InstanceSlots, MatrixAndScalarLookupsDoNotCrossOver) {
+  const api::VertexLayout layout = modelColorWindLayout();
+
+  const InstanceMatrixSlot model =
+      findInstanceMatrixSlot(layout, Name("instanceModel"));
+  ASSERT_TRUE(model.valid());
+  EXPECT_EQ(model.rowOffset[0], 0u);
+  EXPECT_EQ(model.rowOffset[1], 4u);
+  EXPECT_EQ(model.rowOffset[2], 8u);
+  EXPECT_EQ(model.rowOffset[3], 12u);
+
+  // A mat4 attribute is not a vec4, and a vec4 is not a mat4.
+  EXPECT_FALSE(findInstanceSlot(layout, Name("instanceModel")).valid());
+  EXPECT_FALSE(findInstanceMatrixSlot(layout, Name("instanceColor")).valid());
+  EXPECT_FALSE(findInstanceMatrixSlot(layout, Name("notThere")).valid());
+}
+
+TEST(InstanceSlots, AMatrixMissingARowIsInvalid) {
+  api::VertexLayout layout;
+  for (int row = 0; row < 3; ++row) { // only three of four rows
+    layout.attributes.push_back({Name("m"), uint32_t(row * 16), 4, false, row});
+  }
+  layout.stride = 48;
+  EXPECT_FALSE(findInstanceMatrixSlot(layout, Name("m")).valid());
+}
+
+TEST(InstanceSlots, WritingThroughSlotsEqualsWritingByName) {
+  const api::VertexLayout layout = modelColorWindLayout();
+
+  Mat4 model(1.0f);
+  model[0][0] = 2.0f;
+  model[3][1] = 7.5f;
+  const Vec4 color(0.1f, 0.2f, 0.3f, 0.4f);
+
+  std::vector<float> byName(layout.stride / sizeof(float), -1.0f);
+  InstanceWriter named(layout, byName.data());
+  named.set(Name("instanceModel"), model);
+  named.set(Name("instanceColor"), color);
+  named.set(Name("wind"), 0.75f);
+
+  std::vector<float> bySlot(layout.stride / sizeof(float), -1.0f);
+  InstanceWriter slotted(layout, bySlot.data());
+  slotted.set(findInstanceMatrixSlot(layout, Name("instanceModel")), model);
+  slotted.set(findInstanceSlot(layout, Name("instanceColor")), color);
+  slotted.set(findInstanceSlot(layout, Name("wind")), 0.75f);
+
+  EXPECT_EQ(bySlot, byName);
+}
+
+TEST(InstanceSlots, TruncateWideValuesAndLeaveNarrowOnesTailsAlone) {
+  api::VertexLayout layout;
+  layout.attributes.push_back({Name("a"), 0, 3, false, -1});  // vec3
+  layout.attributes.push_back({Name("b"), 12, 1, false, -1}); // float
+  layout.attributes.push_back({Name("c"), 16, 4, false, -1}); // vec4
+  layout.stride = 32;
+
+  std::vector<float> data(8, 7.0f);
+  InstanceWriter w(layout, data.data());
+  w.set(findInstanceSlot(layout, Name("b")), 5.0f);
+  w.set(findInstanceSlot(layout, Name("a")), Vec4(1, 2, 3, 99)); // too wide
+  w.set(findInstanceSlot(layout, Name("c")), Vec2(8, 9));        // too narrow
+
+  EXPECT_EQ(data[0], 1.0f);
+  EXPECT_EQ(data[1], 2.0f);
+  EXPECT_EQ(data[2], 3.0f);
+  EXPECT_EQ(data[3], 5.0f) << "the vec4 must not spill into the next attribute";
+  EXPECT_EQ(data[4], 8.0f);
+  EXPECT_EQ(data[5], 9.0f);
+  EXPECT_EQ(data[6], 7.0f) << "unwritten components keep their value";
+  EXPECT_EQ(data[7], 7.0f);
+}
+
+TEST(InstanceSlots, WritingAnInvalidSlotChangesNothing) {
+  const api::VertexLayout layout = modelColorWindLayout();
+  std::vector<float> data(layout.stride / sizeof(float), 3.0f);
+  InstanceWriter w(layout, data.data());
+
+  const InstanceSlot missing = findInstanceSlot(layout, Name("notThere"));
+  const InstanceMatrixSlot missingMatrix =
+      findInstanceMatrixSlot(layout, Name("notThere"));
+  w.set(missing, 1.0f);
+  w.set(missing, Vec4(1, 2, 3, 4));
+  w.set(missingMatrix, Mat4(2.0f));
+  w.set(InstanceSlot{}, 9.0f); // a default-constructed slot is invalid too
+
+  EXPECT_TRUE(
+      std::all_of(data.begin(), data.end(), [](float f) { return f == 3.0f; }));
+}
+
+TEST(InstanceSlots, MatrixRowsNeedNotBeContiguous) {
+  // Hand-built layout with the four rows interleaved with other attributes.
+  api::VertexLayout layout;
+  layout.attributes.push_back({Name("m"), 0, 4, false, 0});
+  layout.attributes.push_back({Name("x"), 16, 4, false, -1});
+  layout.attributes.push_back({Name("m"), 32, 4, false, 1});
+  layout.attributes.push_back({Name("y"), 48, 4, false, -1});
+  layout.attributes.push_back({Name("m"), 64, 4, false, 2});
+  layout.attributes.push_back({Name("m"), 80, 4, false, 3});
+  layout.stride = 96;
+
+  Mat4 m(1.0f);
+  for (int c = 0; c < 4; ++c)
+    for (int r = 0; r < 4; ++r)
+      m[c][r] = float(c * 4 + r + 1);
+
+  std::vector<float> data(24, 0.0f);
+  InstanceWriter w(layout, data.data());
+  w.set(findInstanceMatrixSlot(layout, Name("m")), m);
+
+  for (int r = 0; r < 4; ++r) {         // row slot r holds column r
+    const int base[4] = {0, 8, 16, 20}; // float offsets of the four rows
+    for (int k = 0; k < 4; ++k) {
+      EXPECT_EQ(data[base[r] + k], m[r][k]) << "row " << r << " comp " << k;
+    }
+  }
+  // The attributes in between were not touched.
+  for (int k = 0; k < 4; ++k) {
+    EXPECT_EQ(data[4 + k], 0.0f);
+    EXPECT_EQ(data[12 + k], 0.0f);
+  }
+}
+
+namespace {
+class RecordingMaterial : public IMaterial {
+public:
+  using IMaterial::IMaterial;
+  void resolveInstanceSlots(const api::VertexLayout &layout) override {
+    ++resolveCalls;
+    lastStride = layout.stride;
+  }
+  void writeInstanceData(const InstanceContext &,
+                         InstanceWriter &) const override {
+  }
+  int resolveCalls = 0;
+  uint32_t lastStride = 0;
+};
+} // namespace
+
+TEST(InstanceSlots, MaterialsAreToldWheneverTheyReceiveALayout) {
+  RecordingMaterial material(1, 1);
+  EXPECT_EQ(material.resolveCalls, 0);
+
+  material.setVertexLayout(modelColorWindLayout());
+  EXPECT_EQ(material.resolveCalls, 1);
+  EXPECT_EQ(material.lastStride, 84u);
+
+  api::VertexLayout other;
+  other.stride = 32;
+  material.setVertexLayout(other);
+  EXPECT_EQ(material.resolveCalls, 2);
+  EXPECT_EQ(material.lastStride, 32u);
+}
+
+TEST(InstanceSlots, DiffuseWritesToWhereTheCurrentLayoutPutsItsAttributes) {
+  auto world = makeWorld();
+  EntityID e = world->createEntity();
+  TransformComponent t{{4, 5, 6}, {0, 0, 0}, {1, 1, 1}};
+  world->addComponents(e, TransformComponent(t),
+                       ColorComponent{.color = Vec4(0.1f, 0.2f, 0.3f, 0.4f)});
+
+  // Layout B: colour first, then the matrix, i.e. different offsets from A.
+  api::VertexLayout layoutB;
+  layoutB.attributes.push_back({Name("instanceColor"), 0, 4, false, -1});
+  for (int row = 0; row < 4; ++row) {
+    layoutB.attributes.push_back(
+        {Name("instanceModel"), uint32_t(16 + row * 16), 4, false, row});
+  }
+  layoutB.stride = 80;
+
+  DiffuseMaterial material(1, 1);
+  TransformMatrixCache cache;
+
+  // Before any layout arrives the slots are invalid: nothing is written.
+  {
+    std::vector<float> data(20, -1.0f);
+    InstanceWriter writer(layoutB, data.data());
+    InstanceContext ctx(*world, e, world->getComponent<TransformComponent>(e),
+                        cache);
+    material.writeInstanceData(ctx, writer);
+    EXPECT_TRUE(std::all_of(data.begin(), data.end(),
+                            [](float f) { return f == -1.0f; }));
+  }
+
+  // Layout A, then layout B: each write follows the layout most recently set.
+  material.setVertexLayout(modelColorWindLayout());
+  material.setVertexLayout(layoutB);
+
+  std::vector<float> data(20, 0.0f);
+  InstanceWriter writer(layoutB, data.data());
+  InstanceContext ctx(*world, e, world->getComponent<TransformComponent>(e),
+                      cache);
+  material.writeInstanceData(ctx, writer);
+
+  EXPECT_EQ(data[0], 0.1f);
+  EXPECT_EQ(data[1], 0.2f);
+  EXPECT_EQ(data[3], 0.4f);
+  const Mat4 expected = referenceModelMatrix(t);
+  for (int i = 0; i < 16; ++i) {
+    EXPECT_NEAR(data[4 + i], value_ptr(expected)[i], kEps) << i;
+  }
 }

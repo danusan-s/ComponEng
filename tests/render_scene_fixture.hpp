@@ -31,8 +31,6 @@ using namespace componeng::core;
 using namespace componeng::ecs;
 using namespace componeng::renderer;
 
-
-
 // instanceModel (mat4 as 4 rows) + instanceColor (vec4): what diffuse.vert
 // reflects to.
 inline api::VertexLayout diffuseLayout() {
@@ -50,8 +48,9 @@ inline api::VertexLayout diffuseLayout() {
 // distinguishable by index count.
 inline const char *kTriangleObj =
     "v 0 0 0\nv 1 0 0\nv 0 1 0\nvn 0 0 1\nvt 0 0\nf 1/1/1 2/1/1 3/1/1\n";
-inline const char *kQuadObj = "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nvn 0 0 1\nvt 0 0\n"
-                       "f 1/1/1 2/1/1 3/1/1 4/1/1\n";
+inline const char *kQuadObj =
+    "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nvn 0 0 1\nvt 0 0\n"
+    "f 1/1/1 2/1/1 3/1/1 4/1/1\n";
 
 struct Scene {
   std::unique_ptr<World> world;
@@ -71,12 +70,12 @@ struct Scene {
 
   EntityID spawn(const char *mesh, const char *material, float x = 0.0f) {
     EntityID e = world->createEntity();
-    world->addComponents(
-        e, TransformComponent{.position = Vec3(x, 0.0f, 0.0f),
-                              .rotation = Vec3(0.0f),
-                              .scale = Vec3(1.0f)},
-        MeshComponent{.meshName = mesh, .visible = true},
-        MaterialComponent{.materialName = material});
+    world->addComponents(e,
+                         TransformComponent{.position = Vec3(x, 0.0f, 0.0f),
+                                            .rotation = Vec3(0.0f),
+                                            .scale = Vec3(1.0f)},
+                         MeshComponent{.meshName = mesh, .visible = true},
+                         MaterialComponent{.materialName = material});
     return e;
   }
 };
@@ -103,9 +102,9 @@ makeScene(const std::function<void(fake::Recorder &)> &configure = {},
   world.setResource<AssetManager>(AssetManager(world.getRenderDevice()));
   world.setResource<resources::Fog>(resources::Fog{});
 
-  world.registerComponents<
-      TransformComponent, MeshComponent, MaterialComponent, ColorComponent,
-      camera::CameraComponent, DirectionalLightComponent, SkyboxComponent>();
+  world.registerComponents<TransformComponent, MeshComponent, MaterialComponent,
+                           ColorComponent, camera::CameraComponent,
+                           DirectionalLightComponent, SkyboxComponent>();
 
   AssetManager &assets = scene->assets();
   // Shader sources are never read by the fake device, so missing files are
@@ -117,8 +116,8 @@ makeScene(const std::function<void(fake::Recorder &)> &configure = {},
   assets.loadTexture(white.c_str(), false, "t1");
   assets.loadTexture(white.c_str(), false, "t2");
 
-  for (auto [name, obj] : {std::pair{"tri", kTriangleObj},
-                           std::pair{"quad", kQuadObj}}) {
+  for (auto [name, obj] :
+       {std::pair{"tri", kTriangleObj}, std::pair{"quad", kQuadObj}}) {
     auto mesh = std::make_unique<Mesh>();
     mesh->generateFromWavefrontObj(obj);
     assets.addMesh(name, std::move(mesh));
@@ -142,9 +141,9 @@ makeScene(const std::function<void(fake::Recorder &)> &configure = {},
   world.setResource(camera::MainCamera{scene->camera});
 
   EntityID sun = world.createEntity();
-  world.addComponents(sun, DirectionalLightComponent{
-                               .direction = Vec3(0.0f, 1.0f, 0.0f),
-                               .color = Vec3(0.5f, 0.25f, 0.125f)});
+  world.addComponents(
+      sun, DirectionalLightComponent{.direction = Vec3(0.0f, 1.0f, 0.0f),
+                                     .color = Vec3(0.5f, 0.25f, 0.125f)});
 
   if (withCulling) {
     world.registerSystem<CullingSystem>(SystemGroup::Presentation);
@@ -173,6 +172,5 @@ inline void spawnMixed(Scene &s) {
   s.spawn("tri", "matA", 8);
   s.spawn("tri", "matB", 9);
 }
-
 
 } // namespace rscene

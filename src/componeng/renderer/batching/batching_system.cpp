@@ -34,56 +34,55 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
   state.world
       ->query<core::TransformComponent, renderer::MeshComponent,
               renderer::MaterialComponent>()
-      .eachWithEntity([&](ecs::EntityID entity,
-                          core::TransformComponent &transform,
-                          renderer::MeshComponent &m,
-                          renderer::MaterialComponent &mat) {
-        if (mat.materialID == 0) {
-          mat.materialID = assetManager.getMaterialID(
-              mat.materialName.empty() ? core::Name("default_diffuse")
-                                       : mat.materialName);
-        }
-        IMaterial &material = assetManager.getMaterial(mat.materialID);
-        if (mat.textureID == 0 || mat.shaderID == 0) {
-          mat.textureID = material.getTextureID();
-          mat.shaderID = material.getShaderID();
-        }
-        if (m.meshID == 0) {
-          m.meshID = assetManager.getMeshID(
-              m.meshName.empty() ? core::Name("cube") : m.meshName);
-        }
+      .eachWithEntity(
+          [&](ecs::EntityID entity, core::TransformComponent &transform,
+              renderer::MeshComponent &m, renderer::MaterialComponent &mat) {
+            if (mat.materialID == 0) {
+              mat.materialID = assetManager.getMaterialID(
+                  mat.materialName.empty() ? core::Name("default_diffuse")
+                                           : mat.materialName);
+            }
+            IMaterial &material = assetManager.getMaterial(mat.materialID);
+            if (mat.textureID == 0 || mat.shaderID == 0) {
+              mat.textureID = material.getTextureID();
+              mat.shaderID = material.getShaderID();
+            }
+            if (m.meshID == 0) {
+              m.meshID = assetManager.getMeshID(
+                  m.meshName.empty() ? core::Name("cube") : m.meshName);
+            }
 
-        if (!m.visible || m.culled) {
-          return;
-        }
+            if (!m.visible || m.culled) {
+              return;
+            }
 
-        const DrawKey key{m.meshID, mat.materialID};
-        if (lastBatch == kNoBatch || !(key == lastKey)) {
-          auto [it, inserted] = m_batchIndex.try_emplace(key, kNoBatch);
-          if (inserted) {
-            it->second = renderQueue.openBatch(
-                key.meshID, key.materialID, material.getShaderID(),
-                material.getTextureID());
-          }
-          lastKey = key;
-          lastBatch = it->second;
-          lastMaterial = &material;
-        }
+            const DrawKey key{m.meshID, mat.materialID};
+            if (lastBatch == kNoBatch || !(key == lastKey)) {
+              auto [it, inserted] = m_batchIndex.try_emplace(key, kNoBatch);
+              if (inserted) {
+                it->second = renderQueue.openBatch(key.meshID, key.materialID,
+                                                   material.getShaderID(),
+                                                   material.getTextureID());
+              }
+              lastKey = key;
+              lastBatch = it->second;
+              lastMaterial = &material;
+            }
 
-        RenderBatch &batch = renderQueue.batch(lastBatch);
-        const api::VertexLayout &layout = lastMaterial->getVertexLayout();
-        const std::size_t strideFloats = layout.stride / sizeof(float);
+            RenderBatch &batch = renderQueue.batch(lastBatch);
+            const api::VertexLayout &layout = lastMaterial->getVertexLayout();
+            const std::size_t strideFloats = layout.stride / sizeof(float);
 
-        // resize() zero-fills the new instance, so any attribute the material
-        // does not write reads as 0.
-        const std::size_t base = batch.instanceData.size();
-        batch.instanceData.resize(base + strideFloats);
+            // resize() zero-fills the new instance, so any attribute the
+            // material does not write reads as 0.
+            const std::size_t base = batch.instanceData.size();
+            batch.instanceData.resize(base + strideFloats);
 
-        InstanceWriter writer(layout, batch.instanceData.data() + base);
-        InstanceContext ctx(*state.world, entity, transform, m_matrixCache);
-        lastMaterial->writeInstanceData(ctx, writer);
-        ++batch.instanceCount;
-      });
+            InstanceWriter writer(layout, batch.instanceData.data() + base);
+            InstanceContext ctx(*state.world, entity, transform, m_matrixCache);
+            lastMaterial->writeInstanceData(ctx, writer);
+            ++batch.instanceCount;
+          });
 
   renderQueue.sort();
 }

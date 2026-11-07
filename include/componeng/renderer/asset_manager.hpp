@@ -67,7 +67,8 @@ public:
     m_materials[name] = id;
   }
 
-  /** Register a PBR material with albedo + optional normal/metallic/roughness/AO maps. */
+  /** Register a PBR material with albedo + optional
+   * normal/metallic/roughness/AO maps. */
   template <typename T>
   void registerPbrMaterial(const char *name, const char *shaderName,
                            const char *albedoName,
@@ -84,11 +85,14 @@ public:
     material->setKnownUniforms(shader.reflectActiveUniformNames());
 
     if (normalName && textureExists(normalName))
-      static_cast<T *>(material.get())->setNormalMapID(getTextureID(normalName));
+      static_cast<T *>(material.get())
+          ->setNormalMapID(getTextureID(normalName));
     if (metallicName && textureExists(metallicName))
-      static_cast<T *>(material.get())->setMetallicMapID(getTextureID(metallicName));
+      static_cast<T *>(material.get())
+          ->setMetallicMapID(getTextureID(metallicName));
     if (roughnessName && textureExists(roughnessName))
-      static_cast<T *>(material.get())->setRoughnessMapID(getTextureID(roughnessName));
+      static_cast<T *>(material.get())
+          ->setRoughnessMapID(getTextureID(roughnessName));
     if (aoName && textureExists(aoName))
       static_cast<T *>(material.get())->setAOMapID(getTextureID(aoName));
 

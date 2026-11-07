@@ -21,8 +21,9 @@ float maxAnisotropy() {
     for (GLint i = 0; i < count; ++i) {
       const char *name =
           reinterpret_cast<const char *>(glGetStringi(GL_EXTENSIONS, i));
-      if (name && (std::strcmp(name, "GL_EXT_texture_filter_anisotropic") == 0 ||
-                   std::strcmp(name, "GL_ARB_texture_filter_anisotropic") == 0)) {
+      if (name &&
+          (std::strcmp(name, "GL_EXT_texture_filter_anisotropic") == 0 ||
+           std::strcmp(name, "GL_ARB_texture_filter_anisotropic") == 0)) {
         GLfloat maxValue = 1.0f;
         glGetFloatv(kMaxTextureMaxAnisotropy, &maxValue);
         return std::max(1.0f, maxValue);

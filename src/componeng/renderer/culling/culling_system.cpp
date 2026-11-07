@@ -31,23 +31,24 @@ void CullingSystem::onUpdate(const ecs::SystemState &state) {
   state.world
       ->query<core::TransformComponent, renderer::MeshComponent,
               renderer::MaterialComponent>()
-      .eachParallel(
-          state.world->threadPool(),
-          [&](core::TransformComponent &t, renderer::MeshComponent &m,
-              renderer::MaterialComponent &mat) {
-            // BatchingSystem resolves names to ids on an entity's first
-            // frame; until then there is nothing to measure, so draw it.
-            if (m.meshID == 0 || mat.materialID == 0) {
-              m.culled = false;
-              return;
-            }
+      .eachParallel(state.world->threadPool(),
+                    [&](core::TransformComponent &t, renderer::MeshComponent &m,
+                        renderer::MaterialComponent &mat) {
+                      // BatchingSystem resolves names to ids on an entity's
+                      // first frame; until then there is nothing to measure, so
+                      // draw it.
+                      if (m.meshID == 0 || mat.materialID == 0) {
+                        m.culled = false;
+                        return;
+                      }
 
-            const Mesh &mesh = assets.getMesh(m.meshID);
-            const float padding =
-                assets.getMaterial(mat.materialID).getBoundsPadding();
-            const Aabb world = transformAabb(mesh.bounds(), t.toMatrix(), padding);
-            m.culled = !frustum.isBoxInFrustum(world.min, world.max);
-          });
+                      const Mesh &mesh = assets.getMesh(m.meshID);
+                      const float padding =
+                          assets.getMaterial(mat.materialID).getBoundsPadding();
+                      const Aabb world =
+                          transformAabb(mesh.bounds(), t.toMatrix(), padding);
+                      m.culled = !frustum.isBoxInFrustum(world.min, world.max);
+                    });
 }
 
 } // namespace componeng::renderer

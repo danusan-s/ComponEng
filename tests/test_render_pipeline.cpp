@@ -7,7 +7,6 @@
 
 using namespace rscene;
 
-
 // --- Decoupling from the GL backend -----------------------------------------
 
 TEST(RenderPipeline, AssetsAreCreatedThroughTheDevice) {
@@ -214,7 +213,8 @@ bool hasUniform(Scene &s, int shader, const char *name) {
 }
 } // namespace
 
-TEST(RenderPipeline, SkyIsAFullscreenTriangleDrawnBeforeTheSceneWithItsOwnState) {
+TEST(RenderPipeline,
+     SkyIsAFullscreenTriangleDrawnBeforeTheSceneWithItsOwnState) {
   auto s = makeScene();
   // Note: no "cube" mesh exists in this scene. The sky needs no mesh.
   s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox"); // id 3
@@ -266,7 +266,8 @@ TEST(RenderPipeline, SkyUsesTheShaderNamedByTheComponent) {
   EXPECT_EQ(s->rec().fullscreenDraws[0].shaderId, 4);
 }
 
-TEST(RenderPipeline, SkyGetsItsOwnUniformsAndLooseFrameValuesOnlyWithoutTheBlock) {
+TEST(RenderPipeline,
+     SkyGetsItsOwnUniformsAndLooseFrameValuesOnlyWithoutTheBlock) {
   // Sky shader is id 3. In the first scene it has no FrameData block.
   {
     auto s = makeScene();
@@ -280,9 +281,8 @@ TEST(RenderPipeline, SkyGetsItsOwnUniformsAndLooseFrameValuesOnlyWithoutTheBlock
   }
   // In the second it does: the per-frame values come from the buffer.
   {
-    auto s = makeScene([](fake::Recorder &rec) {
-      rec.shaderDeclaresFrameBlock[3] = true;
-    });
+    auto s = makeScene(
+        [](fake::Recorder &rec) { rec.shaderDeclaresFrameBlock[3] = true; });
     s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
     s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
     s->frame();
@@ -353,7 +353,8 @@ TEST(TextureOptions, MissingFileBecomesAOneByOneFallbackInsteadOfGarbage) {
   s->assets().loadTexture("definitely/not/a/file.png", false, "missing");
 
   ASSERT_EQ(s->rec().textureSizes.size(), before + 1);
-  EXPECT_EQ(s->rec().textureSizes.back(), (std::pair<uint32_t, uint32_t>(1, 1)));
+  EXPECT_EQ(s->rec().textureSizes.back(),
+            (std::pair<uint32_t, uint32_t>(1, 1)));
   EXPECT_NO_THROW(s->assets().getTextureID("missing"));
 }
 
@@ -363,7 +364,8 @@ TEST(RenderPipeline, EachInstanceCarriesItsOwnModelMatrixAndColor) {
   auto s = makeScene();
   EntityID a = s->spawn("tri", "matA", 7.0f);
   EntityID b = s->spawn("tri", "matA", 9.0f);
-  s->world->addComponent(b, ColorComponent{.color = Vec4(0.2f, 0.4f, 0.6f, 1.0f)});
+  s->world->addComponent(b,
+                         ColorComponent{.color = Vec4(0.2f, 0.4f, 0.6f, 1.0f)});
   (void)a;
   s->frame();
 

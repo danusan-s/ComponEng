@@ -29,10 +29,18 @@ public:
   }
 
   // PBR texture IDs (default 0 = not used). Overridden by PbrMaterial.
-  virtual core::HandleID getNormalMapID() const { return 0; }
-  virtual core::HandleID getMetallicMapID() const { return 0; }
-  virtual core::HandleID getRoughnessMapID() const { return 0; }
-  virtual core::HandleID getAOMapID() const { return 0; }
+  virtual core::HandleID getNormalMapID() const {
+    return 0;
+  }
+  virtual core::HandleID getMetallicMapID() const {
+    return 0;
+  }
+  virtual core::HandleID getRoughnessMapID() const {
+    return 0;
+  }
+  virtual core::HandleID getAOMapID() const {
+    return 0;
+  }
 
   void setUniform(const char *name, core::UniformMap::mapped_type value) {
     if (!m_knownUniforms.empty() &&
@@ -82,6 +90,15 @@ public:
 
   void setVertexLayout(const api::VertexLayout &layout) {
     m_vertexLayout = layout;
+    resolveInstanceSlots(layout);
+  }
+
+  /** Called whenever the material receives its vertex layout (registration,
+   *  or a changed shader). Look up the attributes you write here, with
+   *  findInstanceSlot()/findInstanceMatrixSlot(), and keep the results as
+   *  members: writeInstanceData() runs once per entity per frame and should
+   *  not search the layout by name each time. */
+  virtual void resolveInstanceSlots(const api::VertexLayout &) {
   }
 
   const api::VertexLayout &getVertexLayout() const {
@@ -92,8 +109,9 @@ public:
    *  shader's own attribute names (see IShader::reflectInstanceLayout).
    *
    *  This is the hot path: it runs once per rendered entity per frame, writing
-   *  straight into the batch's flat instance buffer. Override it and avoid
-   *  heap allocation; build Names once rather than per call.
+   *  straight into the batch's flat instance buffer. Override it, avoid heap
+   *  allocation, and write through slots resolved in resolveInstanceSlots()
+   *  rather than by Name.
    *
    *  The default implementation adapts the legacy buildInstanceData() below so
    *  existing materials keep working, at the cost of a map per entity. */

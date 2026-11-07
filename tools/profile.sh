@@ -25,7 +25,7 @@ for tool in perf stackcollapse-perf.pl flamegraph.pl; do
   command -v "$tool" > /dev/null || { echo "missing: $tool" >&2; exit 1; }
 done
 
-out="profile-$(date +%Y%m%d-%H%M%S)"
+out="profilings/profile-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$out"
 
 # -D skips the startup (asset loading, scene spawn), which would otherwise

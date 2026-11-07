@@ -74,8 +74,7 @@ void GLRenderDevice::applyRenderState(const api::RenderState &state,
   m_state = state;
 }
 
-void GLRenderDevice::bindUniformBuffer(uint32_t binding,
-                                       api::IBuffer &buffer) {
+void GLRenderDevice::bindUniformBuffer(uint32_t binding, api::IBuffer &buffer) {
   glBindBufferBase(GL_UNIFORM_BUFFER, binding,
                    static_cast<GLBuffer &>(buffer).handle());
 }

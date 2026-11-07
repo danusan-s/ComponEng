@@ -14,8 +14,8 @@
 #include "componeng/physics/physics_system.hpp"
 #include "componeng/physics/rigidbody_component.hpp"
 #include "componeng/renderer/asset/diffuse.hpp"
-#include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/asset/pbr.hpp"
+#include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 #include "componeng/renderer/batching/batching_system.hpp"
 #include "componeng/renderer/component/light_component.hpp"
@@ -71,12 +71,14 @@ void Engine::init() {
 
   assetManager.loadShader(
       utils::Utils::getAssetPath("assets/shaders/pbr.vert").c_str(),
-      utils::Utils::getAssetPath("assets/shaders/pbr.frag").c_str(),
-      nullptr, "pbr");
+      utils::Utils::getAssetPath("assets/shaders/pbr.frag").c_str(), nullptr,
+      "pbr");
 
   assetManager.loadShader(
-      utils::Utils::getAssetPath("assets/shaders/skybox_procedural.vert").c_str(),
-      utils::Utils::getAssetPath("assets/shaders/skybox_procedural.frag").c_str(),
+      utils::Utils::getAssetPath("assets/shaders/skybox_procedural.vert")
+          .c_str(),
+      utils::Utils::getAssetPath("assets/shaders/skybox_procedural.frag")
+          .c_str(),
       nullptr, "skybox");
 
   // Set up fog resource
@@ -95,13 +97,12 @@ void Engine::init() {
 }
 
 void Engine::registerComponents() {
-  m_world
-      .registerComponents<core::TransformComponent, renderer::MeshComponent,
-                          renderer::MaterialComponent, renderer::ColorComponent,
-                          camera::CameraComponent, physics::RigidBodyComponent,
-                          physics::ColliderComponent, audio::AudioComponent,
-                          renderer::DirectionalLightComponent,
-                          renderer::SkyboxComponent>();
+  m_world.registerComponents<
+      core::TransformComponent, renderer::MeshComponent,
+      renderer::MaterialComponent, renderer::ColorComponent,
+      camera::CameraComponent, physics::RigidBodyComponent,
+      physics::ColliderComponent, audio::AudioComponent,
+      renderer::DirectionalLightComponent, renderer::SkyboxComponent>();
 }
 
 void Engine::registerSystems() {

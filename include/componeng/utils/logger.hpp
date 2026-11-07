@@ -5,11 +5,11 @@
 #include <iostream>
 
 #define LOG_INFO(fmt, ...)                                                     \
-  componeng::utils::Logger::Log(__FILE__, __FUNCTION__, "INFO", fmt,           \
-                                ##__VA_ARGS__)
+  componeng::utils::Logger::Log(__FILE__, __FUNCTION__, "INFO",                \
+                                fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...)                                                    \
-  componeng::utils::Logger::Log(__FILE__, __FUNCTION__, "ERROR", fmt,          \
-                                ##__VA_ARGS__)
+  componeng::utils::Logger::Log(__FILE__, __FUNCTION__, "ERROR",               \
+                                fmt, ##__VA_ARGS__)
 
 namespace componeng::utils {
 

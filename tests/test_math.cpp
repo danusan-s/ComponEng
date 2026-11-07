@@ -1,10 +1,10 @@
 #include "componeng/core/math/ops.hpp"
 #include "componeng/renderer/culling/frustum.hpp"
 
+#include "gtest/gtest.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include "gtest/gtest.h"
 
 #include <algorithm>
 #include <array>
@@ -43,11 +43,10 @@ glm::vec3 ToGlmVec3(const Vec3 &v) {
 // Σ_col m[col][row] * v[col]. Kept in the test so we can check the whole
 // pipeline against glm without adding production code.
 Vec4 MulMat4Vec4(const Mat4 &m, const Vec4 &v) {
-  return Vec4(
-      m[0][0] * v.x + m[1][0] * v.y + m[2][0] * v.z + m[3][0] * v.w,
-      m[0][1] * v.x + m[1][1] * v.y + m[2][1] * v.z + m[3][1] * v.w,
-      m[0][2] * v.x + m[1][2] * v.y + m[2][2] * v.z + m[3][2] * v.w,
-      m[0][3] * v.x + m[1][3] * v.y + m[2][3] * v.z + m[3][3] * v.w);
+  return Vec4(m[0][0] * v.x + m[1][0] * v.y + m[2][0] * v.z + m[3][0] * v.w,
+              m[0][1] * v.x + m[1][1] * v.y + m[2][1] * v.z + m[3][1] * v.w,
+              m[0][2] * v.x + m[1][2] * v.y + m[2][2] * v.z + m[3][2] * v.w,
+              m[0][3] * v.x + m[1][3] * v.y + m[2][3] * v.z + m[3][3] * v.w);
 }
 
 ::testing::AssertionResult SameMat4(const Mat4 &a, const glm::mat4 &b,
@@ -74,8 +73,7 @@ testing::AssertionResult SameVec3(const Vec3 &a, const glm::vec3 &b,
   auto diff = [&](float x, float y) {
     return (isNanBits(x) && isNanBits(y)) ? 0.0f : std::fabs(x - y);
   };
-  float worst =
-      std::max({diff(a.x, b.x), diff(a.y, b.y), diff(a.z, b.z)});
+  float worst = std::max({diff(a.x, b.x), diff(a.y, b.y), diff(a.z, b.z)});
   if (worst <= eps)
     return ::testing::AssertionSuccess();
   char msg[128];
@@ -146,8 +144,8 @@ TEST(MathVsGlm, Mat4MultiplicationDistributes) {
 // --- Transform helpers -------------------------------------------------------
 
 TEST(MathVsGlm, Translate) {
-  const Mat4 base = FromGlm(glm::rotate(glm::mat4(1.0f), 0.7f,
-                                        glm::vec3(1.0f, 2.0f, 3.0f)));
+  const Mat4 base =
+      FromGlm(glm::rotate(glm::mat4(1.0f), 0.7f, glm::vec3(1.0f, 2.0f, 3.0f)));
   const glm::mat4 gBase = ToGlm(base);
   const Vec3 t(4.0f, -1.5f, 2.25f);
   ExpectAllMat4s({{translate(base, t), glm::translate(gBase, ToGlmVec3(t))}});
@@ -193,8 +191,8 @@ TEST(MathVsGlm, RotateArbitraryAxisComposed) {
 }
 
 TEST(MathVsGlm, Scale) {
-  const Mat4 base = FromGlm(glm::rotate(glm::mat4(1.0f), 0.6f,
-                                        glm::vec3(0.0f, 1.0f, 0.0f)));
+  const Mat4 base =
+      FromGlm(glm::rotate(glm::mat4(1.0f), 0.6f, glm::vec3(0.0f, 1.0f, 0.0f)));
   const glm::mat4 gBase = ToGlm(base);
   const Vec3 s(2.0f, -0.5f, 3.0f);
   ExpectAllMat4s({{scale(base, s), glm::scale(gBase, ToGlmVec3(s))}});
@@ -213,8 +211,8 @@ TEST(MathVsGlm, LookAt) {
   };
   for (const auto &c : cases) {
     const Mat4 mine = lookAt(c.eye, c.center, c.up);
-    const glm::mat4 ref = glm::lookAt(ToGlmVec3(c.eye), ToGlmVec3(c.center),
-                                      ToGlmVec3(c.up));
+    const glm::mat4 ref =
+        glm::lookAt(ToGlmVec3(c.eye), ToGlmVec3(c.center), ToGlmVec3(c.up));
     EXPECT_TRUE(SameMat4(mine, ref));
   }
 }
@@ -239,8 +237,8 @@ TEST(MathVsGlm, ViewProjectionPipeline) {
   const Mat4 view = lookAt(eye, center, up);
   const Mat4 proj = perspective(fov, aspect, 0.1f, 1000.0f);
 
-  const glm::mat4 gView = glm::lookAt(ToGlmVec3(eye), ToGlmVec3(center),
-                                      ToGlmVec3(up));
+  const glm::mat4 gView =
+      glm::lookAt(ToGlmVec3(eye), ToGlmVec3(center), ToGlmVec3(up));
   const glm::mat4 gProj = glm::perspective(fov, aspect, 0.1f, 1000.0f);
 
   EXPECT_TRUE(SameMat4(proj * view, gProj * gView));
@@ -335,7 +333,8 @@ TEST(MathVsGlm, TransformPointMatchesClipSpace) {
   const Vec4 myClip = MulMat4Vec4(modelViewProj, v);
 
   // GLM reference: clip = (proj * view) * model * v
-  const glm::vec4 refClip = gProj * gView * gModel * glm::vec4(v.x, v.y, v.z, v.w);
+  const glm::vec4 refClip =
+      gProj * gView * gModel * glm::vec4(v.x, v.y, v.z, v.w);
 
   EXPECT_NEAR(myClip.x, refClip[0], kEps);
   EXPECT_NEAR(myClip.y, refClip[1], kEps);
@@ -371,8 +370,7 @@ using namespace componeng::renderer;
 
 std::array<FrustumPlane, 6> ExtractGlm(const glm::mat4 &m) {
   std::array<FrustumPlane, 6> p;
-  FrustumPlane *planes[] = {&p[0], &p[1], &p[2],
-                            &p[3], &p[4], &p[5]};
+  FrustumPlane *planes[] = {&p[0], &p[1], &p[2], &p[3], &p[4], &p[5]};
   const int sign[6] = {1, -1, 1, -1, 1, -1};
   for (int c = 0; c < 3; ++c) {
     for (int k = 0; k < 2; ++k) {
@@ -386,7 +384,8 @@ std::array<FrustumPlane, 6> ExtractGlm(const glm::mat4 &m) {
     }
   }
   for (auto &pl : p) {
-    const float len = glm::length(glm::vec3(pl.normal.x, pl.normal.y, pl.normal.z));
+    const float len =
+        glm::length(glm::vec3(pl.normal.x, pl.normal.y, pl.normal.z));
     pl.normal /= len;
     pl.distance /= len;
   }
@@ -435,9 +434,9 @@ TEST(MathVsGlm, FrustumPlaneExtraction) {
 // --- transpose / inverse -----------------------------------------------------
 
 TEST(MathVsGlm, TransposeMatchesGlm) {
-  const glm::mat4 g = glm::perspective(1.0f, 1.7f, 0.1f, 100.0f) *
-                      glm::lookAt(glm::vec3(1, 2, 3), glm::vec3(0, 0, 0),
-                                  glm::vec3(0, 1, 0));
+  const glm::mat4 g =
+      glm::perspective(1.0f, 1.7f, 0.1f, 100.0f) *
+      glm::lookAt(glm::vec3(1, 2, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
   EXPECT_TRUE(SameMat4(transpose(FromGlm(g)), glm::transpose(g)));
 }
 

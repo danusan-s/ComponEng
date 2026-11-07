@@ -18,9 +18,9 @@ using namespace componeng::renderer;
 struct Draw {
   size_t indexCount = 0;
   uint32_t instanceCount = 0;
-  api::RenderState state;   // pipeline state at the moment of the draw
-  int shaderId = 0;         // shader in use
-  int albedoTextureId = 0;  // texture bound to unit 0
+  api::RenderState state;            // pipeline state at the moment of the draw
+  int shaderId = 0;                  // shader in use
+  int albedoTextureId = 0;           // texture bound to unit 0
   std::vector<float> instanceFloats; // instance buffer contents at draw time
 };
 
@@ -43,8 +43,8 @@ struct Recorder {
   std::vector<int> unit0TextureBinds;          // texture id per unit-0 bind
   std::vector<UniformBufferBind> uniformBufferBinds;
   std::vector<Draw> draws;
-  std::vector<Draw> fullscreenDraws;      // drawFullscreenTriangle calls
-  std::vector<std::string> drawSequence;  // "fullscreen" / "indexed", in order
+  std::vector<Draw> fullscreenDraws;     // drawFullscreenTriangle calls
+  std::vector<std::string> drawSequence; // "fullscreen" / "indexed", in order
 
   // Names passed to loose uniform setters, per shader id.
   std::map<int, std::vector<std::string>> looseUniforms;
@@ -59,7 +59,8 @@ struct Recorder {
   int currentShader = 0;
   uint32_t activeUnit = 0;
   std::map<uint32_t, int> boundTextureByUnit;
-  std::vector<float> pendingInstanceFloats; // from the latest setupInstanceAttributes
+  std::vector<float>
+      pendingInstanceFloats; // from the latest setupInstanceAttributes
 
   // One entry per texture created, in creation order.
   std::vector<api::TextureDesc> textureDescs;
@@ -136,7 +137,8 @@ public:
   api::VertexLayout reflectInstanceLayout() const override {
     return m_rec.instanceLayout;
   }
-  std::vector<componeng::core::Name> reflectActiveUniformNames() const override {
+  std::vector<componeng::core::Name>
+  reflectActiveUniformNames() const override {
     return {};
   }
 

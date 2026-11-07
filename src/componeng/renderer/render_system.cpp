@@ -9,15 +9,15 @@
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset/pbr.hpp"
-#include "componeng/renderer/frame_data.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
 #include "componeng/renderer/component/light_component.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
-#include "componeng/resources/fog.hpp"
 #include "componeng/renderer/component/skybox_component.hpp"
+#include "componeng/renderer/frame_data.hpp"
+#include "componeng/resources/fog.hpp"
 
 #include <algorithm>
 
@@ -162,10 +162,11 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
                           core::inverse(cam.projectionMatrix * cam.viewMatrix));
         shader.setVector3f("skyColor", sky.color);
         // The fog colour as horizon lets fogged ground fade into the sky.
-        shader.setVector3f("horizonColor",
-                           sky.horizonFromFog
-                               ? core::Vec3(fog.color.x, fog.color.y, fog.color.z)
-                               : sky.horizonColor);
+        shader.setVector3f(
+            "horizonColor",
+            sky.horizonFromFog
+                ? core::Vec3(fog.color.x, fog.color.y, fog.color.z)
+                : sky.horizonColor);
 
         api::RenderState skyState;
         skyState.cull = api::CullMode::None;
@@ -203,7 +204,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     const api::VertexLayout &layout = material.getVertexLayout();
     const Mesh &model = assetManager.getMesh(meshID);
     const Shader &shader = assetManager.getShader(material.getShaderID());
-    const Texture2D &albedoTex = assetManager.getTexture(material.getTextureID());
+    const Texture2D &albedoTex =
+        assetManager.getTexture(material.getTextureID());
 
     const bool shaderChanged = material.getShaderID() != boundShader;
     if (shaderChanged) {
@@ -237,7 +239,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     if (isPbr) {
       renderDevice.setActiveTextureUnit(1);
       if (pbr->getNormalMapID() != 0) {
-        const Texture2D &normalTex = assetManager.getTexture(pbr->getNormalMapID());
+        const Texture2D &normalTex =
+            assetManager.getTexture(pbr->getNormalMapID());
         normalTex.bind();
       } else {
         albedoTex.bind(); // fallback
@@ -246,7 +249,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
       renderDevice.setActiveTextureUnit(2);
       if (pbr->getMetallicMapID() != 0) {
-        const Texture2D &metallicTex = assetManager.getTexture(pbr->getMetallicMapID());
+        const Texture2D &metallicTex =
+            assetManager.getTexture(pbr->getMetallicMapID());
         metallicTex.bind();
       } else {
         albedoTex.bind();
@@ -255,7 +259,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
       renderDevice.setActiveTextureUnit(3);
       if (pbr->getRoughnessMapID() != 0) {
-        const Texture2D &roughTex = assetManager.getTexture(pbr->getRoughnessMapID());
+        const Texture2D &roughTex =
+            assetManager.getTexture(pbr->getRoughnessMapID());
         roughTex.bind();
       } else {
         albedoTex.bind();

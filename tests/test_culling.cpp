@@ -38,8 +38,8 @@ Mat4 lookDownPlusX() {
 }
 
 void setCamera(Scene &s, const Mat4 &viewProj) {
-  s.world->getComponent<camera::CameraComponent>(s.camera).viewProjectionMatrix =
-      viewProj;
+  s.world->getComponent<camera::CameraComponent>(s.camera)
+      .viewProjectionMatrix = viewProj;
 }
 
 uint32_t drawnInstances(Scene &s) {
@@ -62,7 +62,8 @@ void settle(Scene &s) {
 // --- transformAabb ----------------------------------------------------------
 
 TEST(TransformAabb, IdentityLeavesTheBoxAlone) {
-  expectBox(transformAabb(unitBox(), Mat4(1.0f)), Vec3(-1, -1, -1), Vec3(1, 1, 1));
+  expectBox(transformAabb(unitBox(), Mat4(1.0f)), Vec3(-1, -1, -1),
+            Vec3(1, 1, 1));
 }
 
 TEST(TransformAabb, TranslationAndScale) {
@@ -88,12 +89,13 @@ TEST(TransformAabb, QuarterTurnSwapsTheExtents) {
 TEST(TransformAabb, FortyFiveDegreesGrowsToTheEnclosingBox) {
   TransformComponent t{{0, 0, 0}, {0, 0, 45}, {1, 1, 1}};
   const float r = std::sqrt(2.0f);
-  expectBox(transformAabb(unitBox(), t.toMatrix()), Vec3(-r, -r, -1), Vec3(r, r, 1));
+  expectBox(transformAabb(unitBox(), t.toMatrix()), Vec3(-r, -r, -1),
+            Vec3(r, r, 1));
 }
 
 TEST(TransformAabb, PaddingInflatesEverySide) {
-  expectBox(transformAabb(unitBox(), Mat4(1.0f), 0.5f), Vec3(-1.5f, -1.5f, -1.5f),
-            Vec3(1.5f, 1.5f, 1.5f));
+  expectBox(transformAabb(unitBox(), Mat4(1.0f), 0.5f),
+            Vec3(-1.5f, -1.5f, -1.5f), Vec3(1.5f, 1.5f, 1.5f));
 }
 
 TEST(TransformAabb, MatchesTransformingAllEightCorners) {
@@ -132,7 +134,7 @@ TEST(MeshBounds, ComeFromTheUploadedVertices) {
 TEST(Culling, EverythingIsDrawnOnTheFirstFrameBeforeIdsAreResolved) {
   auto s = makeScene({}, /*withCulling=*/true);
   setCamera(*s, lookDownMinusZ());
-  s->spawn("tri", "matA", 0);   // placed at z = 0 by spawn(); in front is below
+  s->spawn("tri", "matA", 0); // placed at z = 0 by spawn(); in front is below
   EntityID far = s->spawn("tri", "matA", 5000);
   (void)far;
   s->frame();

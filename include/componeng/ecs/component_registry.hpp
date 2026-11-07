@@ -45,7 +45,8 @@ template <typename Plain> std::size_t plainComponentTypeIndex() {
 
 // T, const T and T& share an index, matching what typeid() ignores.
 template <typename T> std::size_t componentTypeIndex() {
-  return plainComponentTypeIndex<std::remove_cv_t<std::remove_reference_t<T>>>();
+  return plainComponentTypeIndex<
+      std::remove_cv_t<std::remove_reference_t<T>>>();
 }
 
 } // namespace detail

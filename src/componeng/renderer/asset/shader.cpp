@@ -12,9 +12,8 @@ void Shader::use() const {
 void Shader::compile(const char *vertexSource, const char *fragmentSource,
                      const char *geometrySource) {
   m_impl->loadGLSL(vertexSource, fragmentSource, geometrySource);
-  m_usesFrameData = m_impl->bindUniformBlock(kFrameDataBlockName,
-                                             kFrameDataBinding,
-                                             sizeof(FrameData));
+  m_usesFrameData = m_impl->bindUniformBlock(
+      kFrameDataBlockName, kFrameDataBinding, sizeof(FrameData));
 }
 
 void Shader::setFloat(const char *name, float value) const {

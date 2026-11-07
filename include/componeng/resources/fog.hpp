@@ -13,9 +13,9 @@ namespace componeng::resources {
  */
 struct Fog {
   core::Vec4 color = core::Vec4(0.5f, 0.7f, 1.0f, 1.0f); // sky-like fog
-  float density = 0.002f;    // exponential density
-  float start = 50.0f;       // linear fog start distance
-  float end = 800.0f;        // linear fog end distance
+  float density = 0.002f;                                // exponential density
+  float start = 50.0f; // linear fog start distance
+  float end = 800.0f;  // linear fog end distance
   bool enabled = true;
 };
 

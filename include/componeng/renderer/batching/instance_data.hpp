@@ -57,8 +57,7 @@ private:
     bool valid = false;
   };
 
-  static bool sameTransform(const Entry &e,
-                            const core::TransformComponent &t) {
+  static bool sameTransform(const Entry &e, const core::TransformComponent &t) {
     return e.position.x == t.position.x && e.position.y == t.position.y &&
            e.position.z == t.position.z && e.rotation.x == t.rotation.x &&
            e.rotation.y == t.rotation.y && e.rotation.z == t.rotation.z &&
@@ -98,17 +97,83 @@ private:
 };
 
 /**
- * @brief Cursor over the floats of a single instance, addressed by the
- * shader's own attribute names (see IShader::reflectInstanceLayout).
+ * @brief Where one vec/float instance attribute lives inside an instance: a
+ * name looked up once, so writing it per entity is a plain copy.
+ *
+ * Obtain one with findInstanceSlot() when a material receives its vertex
+ * layout (IMaterial::resolveInstanceSlots) and keep it as a member. A slot
+ * whose attribute the shader does not declare is invalid, and writing to an
+ * invalid slot does nothing, exactly as writing an unknown name always has.
+ */
+struct InstanceSlot {
+  static constexpr uint32_t kInvalid = UINT32_MAX;
+
+  uint32_t offset = kInvalid; // in floats, from the start of one instance
+  uint32_t components = 0;    // the attribute's width: 1 (float) to 4 (vec4)
+
+  bool valid() const {
+    return offset != kInvalid;
+  }
+};
+
+/** The same for a mat4 attribute, which occupies four vec4 rows. */
+struct InstanceMatrixSlot {
+  uint32_t rowOffset[4] = {InstanceSlot::kInvalid, InstanceSlot::kInvalid,
+                           InstanceSlot::kInvalid, InstanceSlot::kInvalid};
+
+  bool valid() const {
+    return rowOffset[0] != InstanceSlot::kInvalid &&
+           rowOffset[1] != InstanceSlot::kInvalid &&
+           rowOffset[2] != InstanceSlot::kInvalid &&
+           rowOffset[3] != InstanceSlot::kInvalid;
+  }
+};
+
+/** Looks `name` up in `layout` as a float/vec2/vec3/vec4 attribute. */
+inline InstanceSlot findInstanceSlot(const api::VertexLayout &layout,
+                                     core::Name name) {
+  for (const api::VertexAttribute &attr : layout.attributes) {
+    if (attr.name == name && attr.matrixRow < 0) {
+      return {attr.offset / static_cast<uint32_t>(sizeof(float)),
+              attr.componentCount};
+    }
+  }
+  return {};
+}
+
+/** Looks `name` up in `layout` as a mat4 attribute. Invalid unless all four
+ *  rows are present. */
+inline InstanceMatrixSlot
+findInstanceMatrixSlot(const api::VertexLayout &layout, core::Name name) {
+  InstanceMatrixSlot slot;
+  for (const api::VertexAttribute &attr : layout.attributes) {
+    if (attr.name == name && attr.matrixRow >= 0 && attr.matrixRow < 4) {
+      slot.rowOffset[attr.matrixRow] =
+          attr.offset / static_cast<uint32_t>(sizeof(float));
+    }
+  }
+  return slot;
+}
+
+/**
+ * @brief Cursor over the floats of a single instance.
  *
  * Writes straight into the batch's flat instance buffer: no allocation, no
- * intermediate map. Names the shader does not declare are ignored, so a
- * material can offer more attributes than a given shader consumes. A value
- * wider than its attribute is truncated to the attribute's component count
- * instead of spilling into the next attribute.
+ * intermediate map. Two ways to address an attribute:
  *
- * Name construction interns a string; materials should build their Names once
- * (a member or a static) rather than from a literal on every call.
+ *  - By InstanceSlot / InstanceMatrixSlot, resolved once per material. This is
+ *    the fast path and what a material's writeInstanceData() should use: the
+ *    per-entity cost is a copy, with no search.
+ *  - By Name, which searches the layout on every call. Kept for the legacy
+ *    UniformMap path and for one-off use.
+ *
+ * Either way, an attribute the shader does not declare is ignored (so a
+ * material can offer more attributes than a given shader consumes), and a
+ * value wider than its attribute is truncated to the attribute's component
+ * count instead of spilling into the next one.
+ *
+ * Name construction interns a string; build Names once (a member or a static)
+ * rather than from a literal on every call.
  */
 class InstanceWriter {
 public:
@@ -141,12 +206,54 @@ public:
     }
   }
 
+  void set(const InstanceSlot &slot, float value) {
+    copyScalars<1>(slot, &value);
+  }
+  void set(const InstanceSlot &slot, const core::Vec2 &value) {
+    copyScalars<2>(slot, core::value_ptr(value));
+  }
+  void set(const InstanceSlot &slot, const core::Vec3 &value) {
+    copyScalars<3>(slot, core::value_ptr(value));
+  }
+  void set(const InstanceSlot &slot, const core::Vec4 &value) {
+    copyScalars<4>(slot, core::value_ptr(value));
+  }
+
+  /** Row r of the attribute takes column r of the matrix. */
+  void set(const InstanceMatrixSlot &slot, const core::Mat4 &value) {
+    if (!slot.valid()) {
+      return;
+    }
+    const float *src = core::value_ptr(value);
+    for (int row = 0; row < 4; ++row) {
+      std::memcpy(m_instance + slot.rowOffset[row], src + row * 4,
+                  sizeof(float) * 4);
+    }
+  }
+
   /** Type-erased form, used by the legacy UniformMap material path. */
   void set(core::Name name, const core::UniformMap::mapped_type &value) {
     std::visit([&](const auto &v) { set(name, v); }, value);
   }
 
 private:
+  // `Count` is the width of the value being written, known at every call
+  // site. In the common case the attribute is at least that wide, so the copy
+  // is a fixed-size one the compiler turns into a few register moves; only a
+  // value wider than its attribute takes the (runtime-length) truncating copy.
+  template <uint32_t Count>
+  void copyScalars(const InstanceSlot &slot, const float *src) {
+    if (!slot.valid()) {
+      return;
+    }
+    float *dst = m_instance + slot.offset;
+    if (slot.components >= Count) {
+      std::memcpy(dst, src, sizeof(float) * Count);
+    } else {
+      std::memcpy(dst, src, sizeof(float) * slot.components);
+    }
+  }
+
   void setScalars(core::Name name, const float *src, uint32_t count) {
     for (const api::VertexAttribute &attr : m_layout.attributes) {
       if (attr.name == name && attr.matrixRow < 0) {

@@ -52,13 +52,16 @@ struct FrameData {
   float padding[3]; // std140 rounds the block up to a multiple of 16 bytes
 };
 
-static_assert(sizeof(FrameData) == 160, "FrameData must match its std140 block");
+static_assert(sizeof(FrameData) == 160,
+              "FrameData must match its std140 block");
 static_assert(offsetof(FrameData, cameraPos) == 64, "std140: after the mat4");
 static_assert(offsetof(FrameData, lightDir) == 80, "std140: vec3 + float = 16");
-static_assert(offsetof(FrameData, lightColor) == 96, "std140: vec3 + float = 16");
+static_assert(offsetof(FrameData, lightColor) == 96,
+              "std140: vec3 + float = 16");
 static_assert(offsetof(FrameData, ambientColor) == 112,
               "std140: vec3 + float = 16");
-static_assert(offsetof(FrameData, fogColor) == 128, "std140: vec4 is 16-aligned");
+static_assert(offsetof(FrameData, fogColor) == 128,
+              "std140: vec4 is 16-aligned");
 static_assert(offsetof(FrameData, fogEnd) == 144, "std140: scalar after vec4");
 
 } // namespace componeng::renderer
