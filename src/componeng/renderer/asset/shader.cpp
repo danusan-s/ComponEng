@@ -53,6 +53,10 @@ void Shader::setMatrix4(const char *name, const core::Mat4 &matrix) const {
   m_impl->setMatrix4(name, &matrix[0][0]);
 }
 
+bool Shader::bindUniformBlock(const char *blockName, uint32_t binding) const {
+  return m_impl->bindUniformBlock(blockName, binding);
+}
+
 api::VertexLayout Shader::reflectInstanceLayout() const {
   return m_impl->reflectInstanceLayout();
 }

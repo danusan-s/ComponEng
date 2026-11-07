@@ -57,6 +57,62 @@ bool AssetManager::textureExists(core::Name name) const {
   return m_textures.find(name) != m_textures.end();
 }
 
+void AssetManager::createTexture(core::Name name, uint32_t width,
+                                 uint32_t height, api::TextureFormat format,
+                                 const void *pixels,
+                                 const api::TextureDesc &desc) {
+  LOG_INFO("Creating Texture: %s (%ux%u)", name.c_str(), width, height);
+  auto texture = std::make_unique<Texture2D>();
+  texture->create(*m_device, width, height, format, pixels, desc);
+  m_textureResources.push_back(std::move(texture));
+  core::HandleID id = m_textureResources.size();
+  m_textures[name] = id;
+}
+
+bool AssetManager::updateTexture(core::HandleID id, uint32_t x, uint32_t y,
+                                 uint32_t width, uint32_t height,
+                                 const void *pixels) {
+  return m_textureResources.at(id - 1)->update(x, y, width, height, pixels);
+}
+
+void AssetManager::createBuffer(core::Name name, const void *data,
+                                size_t sizeBytes, api::IBuffer::Usage usage) {
+  LOG_INFO("Creating Buffer: %s (%zu bytes)", name.c_str(), sizeBytes);
+  auto buffer = m_device->createBuffer();
+  buffer->setData(data, sizeBytes, usage);
+  m_bufferResources.push_back(std::move(buffer));
+  core::HandleID id = m_bufferResources.size();
+  m_buffers[name] = id;
+}
+
+bool AssetManager::updateBuffer(core::HandleID id, size_t offset,
+                                const void *data, size_t sizeBytes) {
+  api::IBuffer &buffer = *m_bufferResources.at(id - 1);
+  if (offset > buffer.size() || sizeBytes > buffer.size() - offset) {
+    LOG_ERROR("Buffer update range (%zu + %zu) is outside the %zu-byte buffer",
+              offset, sizeBytes, buffer.size());
+    return false;
+  }
+  buffer.setSubData(offset, data, sizeBytes);
+  return true;
+}
+
+api::IBuffer &AssetManager::getBuffer(core::HandleID id) const {
+  return *m_bufferResources.at(id - 1);
+}
+
+core::HandleID AssetManager::getBufferID(core::Name name) const {
+  if (m_buffers.find(name) == m_buffers.end()) {
+    LOG_ERROR("Buffer not found: %s", name.c_str());
+    throw std::runtime_error("Buffer not found");
+  }
+  return m_buffers.at(name);
+}
+
+bool AssetManager::bufferExists(core::Name name) const {
+  return m_buffers.find(name) != m_buffers.end();
+}
+
 core::HandleID AssetManager::getMaterialID(core::Name name) const {
   if (m_materials.find(name) == m_materials.end()) {
     LOG_ERROR("Material not found: %s", name.c_str());
@@ -177,6 +233,8 @@ void AssetManager::clear() {
   m_textureResources.clear();
   m_meshes.clear();
   m_meshResources.clear();
+  m_buffers.clear();
+  m_bufferResources.clear();
 }
 
 } // namespace componeng::renderer

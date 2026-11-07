@@ -9,6 +9,7 @@ namespace componeng::renderer {
  */
 class CullingSystem final : public ecs::ISystem {
 public:
+  void onCreate(const ecs::SystemState &state) override;
   void onUpdate(const ecs::SystemState &state) override;
 
 private:

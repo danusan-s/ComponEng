@@ -9,11 +9,15 @@
 #include "componeng/renderer/batching/render_queue.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
+#include "componeng/renderer/component/procedural_instances_component.hpp"
+#include "componeng/utils/logger.hpp"
 
 namespace componeng::renderer {
 
 void BatchingSystem::onCreate(const ecs::SystemState &state) {
   state.world->setResource(RenderQueue());
+  // Both queries below name this component; registering is idempotent.
+  state.world->registerComponent<ProceduralInstancesComponent>();
 }
 
 void BatchingSystem::onUpdate(const ecs::SystemState &state) {
@@ -31,26 +35,36 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
   uint32_t lastBatch = kNoBatch;
   const IMaterial *lastMaterial = nullptr;
 
+  // Resolves an entity's names to ids on its first frame, and returns its
+  // material.
+  auto resolve =
+      [&assetManager](renderer::MeshComponent &m,
+                      renderer::MaterialComponent &mat) -> IMaterial & {
+    if (mat.materialID == 0) {
+      mat.materialID = assetManager.getMaterialID(
+          mat.materialName.empty() ? core::Name("default_diffuse")
+                                   : mat.materialName);
+    }
+    IMaterial &material = assetManager.getMaterial(mat.materialID);
+    if (mat.textureID == 0 || mat.shaderID == 0) {
+      mat.textureID = material.getTextureID();
+      mat.shaderID = material.getShaderID();
+    }
+    if (m.meshID == 0) {
+      m.meshID = assetManager.getMeshID(m.meshName.empty() ? core::Name("cube")
+                                                           : m.meshName);
+    }
+    return material;
+  };
+
   state.world
       ->query<core::TransformComponent, renderer::MeshComponent,
               renderer::MaterialComponent>()
+      .exclude<ProceduralInstancesComponent>()
       .eachWithEntity(
           [&](ecs::EntityID entity, core::TransformComponent &transform,
               renderer::MeshComponent &m, renderer::MaterialComponent &mat) {
-            if (mat.materialID == 0) {
-              mat.materialID = assetManager.getMaterialID(
-                  mat.materialName.empty() ? core::Name("default_diffuse")
-                                           : mat.materialName);
-            }
-            IMaterial &material = assetManager.getMaterial(mat.materialID);
-            if (mat.textureID == 0 || mat.shaderID == 0) {
-              mat.textureID = material.getTextureID();
-              mat.shaderID = material.getShaderID();
-            }
-            if (m.meshID == 0) {
-              m.meshID = assetManager.getMeshID(
-                  m.meshName.empty() ? core::Name("cube") : m.meshName);
-            }
+            IMaterial &material = resolve(m, mat);
 
             if (!m.visible || m.culled) {
               return;
@@ -84,11 +98,43 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
             ++batch.instanceCount;
           });
 
+  // Procedural entities: one batch each, no instance data. The shader places
+  // every instance from gl_InstanceID.
+  state.world
+      ->query<core::TransformComponent, renderer::MeshComponent,
+              renderer::MaterialComponent, ProceduralInstancesComponent>()
+      .each([&](core::TransformComponent &, renderer::MeshComponent &m,
+                renderer::MaterialComponent &mat,
+                ProceduralInstancesComponent &procedural) {
+        IMaterial &material = resolve(m, mat);
+
+        if (!m.visible || m.culled || procedural.count <= 0) {
+          return;
+        }
+
+        // With no instance buffer, a per-instance attribute would read zero.
+        if (!material.getVertexLayout().attributes.empty() &&
+            m_reportedMaterials.insert(mat.materialID).second) {
+          LOG_ERROR("Material '%s' has per-instance attributes but is drawn "
+                    "with ProceduralInstancesComponent, which supplies none; "
+                    "they will read as zero",
+                    mat.materialName.c_str());
+        }
+
+        const uint32_t index = renderQueue.openBatch(m.meshID, mat.materialID,
+                                                     material.getShaderID(),
+                                                     material.getTextureID());
+        RenderBatch &batch = renderQueue.batch(index);
+        batch.procedural = true;
+        batch.instanceCount = static_cast<uint32_t>(procedural.count);
+      });
+
   renderQueue.sort();
 }
 
 void BatchingSystem::onDestroy(const ecs::SystemState &) {
   m_batchIndex.clear();
+  m_reportedMaterials.clear();
   m_matrixCache.clear();
 }
 

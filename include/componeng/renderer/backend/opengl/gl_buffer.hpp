@@ -29,8 +29,13 @@ public:
     return m_id;
   }
 
+  /** The GL texture object through which this buffer is read as a texture
+   *  buffer; created on first use. */
+  GLuint bufferTexture();
+
 private:
   GLuint m_id = 0;
+  GLuint m_bufferTexture = 0;
   size_t m_size = 0;
 };
 

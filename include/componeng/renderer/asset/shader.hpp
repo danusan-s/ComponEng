@@ -27,6 +27,10 @@ public:
   void setVector4f(const char *name, const core::Vec4 &value) const;
   void setMatrix4(const char *name, const core::Mat4 &matrix) const;
 
+  /** Attaches the shader's uniform block `blockName` to uniform-buffer
+   *  binding point `binding`. False if the shader declares no such block. */
+  bool bindUniformBlock(const char *blockName, uint32_t binding) const;
+
   /** True if the compiled shader declares the FrameData uniform block, in
    *  which case it reads per-frame values from the shared buffer and the
    *  RenderSystem does not send them as loose uniforms. */

@@ -57,6 +57,40 @@ GLint toGLMagFilter(api::TextureFilter filter) {
   return filter == api::TextureFilter::Nearest ? GL_NEAREST : GL_LINEAR;
 }
 
+// How a TextureFormat is stored (internal format), and how the CPU data is
+// laid out (pixel format and component type).
+struct GLFormat {
+  GLint internal;
+  GLenum pixel;
+  GLenum type;
+};
+
+GLFormat toGLFormat(api::TextureFormat format, bool srgb) {
+  switch (format) {
+    case api::TextureFormat::R8:
+      return {GL_R8, GL_RED, GL_UNSIGNED_BYTE};
+    case api::TextureFormat::RG8:
+      return {GL_RG8, GL_RG, GL_UNSIGNED_BYTE};
+    case api::TextureFormat::RGB8:
+      return {srgb ? GL_SRGB8 : GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE};
+    case api::TextureFormat::RGBA8:
+      return {srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE};
+    case api::TextureFormat::R16F:
+      return {GL_R16F, GL_RED, GL_FLOAT};
+    case api::TextureFormat::RG16F:
+      return {GL_RG16F, GL_RG, GL_FLOAT};
+    case api::TextureFormat::RGBA16F:
+      return {GL_RGBA16F, GL_RGBA, GL_FLOAT};
+    case api::TextureFormat::R32F:
+      return {GL_R32F, GL_RED, GL_FLOAT};
+    case api::TextureFormat::RG32F:
+      return {GL_RG32F, GL_RG, GL_FLOAT};
+    case api::TextureFormat::RGBA32F:
+      return {GL_RGBA32F, GL_RGBA, GL_FLOAT};
+  }
+  return {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE};
+}
+
 } // namespace
 
 GLTexture::~GLTexture() {
@@ -66,28 +100,32 @@ GLTexture::~GLTexture() {
 void GLTexture::generate(uint32_t width, uint32_t height,
                          const unsigned char *data, bool alpha,
                          const api::TextureDesc &desc) {
+  create(width, height,
+         alpha ? api::TextureFormat::RGBA8 : api::TextureFormat::RGB8, data,
+         desc);
+}
+
+void GLTexture::create(uint32_t width, uint32_t height,
+                       api::TextureFormat format, const void *pixels,
+                       const api::TextureDesc &desc) {
   m_width = width;
   m_height = height;
+  m_format = format;
+  m_mipmaps = desc.mipmaps;
 
   if (m_id == 0) {
     glGenTextures(1, &m_id);
   }
   glBindTexture(GL_TEXTURE_2D, m_id);
 
-  GLint internalFormat;
-  if (desc.srgb) {
-    internalFormat = alpha ? GL_SRGB8_ALPHA8 : GL_SRGB8;
-  } else {
-    internalFormat = alpha ? GL_RGBA8 : GL_RGB8;
-  }
-  const GLenum imageFormat = alpha ? GL_RGBA : GL_RGB;
+  const GLFormat f = toGLFormat(format, desc.srgb);
 
   // Rows of tightly packed RGB are 3 * width bytes, which is not a multiple of
-  // GL's default 4-byte row alignment for most widths; without this such
-  // images upload skewed.
+  // GL's default 4-byte row alignment for most widths (and the same goes for
+  // one- and two-channel bytes); without this such images upload skewed.
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, imageFormat,
-               GL_UNSIGNED_BYTE, data);
+  glTexImage2D(GL_TEXTURE_2D, 0, f.internal, width, height, 0, f.pixel, f.type,
+               pixels);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
   if (desc.mipmaps) {
@@ -105,6 +143,26 @@ void GLTexture::generate(uint32_t width, uint32_t height,
                     std::min(desc.anisotropy, maxAnisotropy()));
   }
 
+  glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void GLTexture::update(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+                       const void *pixels) {
+  if (m_id == 0) {
+    return;
+  }
+  // The pixel format and type do not depend on sRGB; the texture's own
+  // internal format already decides how the values are interpreted.
+  const GLFormat f = toGLFormat(m_format, false);
+
+  glBindTexture(GL_TEXTURE_2D, m_id);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, f.pixel, f.type,
+                  pixels);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+  if (m_mipmaps) {
+    glGenerateMipmap(GL_TEXTURE_2D);
+  }
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 

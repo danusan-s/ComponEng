@@ -29,6 +29,8 @@ public:
   void setViewport(int x, int y, int w, int h) override;
   void setScissor(int x, int y, int w, int h) override;
   void setActiveTextureUnit(uint32_t unit) override;
+  void bindBufferTexture(uint32_t unit, api::IBuffer &buffer,
+                         api::BufferTextureFormat format) override;
   void setRenderState(const api::RenderState &state) override;
   void bindUniformBuffer(uint32_t binding, api::IBuffer &buffer) override;
   void clear(float r, float g, float b, float a) override;

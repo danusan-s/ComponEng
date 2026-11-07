@@ -4,7 +4,9 @@
 
 #include <cstring>
 #include <map>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 // A render device that draws nothing and records what it was asked to do, so
@@ -22,11 +24,39 @@ struct Draw {
   int shaderId = 0;                  // shader in use
   int albedoTextureId = 0;           // texture bound to unit 0
   std::vector<float> instanceFloats; // instance buffer contents at draw time
+  // What was bound on each texture unit at the time of the draw (bindings
+  // persist between draws, as in GL, so units a material does not use may
+  // still show an earlier material's texture).
+  std::map<uint32_t, int> textureUnits;       // unit -> texture id
+  std::map<uint32_t, int> bufferTextureUnits; // unit -> buffer id
 };
 
 struct UniformBufferBind {
   uint32_t binding = 0;
   std::vector<unsigned char> bytes; // buffer contents at bind time
+};
+
+// A texture made through ITexture::create (as opposed to generate).
+struct CreatedTexture {
+  int id = 0;
+  uint32_t width = 0, height = 0;
+  api::TextureFormat format = api::TextureFormat::RGBA8;
+  api::TextureDesc desc;
+  bool hadPixels = false;
+  std::vector<unsigned char> pixels;
+};
+
+struct TextureUpdate {
+  int id = 0;
+  uint32_t x = 0, y = 0, width = 0, height = 0;
+  std::vector<unsigned char> pixels;
+};
+
+struct BufferTextureBind {
+  uint32_t unit = 0;
+  int bufferId = 0;
+  api::BufferTextureFormat format = api::BufferTextureFormat::R32F;
+  std::vector<unsigned char> bytes;
 };
 
 // Everything the fake device observed, in one place so shaders, textures and
@@ -42,6 +72,14 @@ struct Recorder {
   std::vector<int> shaderUses;                 // shader id per use()
   std::vector<int> unit0TextureBinds;          // texture id per unit-0 bind
   std::vector<UniformBufferBind> uniformBufferBinds;
+  std::vector<CreatedTexture> createdTextures;
+  std::vector<TextureUpdate> textureUpdates;
+  std::vector<BufferTextureBind> bufferTextureBinds;
+  // (block name, binding point) for every IShader::bindUniformBlock call.
+  std::vector<std::pair<std::string, uint32_t>> uniformBlockBinds;
+  // Uniform blocks (besides FrameData) the fake shaders claim to declare.
+  std::set<std::string> declaredBlocks;
+  std::map<uint32_t, int> boundBufferTextureByUnit;
   std::vector<Draw> draws;
   std::vector<Draw> fullscreenDraws;     // drawFullscreenTriangle calls
   std::vector<std::string> drawSequence; // "fullscreen" / "indexed", in order
@@ -70,6 +108,11 @@ struct Recorder {
 
 class FakeBuffer final : public api::IBuffer {
 public:
+  explicit FakeBuffer(int id = 0) : m_id(id) {
+  }
+  int id() const {
+    return m_id;
+  }
   void setData(const void *data, size_t sizeBytes, Usage) override {
     m_bytes.assign(static_cast<const unsigned char *>(data),
                    static_cast<const unsigned char *>(data) + sizeBytes);
@@ -90,6 +133,7 @@ public:
   }
 
 private:
+  int m_id;
   std::vector<unsigned char> m_bytes;
 };
 
@@ -127,7 +171,11 @@ public:
     note(n);
   }
 
-  bool bindUniformBlock(const char *, uint32_t, size_t) override {
+  bool bindUniformBlock(const char *name, uint32_t binding, size_t) override {
+    m_rec.uniformBlockBinds.push_back({name, binding});
+    if (std::string(name) != "FrameData") {
+      return m_rec.declaredBlocks.count(name) != 0;
+    }
     auto it = m_rec.shaderDeclaresFrameBlock.find(m_id);
     return it != m_rec.shaderDeclaresFrameBlock.end()
                ? it->second
@@ -162,6 +210,38 @@ public:
     m_rec.textureHadAlpha.push_back(alpha);
     m_rec.textureSizes.push_back({w, h});
   }
+  void create(uint32_t w, uint32_t h, api::TextureFormat format,
+              const void *pixels, const api::TextureDesc &desc) override {
+    m_width = w;
+    m_height = h;
+    m_format = format;
+    CreatedTexture t;
+    t.id = m_id;
+    t.width = w;
+    t.height = h;
+    t.format = format;
+    t.desc = desc;
+    t.hadPixels = pixels != nullptr;
+    if (pixels) {
+      const size_t bytes = size_t(w) * h * api::textureCpuPixelBytes(format);
+      t.pixels.assign(static_cast<const unsigned char *>(pixels),
+                      static_cast<const unsigned char *>(pixels) + bytes);
+    }
+    m_rec.createdTextures.push_back(std::move(t));
+  }
+  void update(uint32_t x, uint32_t y, uint32_t w, uint32_t h,
+              const void *pixels) override {
+    TextureUpdate u;
+    u.id = m_id;
+    u.x = x;
+    u.y = y;
+    u.width = w;
+    u.height = h;
+    const size_t bytes = size_t(w) * h * api::textureCpuPixelBytes(m_format);
+    u.pixels.assign(static_cast<const unsigned char *>(pixels),
+                    static_cast<const unsigned char *>(pixels) + bytes);
+    m_rec.textureUpdates.push_back(std::move(u));
+  }
   void bind() const override {
     m_rec.boundTextureByUnit[m_rec.activeUnit] = m_id;
     if (m_rec.activeUnit == 0) {
@@ -174,6 +254,7 @@ public:
 private:
   Recorder &m_rec;
   int m_id;
+  api::TextureFormat m_format = api::TextureFormat::RGBA8;
 };
 
 class FakeMesh final : public api::IMesh {
@@ -225,7 +306,7 @@ public:
   }
   std::unique_ptr<api::IBuffer> createBuffer() override {
     ++rec.buffersCreated;
-    return std::make_unique<FakeBuffer>();
+    return std::make_unique<FakeBuffer>(rec.buffersCreated);
   }
 
   void setRenderState(const api::RenderState &state) override {
@@ -239,6 +320,12 @@ public:
   void setActiveTextureUnit(uint32_t unit) override {
     rec.activeUnit = unit;
   }
+  void bindBufferTexture(uint32_t unit, api::IBuffer &buffer,
+                         api::BufferTextureFormat format) override {
+    auto &fake = static_cast<FakeBuffer &>(buffer);
+    rec.boundBufferTextureByUnit[unit] = fake.id();
+    rec.bufferTextureBinds.push_back({unit, fake.id(), format, fake.bytes()});
+  }
   void setupInstanceAttributes(api::IBuffer &buffer,
                                const api::VertexLayout &) override {
     const auto &bytes = static_cast<FakeBuffer &>(buffer).bytes();
@@ -247,6 +334,9 @@ public:
                 rec.pendingInstanceFloats.size() * sizeof(float));
   }
   void unbindInstanceAttributes(const api::VertexLayout &) override {
+    // As in GL, once the arrays are disabled the next draw sees no instance
+    // data, unless it binds its own.
+    rec.pendingInstanceFloats.clear();
   }
   void drawFullscreenTriangle() override {
     Draw d;
@@ -266,6 +356,8 @@ public:
     d.shaderId = rec.currentShader;
     auto it = rec.boundTextureByUnit.find(0);
     d.albedoTextureId = it != rec.boundTextureByUnit.end() ? it->second : 0;
+    d.textureUnits = rec.boundTextureByUnit;
+    d.bufferTextureUnits = rec.boundBufferTextureByUnit;
     rec.draws.push_back(d);
     rec.drawSequence.push_back("indexed");
   }

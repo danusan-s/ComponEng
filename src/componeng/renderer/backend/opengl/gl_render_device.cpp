@@ -91,6 +91,28 @@ void GLRenderDevice::setActiveTextureUnit(uint32_t unit) {
   glActiveTexture(GL_TEXTURE0 + unit);
 }
 
+void GLRenderDevice::bindBufferTexture(uint32_t unit, api::IBuffer &buffer,
+                                       api::BufferTextureFormat format) {
+  GLenum internal = GL_R32F;
+  switch (format) {
+    case api::BufferTextureFormat::R32F:
+      internal = GL_R32F;
+      break;
+    case api::BufferTextureFormat::RG32F:
+      internal = GL_RG32F;
+      break;
+    case api::BufferTextureFormat::RGBA32F:
+      internal = GL_RGBA32F;
+      break;
+  }
+  GLBuffer &glBuffer = static_cast<GLBuffer &>(buffer);
+  glActiveTexture(GL_TEXTURE0 + unit);
+  glBindTexture(GL_TEXTURE_BUFFER, glBuffer.bufferTexture());
+  // Attached on every bind: setData may have replaced the buffer's storage
+  // since the last frame, and re-attaching is cheap.
+  glTexBuffer(GL_TEXTURE_BUFFER, internal, glBuffer.handle());
+}
+
 void GLRenderDevice::clear(float r, float g, float b, float a) {
   // glClear honours the depth mask, so a state with depth writes off would
   // leave last frame's depth in place. Clear with the mask on, then put the

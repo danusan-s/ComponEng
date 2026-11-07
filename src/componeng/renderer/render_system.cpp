@@ -20,6 +20,8 @@
 #include "componeng/resources/fog.hpp"
 
 #include <algorithm>
+#include <string>
+#include <unordered_set>
 
 namespace componeng::renderer {
 
@@ -48,6 +50,65 @@ static void setShaderUniforms(const Shader &shader, const IMaterial &material) {
           }
         },
         value);
+  }
+}
+
+// Binds the extra textures, texture buffers and uniform blocks a material
+// declared (IMaterial::setTexture and friends). Problems are reported once.
+static void bindMaterialResources(api::IRenderDevice &device,
+                                  const AssetManager &assets,
+                                  const Shader &shader,
+                                  const IMaterial &material,
+                                  std::unordered_set<std::string> &reported) {
+  auto report = [&reported](const std::string &key, const char *message,
+                            const std::string &name) {
+    if (reported.insert(key).second) {
+      LOG_ERROR("%s: %s", message, name.c_str());
+    }
+  };
+
+  uint32_t unit = api::kFirstMaterialTextureUnit;
+  for (const auto &b : material.getTextureBindings()) {
+    if (unit >= api::kTextureUnitLimit) {
+      report("units:" + b.sampler, "out of texture units for sampler",
+             b.sampler);
+      break;
+    }
+    device.setActiveTextureUnit(unit);
+    assets.getTexture(b.texture).bind();
+    shader.setInteger(b.sampler.c_str(), static_cast<int>(unit));
+    ++unit;
+  }
+  for (const auto &b : material.getBufferTextureBindings()) {
+    if (unit >= api::kTextureUnitLimit) {
+      report("units:" + b.sampler, "out of texture units for sampler",
+             b.sampler);
+      break;
+    }
+    device.bindBufferTexture(unit, assets.getBuffer(b.buffer), b.format);
+    shader.setInteger(b.sampler.c_str(), static_cast<int>(unit));
+    ++unit;
+  }
+  if (unit != api::kFirstMaterialTextureUnit) {
+    // Back to unit 0 so the albedo binding the loop tracks stays the one that
+    // later binds and draws see.
+    device.setActiveTextureUnit(0);
+  }
+
+  uint32_t binding = api::kFirstMaterialUniformBinding;
+  for (const auto &b : material.getUniformBlockBindings()) {
+    if (binding >= api::kUniformBindingLimit) {
+      report("bindings:" + b.block, "out of uniform buffer bindings for block",
+             b.block);
+      break;
+    }
+    if (shader.bindUniformBlock(b.block.c_str(), binding)) {
+      device.bindUniformBuffer(binding, assets.getBuffer(b.buffer));
+    } else {
+      report("block:" + b.block, "the shader declares no uniform block",
+             b.block);
+    }
+    ++binding;
   }
 }
 
@@ -281,12 +342,25 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
       renderDevice.setActiveTextureUnit(0);
     }
 
+    bindMaterialResources(renderDevice, assetManager, shader, material,
+                          m_reportedBindingProblems);
+
     // Set material uniforms (fogColor etc. from PbrMaterial constructor)
     setShaderUniforms(shader, material);
 
     materialOverrodeUniforms = !material.getUniforms().empty();
 
     model.getImpl().bind();
+
+    // Procedural batches carry no per-instance data: nothing to upload and no
+    // instance attributes to enable; the shader reads gl_InstanceID.
+    if (batch.procedural) {
+      renderDevice.drawIndexedInstanced(model.indexCount(),
+                                        batch.instanceCount);
+      ++drawCalls;
+      instancesRendered += batch.instanceCount;
+      continue;
+    }
 
     // Reuse one GPU buffer per (mesh,material) combo across frames instead of
     // creating/destroying one every draw call; only reallocate (setData) when

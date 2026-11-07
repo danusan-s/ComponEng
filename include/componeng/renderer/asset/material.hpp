@@ -7,8 +7,10 @@
 #include "componeng/renderer/batching/instance_data.hpp"
 #include "componeng/utils/logger.hpp"
 
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace componeng::renderer {
 
@@ -54,6 +56,79 @@ public:
 
   const core::UniformMap &getUniforms() const {
     return m_uniforms;
+  }
+
+  // --- Extra resources the shader reads ------------------------------------
+  //
+  // Beyond its albedo (and a PbrMaterial's maps), a material can hand its
+  // shader any number of textures and buffers, by the names the shader
+  // declares. The RenderSystem binds them before each of the material's draws:
+  // textures and buffer textures take units from api::kFirstMaterialTextureUnit
+  // up, uniform blocks take binding points from
+  // api::kFirstMaterialUniformBinding up.
+
+  struct TextureBinding {
+    std::string sampler; // `uniform sampler2D <sampler>`
+    core::HandleID texture = 0;
+  };
+  struct BufferTextureBinding {
+    std::string sampler; // `uniform samplerBuffer <sampler>`
+    core::HandleID buffer = 0;
+    api::BufferTextureFormat format = api::BufferTextureFormat::R32F;
+  };
+  struct UniformBlockBinding {
+    std::string block; // `layout(std140) uniform <block> { ... }`
+    core::HandleID buffer = 0;
+  };
+
+  /** Binds a texture (AssetManager::getTextureID) to the shader's sampler2D
+   *  `sampler`. Setting the same sampler again replaces the texture. */
+  void setTexture(const char *sampler, core::HandleID texture) {
+    warnIfNotUniform(sampler, "setTexture");
+    for (TextureBinding &b : m_textureBindings) {
+      if (b.sampler == sampler) {
+        b.texture = texture;
+        return;
+      }
+    }
+    m_textureBindings.push_back({sampler, texture});
+  }
+
+  /** Binds a buffer (AssetManager::getBufferID) to the shader's samplerBuffer
+   *  `sampler`, read with texelFetch. Unlike a uniform block there is no small
+   *  size limit, so this is how to give a shader a long list of values. */
+  void setBufferTexture(const char *sampler, core::HandleID buffer,
+                        api::BufferTextureFormat format) {
+    warnIfNotUniform(sampler, "setBufferTexture");
+    for (BufferTextureBinding &b : m_bufferTextureBindings) {
+      if (b.sampler == sampler) {
+        b.buffer = buffer;
+        b.format = format;
+        return;
+      }
+    }
+    m_bufferTextureBindings.push_back({sampler, buffer, format});
+  }
+
+  /** Binds a buffer to the shader's std140 uniform block `block`. */
+  void setUniformBuffer(const char *block, core::HandleID buffer) {
+    for (UniformBlockBinding &b : m_uniformBlockBindings) {
+      if (b.block == block) {
+        b.buffer = buffer;
+        return;
+      }
+    }
+    m_uniformBlockBindings.push_back({block, buffer});
+  }
+
+  const std::vector<TextureBinding> &getTextureBindings() const {
+    return m_textureBindings;
+  }
+  const std::vector<BufferTextureBinding> &getBufferTextureBindings() const {
+    return m_bufferTextureBindings;
+  }
+  const std::vector<UniformBlockBinding> &getUniformBlockBindings() const {
+    return m_uniformBlockBindings;
   }
 
   /** Called by AssetManager::registerMaterial right after construction, from
@@ -131,12 +206,23 @@ public:
   }
 
 private:
+  void warnIfNotUniform(const char *name, const char *caller) const {
+    if (!m_knownUniforms.empty() &&
+        m_knownUniforms.find(core::Name(name)) == m_knownUniforms.end()) {
+      LOG_ERROR("%s: '%s' is not an active uniform in this material's shader",
+                caller, name);
+    }
+  }
+
   core::HandleID m_shaderID = 0;
   core::HandleID m_textureID = 0;
   api::VertexLayout m_vertexLayout;
   api::RenderState m_renderState;
   float m_boundsPadding = 0.0f;
   core::UniformMap m_uniforms;
+  std::vector<TextureBinding> m_textureBindings;
+  std::vector<BufferTextureBinding> m_bufferTextureBindings;
+  std::vector<UniformBlockBinding> m_uniformBlockBindings;
   std::unordered_set<core::Name> m_knownUniforms;
   mutable core::UniformMap m_scratchInstanceData;
 };

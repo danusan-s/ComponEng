@@ -382,10 +382,15 @@ const auto& events = world.get_events<CollisionEvent>();
 4. **Batching**: Group visible entities by (meshID, materialID); each entity's
    instance data is written directly into its batch's flat buffer, with the model
    matrix built by `TransformComponent::toMatrix()` and cached per entity while
-   the transform is unchanged
+   the transform is unchanged. An entity with a `ProceduralInstancesComponent`
+   becomes one data-less batch of `count` instances instead (the shader places
+   them from `gl_InstanceID`); the render step skips its buffer upload and
+   instance attributes
 5. **Sorting**: Order batches by (shaderID, textureID, materialID, meshID) so
    draws sharing GPU state are adjacent
-6. **Draw**: Upload each batch's buffer and use glDrawElementsInstanced for
+6. **Draw**: Bind the material's extra textures, texture buffers and uniform
+   blocks (`IMaterial::setTexture` / `setBufferTexture` / `setUniformBuffer`),
+   upload each batch's buffer and use glDrawElementsInstanced for
    single-draw-call rendering, skipping shader/texture rebinds that did not change
 
 ### RenderQueue (`renderer/batching/render_queue.hpp`)

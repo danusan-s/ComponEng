@@ -16,6 +16,9 @@ namespace componeng::renderer {
  *
  * `instanceData` is `instanceCount` instances packed back to back, each
  * `material.getVertexLayout().stride` bytes, ready to upload as-is.
+ *
+ * A `procedural` batch (ProceduralInstancesComponent) has `instanceCount`
+ * instances but no `instanceData`: the shader places them from gl_InstanceID.
  */
 struct RenderBatch {
   core::HandleID meshID = 0;
@@ -26,6 +29,7 @@ struct RenderBatch {
   core::HandleID textureID = 0;
 
   uint32_t instanceCount = 0;
+  bool procedural = false;
   std::vector<float> instanceData;
 };
 
@@ -54,6 +58,7 @@ public:
     batch.shaderID = shaderID;
     batch.textureID = textureID;
     batch.instanceCount = 0;
+    batch.procedural = false;
     batch.instanceData.clear();
     return static_cast<uint32_t>(m_active++);
   }

@@ -21,6 +21,7 @@
 #include "componeng/renderer/component/light_component.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
+#include "componeng/renderer/component/procedural_instances_component.hpp"
 #include "componeng/renderer/component/skybox_component.hpp"
 #include "componeng/renderer/culling/culling_system.hpp"
 #include "componeng/renderer/lod/lod_component.hpp"
@@ -99,13 +100,13 @@ void Engine::init() {
 }
 
 void Engine::registerComponents() {
-  m_world
-      .registerComponents<core::TransformComponent, renderer::MeshComponent,
-                          renderer::MaterialComponent, renderer::ColorComponent,
-                          camera::CameraComponent, physics::RigidBodyComponent,
-                          physics::ColliderComponent, audio::AudioComponent,
-                          renderer::DirectionalLightComponent,
-                          renderer::SkyboxComponent, renderer::LodComponent>();
+  m_world.registerComponents<
+      core::TransformComponent, renderer::MeshComponent,
+      renderer::MaterialComponent, renderer::ColorComponent,
+      camera::CameraComponent, physics::RigidBodyComponent,
+      physics::ColliderComponent, audio::AudioComponent,
+      renderer::DirectionalLightComponent, renderer::SkyboxComponent,
+      renderer::LodComponent, renderer::ProceduralInstancesComponent>();
 }
 
 void Engine::registerSystems() {

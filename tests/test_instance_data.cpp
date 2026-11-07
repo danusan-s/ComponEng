@@ -98,7 +98,10 @@ TEST(TransformToMatrix, UnrotatedIsExactlyTranslationTimesScale) {
 TEST(TransformMatrixCache, ReturnsTheSameMatrixAsToMatrix) {
   TransformMatrixCache cache;
   const TransformComponent t{{1, 2, 3}, {10, 20, 30}, {1, 2, 3}};
-  EXPECT_TRUE(SameMat4(cache.get(5, t), t.toMatrix(), 0.0f));
+  // Same function, but under -ffast-math -march=native two inlined copies may
+  // fuse multiply-adds differently and differ by an ulp, so compare within the
+  // file's tolerance rather than bit for bit.
+  EXPECT_TRUE(SameMat4(cache.get(5, t), t.toMatrix()));
 }
 
 TEST(TransformMatrixCache, ReusesEntryWhileTransformIsUnchanged) {

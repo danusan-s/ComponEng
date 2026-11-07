@@ -5,7 +5,9 @@
 #include "componeng/renderer/batching/draw_key.hpp"
 
 #include <memory>
+#include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace componeng::renderer {
 
@@ -29,6 +31,11 @@ private:
   // across frames via setSubData instead of being recreated every draw call.
   std::unordered_map<DrawKey, std::unique_ptr<api::IBuffer>, DrawKeyHash>
       m_instanceBuffers;
+
+  // Problems with a material's extra bindings (no such block in the shader,
+  // out of texture units) already logged, so each is reported once rather than
+  // every frame.
+  std::unordered_set<std::string> m_reportedBindingProblems;
 };
 
 } // namespace componeng::renderer

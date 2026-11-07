@@ -158,6 +158,8 @@ set(TEST_SOURCES
     tests/test_render_pipeline.cpp
     tests/test_culling.cpp
     tests/test_lod.cpp
+    tests/test_procedural_instances.cpp
+    tests/test_material_bindings.cpp
     tests/test_utils.cpp
     tests/test_world.cpp
 )

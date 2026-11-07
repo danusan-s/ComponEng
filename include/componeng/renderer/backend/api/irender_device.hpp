@@ -39,6 +39,19 @@ struct VertexLayout {
 constexpr uint32_t kFirstInstanceAttribLocation = 3;
 
 /**
+ * @brief Texture units and uniform-buffer binding points the engine hands out.
+ *
+ * Unit 0 is the material's albedo and units 1-4 the PBR maps of a PbrMaterial;
+ * extra textures a material binds with IMaterial::setTexture start after
+ * those. Uniform-buffer binding 0 is the per-frame FrameData block; a
+ * material's own blocks start after it.
+ */
+constexpr uint32_t kFirstMaterialTextureUnit = 5;
+constexpr uint32_t kTextureUnitLimit = 16;
+constexpr uint32_t kFirstMaterialUniformBinding = 1;
+constexpr uint32_t kUniformBindingLimit = 16;
+
+/**
  * @brief Default mesh vertex layout: position (3), normal (3), uv (2).
  *        Stride = 32 bytes.
  */
@@ -52,6 +65,13 @@ inline VertexLayout defaultMeshLayout() {
   layout.stride = 32;
   return layout;
 }
+
+/**
+ * @brief How a buffer is read when bound as a texture buffer (a
+ * `samplerBuffer` in GLSL, read with texelFetch): one float, two or four per
+ * texel.
+ */
+enum class BufferTextureFormat { R32F, RG32F, RGBA32F };
 
 /**
  * @brief API-agnostic buffer interface.
@@ -148,6 +168,57 @@ enum class TextureWrap { ClampToEdge, Repeat, MirroredRepeat };
 enum class TextureFilter { Nearest, Linear };
 
 /**
+ * @brief Storage format of a texture created from memory.
+ *
+ * 8-bit formats take unsigned bytes (normalised to [0, 1] when sampled); the
+ * 16F and 32F formats take 32-bit floats on the CPU side, stored on the GPU as
+ * half or full floats and sampled unnormalised. Float textures are the way to
+ * hand a shader real data (heights, densities) rather than colour.
+ */
+enum class TextureFormat {
+  R8,
+  RG8,
+  RGB8,
+  RGBA8,
+  R16F,
+  RG16F,
+  RGBA16F,
+  R32F,
+  RG32F,
+  RGBA32F
+};
+
+constexpr uint32_t textureChannels(TextureFormat format) {
+  switch (format) {
+    case TextureFormat::R8:
+    case TextureFormat::R16F:
+    case TextureFormat::R32F:
+      return 1;
+    case TextureFormat::RG8:
+    case TextureFormat::RG16F:
+    case TextureFormat::RG32F:
+      return 2;
+    case TextureFormat::RGB8:
+      return 3;
+    case TextureFormat::RGBA8:
+    case TextureFormat::RGBA16F:
+    case TextureFormat::RGBA32F:
+      return 4;
+  }
+  return 0;
+}
+
+constexpr bool textureIsFloat(TextureFormat format) {
+  return format != TextureFormat::R8 && format != TextureFormat::RG8 &&
+         format != TextureFormat::RGB8 && format != TextureFormat::RGBA8;
+}
+
+/** Bytes per pixel of the CPU-side data a TextureFormat expects. */
+constexpr size_t textureCpuPixelBytes(TextureFormat format) {
+  return textureChannels(format) * (textureIsFloat(format) ? 4 : 1);
+}
+
+/**
  * @brief How a texture is stored and sampled.
  *
  * The defaults reproduce the engine's original fixed behaviour (clamped,
@@ -185,6 +256,21 @@ public:
   virtual void generate(uint32_t width, uint32_t height,
                         const unsigned char *data, bool alpha,
                         const TextureDesc &desc) = 0;
+
+  /**
+   * Create the GPU texture in any TextureFormat. `pixels` holds
+   * width * height * textureCpuPixelBytes(format) bytes, rows tightly packed,
+   * top row first; null allocates the storage with undefined contents.
+   * `desc.srgb` applies to RGB8 and RGBA8 only.
+   */
+  virtual void create(uint32_t width, uint32_t height, TextureFormat format,
+                      const void *pixels, const TextureDesc &desc) = 0;
+
+  /** Overwrite a width x height region at (x, y) of a texture made with
+   *  create(), with pixels in that texture's format. Mip levels are rebuilt
+   *  when the texture has them. The region must lie inside the texture. */
+  virtual void update(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+                      const void *pixels) = 0;
 
   /** Bind this texture to the active texture unit / descriptor set. */
   virtual void bind() const = 0;
@@ -310,6 +396,11 @@ public:
 
   /** Set the active texture unit for subsequent texture binds. */
   virtual void setActiveTextureUnit(uint32_t unit) = 0;
+
+  /** Bind `buffer` to texture unit `unit` as a texture buffer, so a shader's
+   *  `samplerBuffer` on that unit can texelFetch its contents. */
+  virtual void bindBufferTexture(uint32_t unit, IBuffer &buffer,
+                                 BufferTextureFormat format) = 0;
 
   /**
    * Configure instance vertex attributes on the currently bound mesh.

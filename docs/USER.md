@@ -506,6 +506,93 @@ A `mesh[k]` of 0 means "no mesh at this level", so a part can exist only up
 close. Entities that form one object switch together if they share a position
 and ranges.
 
+### Textures and buffers from memory
+
+Textures need not come from image files. `createTexture` takes pixels you
+computed, in any `api::TextureFormat`: `R8`, `RG8`, `RGB8`, `RGBA8` (bytes),
+and `R16F`, `RG16F`, `RGBA16F`, `R32F`, `RG32F`, `RGBA32F` (supplied as `float`,
+stored as half or full floats). Float textures are how a shader receives real
+data such as heights or densities rather than colour:
+
+```cpp
+std::vector<float> heights = bakeHeights();               // 512 x 512
+renderer::api::TextureDesc desc;
+desc.mipmaps = false;                                     // data, not colour
+desc.minFilter = desc.magFilter = renderer::api::TextureFilter::Linear;
+assets.createTexture("heights", 512, 512, renderer::api::TextureFormat::R32F,
+                     heights.data(), desc);
+
+// Later: overwrite a region in place (rejected if it leaves the texture).
+assets.updateTexture(assets.getTextureID("heights"), x, y, w, h, patch);
+```
+
+`pixels` may be `nullptr` to allocate now and fill later. `desc.srgb` only
+applies to `RGB8`/`RGBA8`.
+
+`createBuffer` / `updateBuffer` do the same for raw GPU buffers.
+
+### Giving a material extra textures and buffers
+
+A material can hand its shader any number of textures and buffers by name.
+The RenderSystem binds them before each of the material's draws (textures and
+texture buffers take units from 5 up; uniform blocks take binding points from 1
+up; the per-frame block stays at 0):
+
+```cpp
+auto &mat = assets.getMaterial(assets.getMaterialID("grass"));
+mat.setTexture("heightMap", assets.getTextureID("heights"));      // sampler2D
+mat.setUniformBuffer("Settings", assets.getBufferID("settings")); // std140 block
+mat.setBufferTexture("positions", assets.getBufferID("positions"),
+                     renderer::api::BufferTextureFormat::RGBA32F); // samplerBuffer
+```
+
+```glsl
+uniform sampler2D heightMap;
+layout(std140) uniform Settings { vec4 tint; };
+uniform samplerBuffer positions;                // texelFetch(positions, i)
+```
+
+Use a uniform block for a few values (blocks are limited to roughly 16 KB) and
+a buffer texture for long lists, which has no such small limit. Setting the
+same name again replaces what it points at. These work for ordinary and
+procedural draws alike.
+
+### Procedural instancing
+
+For things too numerous to be entities (grass, debris, rain), one entity can
+drive a whole instanced draw. Add a `ProceduralInstancesComponent` next to the
+usual transform, mesh and material; the engine draws the mesh `count` times and
+uploads **no** per-instance data. The vertex shader works out each copy from
+`gl_InstanceID`, the per-frame block (camera, time, light) and material
+uniforms:
+
+```cpp
+world.addComponents(field,
+    core::TransformComponent{},
+    renderer::MeshComponent{.meshName = "blade"},
+    renderer::MaterialComponent{.materialName = "grass"},
+    renderer::ProceduralInstancesComponent{.count = 200000});
+```
+
+```glsl
+// grass.vert: no per-instance attributes, so the material has none either
+float h1 = hash(float(gl_InstanceID));
+vec2 cell = vec2(gl_InstanceID % 512, gl_InstanceID / 512) * 0.3 + h1;
+vec3 root = vec3(cell.x, 0.0, cell.y);   // placed entirely in the shader
+```
+
+Things to know:
+
+- The shader must not declare per-instance attributes (`instanceModel`, ...);
+  there is no instance buffer, so they would read zero. The engine logs an
+  error if it finds some.
+- Each such entity is its own draw call, never merged with others that share a
+  mesh and material.
+- The entity's transform is used only for culling, not passed to the shader.
+- Culling is **off** by default, since shader-placed instances can land outside
+  the mesh's bounds. Set `.cull = true` for a static patch whose instances stay
+  inside the mesh bounds (plus the material's bounds padding).
+
 ---
 
 ## Emitting and Handling Events

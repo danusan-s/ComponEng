@@ -51,6 +51,35 @@ public:
   core::HandleID getTextureID(core::Name name) const;
   bool textureExists(core::Name name) const;
 
+  /** Creates a texture from pixels in memory (no file), registered under
+   *  `name`. 8-bit formats take bytes, the 16F/32F formats take floats; see
+   *  api::TextureFormat. `pixels` may be null to allocate storage and fill it
+   *  later with updateTexture. For data textures (heights, masks) set
+   *  `desc.mipmaps = false` and, if values must not be blended,
+   *  Nearest filters. */
+  void createTexture(core::Name name, uint32_t width, uint32_t height,
+                     api::TextureFormat format, const void *pixels,
+                     const api::TextureDesc &desc = {});
+
+  /** Overwrites a width x height region at (x, y) of a texture made with
+   *  createTexture, with pixels in the texture's format. Returns false (and
+   *  logs) if the region is not inside the texture. */
+  bool updateTexture(core::HandleID id, uint32_t x, uint32_t y, uint32_t width,
+                     uint32_t height, const void *pixels);
+
+  /** A GPU buffer registered under `name`, to be bound to a material as a
+   *  uniform block (IMaterial::setUniformBuffer) or a texture buffer
+   *  (IMaterial::setBufferTexture). `data` may be null to only size it. */
+  void createBuffer(core::Name name, const void *data, size_t sizeBytes,
+                    api::IBuffer::Usage usage = api::IBuffer::Usage::Dynamic);
+  /** Overwrites part of a buffer made with createBuffer; the range must lie
+   *  inside it. Returns false (and logs) otherwise. */
+  bool updateBuffer(core::HandleID id, size_t offset, const void *data,
+                    size_t sizeBytes);
+  api::IBuffer &getBuffer(core::HandleID id) const;
+  core::HandleID getBufferID(core::Name name) const;
+  bool bufferExists(core::Name name) const;
+
   template <typename T>
   void registerMaterial(const char *name, const char *shaderName,
                         const char *textureName) {
@@ -118,11 +147,13 @@ private:
   std::unordered_map<core::Name, core::HandleID> m_textures;
   std::unordered_map<core::Name, core::HandleID> m_materials;
   std::unordered_map<core::Name, core::HandleID> m_meshes;
+  std::unordered_map<core::Name, core::HandleID> m_buffers;
 
   std::vector<std::unique_ptr<Shader>> m_shaderResources;
   std::vector<std::unique_ptr<Texture2D>> m_textureResources;
   std::vector<std::unique_ptr<IMaterial>> m_materialResources;
   std::vector<std::unique_ptr<Mesh>> m_meshResources;
+  std::vector<std::unique_ptr<api::IBuffer>> m_bufferResources;
 
   std::unique_ptr<Shader> loadShaderFromFile(const char *vShaderFile,
                                              const char *fShaderFile,

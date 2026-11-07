@@ -18,6 +18,10 @@ public:
 
   void generate(uint32_t width, uint32_t height, const unsigned char *data,
                 bool alpha, const api::TextureDesc &desc) override;
+  void create(uint32_t width, uint32_t height, api::TextureFormat format,
+              const void *pixels, const api::TextureDesc &desc) override;
+  void update(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+              const void *pixels) override;
   void bind() const override;
   void release() override;
 
@@ -27,6 +31,8 @@ public:
 
 private:
   GLuint m_id = 0;
+  api::TextureFormat m_format = api::TextureFormat::RGBA8;
+  bool m_mipmaps = false;
 };
 
 } // namespace componeng::renderer::opengl
