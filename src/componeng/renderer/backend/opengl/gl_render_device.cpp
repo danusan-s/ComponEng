@@ -31,6 +31,22 @@ void GLRenderDevice::setScissor(int x, int y, int w, int h) {
   glScissor(x, y, w, h);
 }
 
+void GLRenderDevice::setActiveTextureUnit(uint32_t unit) {
+  glActiveTexture(GL_TEXTURE0 + unit);
+}
+
+void GLRenderDevice::setCullEnabled(bool enabled) {
+  if (enabled) {
+    glEnable(GL_CULL_FACE);
+  } else {
+    glDisable(GL_CULL_FACE);
+  }
+}
+
+void GLRenderDevice::setDepthFunc(api::DepthFunc func) {
+  glDepthFunc(func == api::DepthFunc::LessEqual ? GL_LEQUAL : GL_LESS);
+}
+
 void GLRenderDevice::clear(float r, float g, float b, float a) {
   glClearColor(r, g, b, a);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

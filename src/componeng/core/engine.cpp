@@ -15,13 +15,16 @@
 #include "componeng/physics/rigidbody_component.hpp"
 #include "componeng/renderer/asset/diffuse.hpp"
 #include "componeng/renderer/asset_manager.hpp"
+#include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 #include "componeng/renderer/batching/batching_system.hpp"
 #include "componeng/renderer/component/light_component.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
+#include "componeng/renderer/component/skybox_component.hpp"
 #include "componeng/renderer/culling/culling_system.hpp"
 #include "componeng/renderer/render_system.hpp"
+#include "componeng/resources/fog.hpp"
 #include "componeng/utils/logger.hpp"
 #include "componeng/utils/utils.hpp"
 
@@ -65,6 +68,19 @@ void Engine::init() {
   assetManager.registerMaterial<renderer::DiffuseMaterial>("default_diffuse",
                                                            "default", "white");
 
+  assetManager.loadShader(
+      utils::Utils::getAssetPath("assets/shaders/pbr.vert").c_str(),
+      utils::Utils::getAssetPath("assets/shaders/pbr.frag").c_str(),
+      nullptr, "pbr");
+
+  assetManager.loadShader(
+      utils::Utils::getAssetPath("assets/shaders/skybox_procedural.vert").c_str(),
+      utils::Utils::getAssetPath("assets/shaders/skybox_procedural.frag").c_str(),
+      nullptr, "skybox");
+
+  // Set up fog resource
+  m_world.setResource<resources::Fog>(resources::Fog{});
+
   assetManager.loadMesh(
       utils::Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");
   assetManager.loadMesh(
@@ -83,7 +99,8 @@ void Engine::registerComponents() {
                           renderer::MaterialComponent, renderer::ColorComponent,
                           camera::CameraComponent, physics::RigidBodyComponent,
                           physics::ColliderComponent, audio::AudioComponent,
-                          renderer::DirectionalLightComponent>();
+                          renderer::DirectionalLightComponent,
+                          renderer::SkyboxComponent>();
 }
 
 void Engine::registerSystems() {

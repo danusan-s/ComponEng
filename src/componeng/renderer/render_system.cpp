@@ -8,12 +8,15 @@
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset/material.hpp"
+#include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
 #include "componeng/renderer/component/light_component.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
+#include "componeng/resources/fog.hpp"
+#include "componeng/renderer/component/skybox_component.hpp"
 
 namespace componeng::renderer {
 
@@ -57,6 +60,9 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
       state.world->getComponent<camera::CameraComponent>(mainCameraID)
           .viewProjectionMatrix;
 
+  // Read fog resource
+  auto &fog = state.world->getResource<resources::Fog>();
+
   int drawCalls = 0;
 
   core::Vec3 lightDir = DEFAULT_LIGHT_DIR;
@@ -66,6 +72,43 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
       [&](renderer::DirectionalLightComponent &l) {
         lightDir = l.direction;
         lightColor = l.color;
+      });
+
+  // ------------------------------------------------------------------
+  // Skybox pass: procedural sky drawn first, behind everything.
+  // The cube is viewed from the inside, so culling is off, and the shader
+  // pins depth to exactly 1.0, so the depth test must accept equal depth.
+  // The horizon colour follows the fog so distant geometry blends into it.
+  // ------------------------------------------------------------------
+  state.world->query<renderer::SkyboxComponent>().each(
+      [&](renderer::SkyboxComponent &skybox) {
+        const auto &assetManager = state.world->getResource<AssetManager>();
+        const Shader &shader =
+            assetManager.getShader(assetManager.getShaderID("skybox"));
+        const Mesh &model =
+            assetManager.getMesh(assetManager.getMeshID("cube"));
+
+        auto &cam =
+            state.world->getComponent<camera::CameraComponent>(mainCameraID);
+
+        shader.use();
+        // Projection x rotation-only view: the sky follows the camera's
+        // orientation but not its position.
+        shader.setMatrix4("viewProj", cam.projectionMatrix * cam.viewMatrix);
+        shader.setVector3f("skyColor", skybox.color.x, skybox.color.y,
+                           skybox.color.z);
+        shader.setVector3f("horizonColor", fog.color.x, fog.color.y,
+                           fog.color.z);
+        shader.setVector3f("sunDir", lightDir.x, lightDir.y, lightDir.z);
+        shader.setVector3f("sunColor", lightColor.x, lightColor.y,
+                           lightColor.z);
+
+        renderDevice.setCullEnabled(false);
+        renderDevice.setDepthFunc(api::DepthFunc::LessEqual);
+        model.getImpl().bind();
+        renderDevice.drawIndexedInstanced(model.indexCount(), 1);
+        renderDevice.setDepthFunc(api::DepthFunc::Less);
+        renderDevice.setCullEnabled(true);
       });
 
   int instancesRendered = 0;
@@ -82,7 +125,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     auto &material = assetManager.getMaterial(materialID);
     const Mesh &model = assetManager.getMesh(meshID);
     const Shader &shader = assetManager.getShader(material.getShaderID());
-    const Texture2D &texture = assetManager.getTexture(material.getTextureID());
+    const Texture2D &albedoTex = assetManager.getTexture(material.getTextureID());
 
     shader.use();
     shader.setMatrix4("viewProj", viewProj);
@@ -91,9 +134,71 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     shader.setVector3f("cameraPos", cameraPos.x, cameraPos.y, cameraPos.z);
     shader.setFloat("time", state.world->time);
 
+    // Fog uniforms
+    shader.setVector4f("fogColor", fog.color.x, fog.color.y, fog.color.z,
+                       fog.color.w);
+    shader.setFloat("fogDensity", fog.density);
+    shader.setFloat("fogStart", fog.start);
+    shader.setFloat("fogEnd", fog.end);
+
+    // Ambient / environment
+    shader.setVector3f("ambientColor", 0.3f, 0.4f, 0.6f); // sky-like
+    shader.setFloat("ambientStrength", 0.4f);
+
+    // Texture toggles (PBR materials use textures; diffuse may not)
+    bool isPbr = dynamic_cast<const PbrMaterial *>(&material) != nullptr;
+    shader.setInteger("useTextures", isPbr ? 1 : 0);
+    shader.setInteger("useNormalMap", isPbr ? 1 : 0);
+
+    // Bind albedo to texture unit 0
+    renderDevice.setActiveTextureUnit(0);
+    albedoTex.bind();
+    shader.setInteger("albedoMap", 0);
+
+    // Bind PBR textures to units 1-4 if available
+    if (isPbr) {
+      const auto *pbr = dynamic_cast<const PbrMaterial *>(&material);
+
+      renderDevice.setActiveTextureUnit(1);
+      if (pbr->getNormalMapID() != 0) {
+        const Texture2D &normalTex = assetManager.getTexture(pbr->getNormalMapID());
+        normalTex.bind();
+      } else {
+        albedoTex.bind(); // fallback
+      }
+      shader.setInteger("normalMap", 1);
+
+      renderDevice.setActiveTextureUnit(2);
+      if (pbr->getMetallicMapID() != 0) {
+        const Texture2D &metallicTex = assetManager.getTexture(pbr->getMetallicMapID());
+        metallicTex.bind();
+      } else {
+        albedoTex.bind();
+      }
+      shader.setInteger("metallicMap", 2);
+
+      renderDevice.setActiveTextureUnit(3);
+      if (pbr->getRoughnessMapID() != 0) {
+        const Texture2D &roughTex = assetManager.getTexture(pbr->getRoughnessMapID());
+        roughTex.bind();
+      } else {
+        albedoTex.bind();
+      }
+      shader.setInteger("roughnessMap", 3);
+
+      renderDevice.setActiveTextureUnit(4);
+      if (pbr->getAOMapID() != 0) {
+        const Texture2D &aoTex = assetManager.getTexture(pbr->getAOMapID());
+        aoTex.bind();
+      } else {
+        albedoTex.bind();
+      }
+      shader.setInteger("aoMap", 4);
+    }
+
+    // Set material uniforms (fogColor etc. from PbrMaterial constructor)
     setShaderUniforms(shader, material);
 
-    texture.bind();
     model.getImpl().bind();
 
     std::vector<float> flatInstanceData;
@@ -127,6 +232,9 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
                                       data.instanceDatas.size());
 
     renderDevice.unbindInstanceAttributes(material.getVertexLayout());
+
+    // Reset active texture unit to 0
+    renderDevice.setActiveTextureUnit(0);
 
     ++drawCalls;
     instancesRendered += batch.instanceDatas.size();

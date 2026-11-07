@@ -1,0 +1,715 @@
+# ComponEng — Game Development Guide
+
+This is a hands-on guide to building a game with ComponEng, a C++17 ECS-based engine
+using OpenGL 3.3. It walks through the full pipeline: project setup, the game entry
+point, components, systems, queries, resources, assets, physics, audio, events, and
+a complete worked example. It ends with a section on what the engine would need to
+render a high-quality forest scene (grass, lighting, etc.).
+
+> Existing reference docs: `docs/USER.md` (API reference) and `docs/DESIGN.md`
+> (architecture). This guide is task-oriented: "how do I make a game?"
+
+---
+
+## 1. Project setup
+
+ComponEng is a CMake project. Most third-party dependencies are vendored under
+`include/third_party` and `src/third_party`. You only need GLM, GLFW, and OpenGL
+installed on your system.
+
+```bash
+git clone <repository-url>
+cd ComponEng
+make build          # builds libComponEng.a + the Demo example + tests
+./build/example/Demo
+```
+
+Controls: WASD + Space/Shift to move, mouse to look, F11 to toggle cursor lock,
+Escape to quit.
+
+To make your own game, create a new executable target (or add to the example
+folder) that links against `ComponEng` and includes the engine headers:
+
+```cmake
+add_executable(MyGame src/main.cpp src/my_systems.cpp)
+target_include_directories(MyGame PRIVATE include)
+target_link_libraries(MyGame PRIVATE ComponEng)
+```
+
+---
+
+## 2. The game entry point (`IGame`)
+
+Your game is a class inheriting from `componeng::core::IGame`. The engine calls
+`init()` once after startup (before the main loop) and `shutdown()` once before
+teardown. The `World` is passed to both — this is your handle to everything.
+
+```cpp
+#include "componeng/core/engine.hpp"
+#include "componeng/core/game.hpp"
+
+class MyGame : public componeng::core::IGame {
+public:
+    void init(componeng::ecs::World& world) override {
+        // 1. Register custom components
+        // 2. Create entities + add components
+        // 3. Load assets (shaders, textures, meshes, materials)
+        // 4. Register custom systems
+        // 5. Set resources (main camera, etc.)
+    }
+
+    void shutdown(componeng::ecs::World& world) override {
+        // Optional: save scene, write telemetry, etc.
+    }
+};
+
+int main() {
+    componeng::core::Engine::get().init();
+    MyGame game;
+    componeng::core::Engine::get().run(game);
+    componeng::core::Engine::get().shutdown();
+    return 0;
+}
+```
+
+`Engine::run(game)` does: `ensureDefaultCamera()` → `game.init(world)` →
+`world.createSystems()` → main loop (system updates, ImGui, swap buffers) →
+`game.shutdown(world)` → `world.destroySystems()`.
+
+---
+
+## 3. Creating components
+
+Components are plain data structs. Put them in a header, register them in `init()`,
+and add them to entities.
+
+### Define a component
+
+```cpp
+#pragma once
+#include "componeng/core/types.hpp"
+
+namespace mygame {
+
+struct HealthComponent {
+    float current = 100.0f;
+    float max     = 100.0f;
+    bool  invulnerable = false;
+};
+
+struct VelocityComponent {
+    componeng::core::Vec3 linear  = {0,0,0};
+    componeng::core::Vec3 angular = {0,0,0};
+};
+
+} // namespace mygame
+```
+
+### Register components
+
+Built-in components (Transform, Mesh, Material, Color, Camera, RigidBody, Collider,
+Audio, DirectionalLight, PointLight) are registered by the engine automatically.
+Register your own in `init()`:
+
+```cpp
+world.registerComponents<
+    mygame::HealthComponent,
+    mygame::VelocityComponent
+>();
+```
+
+> Limit: `MAX_COMPONENTS = 32` distinct component types, `MAX_ENTITIES = 10000`,
+> `MAX_ARCHETYPES = 64`. Keep this in mind for large worlds.
+
+### Add components to an entity
+
+```cpp
+ecs::EntityID player = world.createEntity();
+
+world.addComponents(player,
+    componeng::components::TransformComponent{
+        .position = {0.0f, 2.0f, 0.0f},
+        .rotation = {0.0f, 0.0f, 0.0f},
+        .scale    = {1.0f, 1.0f, 1.0f}
+    },
+    mygame::HealthComponent{100.0f, 100.0f},
+    mygame::VelocityComponent{{5.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}}
+);
+```
+
+Adding multiple components in one `addComponents` call is more efficient because the
+entity moves to its final archetype in a single step.
+
+### Access components
+
+```cpp
+auto& health = world.getComponent<mygame::HealthComponent>(player);
+if (world.hasComponent<mygame::VelocityComponent>(player)) {
+    auto& vel = world.getComponent<mygame::VelocityComponent>(player);
+}
+world.removeComponent<mygame::HealthComponent>(player);
+```
+
+Removing a component moves the entity to a different archetype (swap-remove, O(1)).
+
+---
+
+## 4. Creating systems
+
+Systems contain game logic and run on entities matching a query. Inherit from
+`componeng::ecs::ISystem`.
+
+```cpp
+#pragma once
+#include "componeng/ecs/system.hpp"
+
+class HealthSystem : public componeng::ecs::ISystem {
+public:
+    void onUpdate(const componeng::ecs::SystemState& state) override;
+};
+```
+
+```cpp
+#include "health_system.hpp"
+#include "my_components.hpp"
+#include "componeng/ecs/world.hpp"
+
+void HealthSystem::onUpdate(const componeng::ecs::SystemState& state) {
+    state.world->query<mygame::HealthComponent>().each(
+        [](mygame::HealthComponent& health) {
+            if (health.current <= 0.0f) health.current = 0.0f;
+        }
+    );
+}
+```
+
+### System lifecycle
+
+| Method | When |
+|--------|------|
+| `onCreate` | Once, before the first frame |
+| `onUpdate` | Every frame |
+| `onDestroy` | Once, during shutdown |
+
+### System groups & execution order
+
+Systems run in three groups, in this order:
+
+| Group | Typical systems |
+|-------|-----------------|
+| `Initialization` | Input processing |
+| `Simulation` | Physics, AI, gameplay logic |
+| `Presentation` | Culling, batching, rendering |
+
+Register with a group:
+
+```cpp
+world.registerSystem<mygame::HealthSystem>(componeng::ecs::SystemGroup::Simulation);
+```
+
+You can also declare ordering dependencies so one system runs after another:
+
+```cpp
+world.addSystemDependencies<renderer::BatchingSystem, renderer::CullingSystem>();
+world.addSystemDependencies<renderer::RenderSystem, renderer::BatchingSystem>();
+```
+
+### SystemState
+
+```cpp
+float dt = state.deltaTime;           // seconds since last frame
+ecs::World* world = state.world;      // queries, resources, events
+double time = state.world->getTime(); // total elapsed time
+```
+
+---
+
+## 5. Using queries
+
+Queries iterate entities that have a specific set of components. They're the
+primary way systems find their data.
+
+```cpp
+// All entities with a Transform
+world.query<componeng::components::TransformComponent>().each(
+    [](componeng::components::TransformComponent& t) { /* ... */ }
+);
+
+// Entities with Transform AND Mesh
+world.query<componeng::components::TransformComponent,
+             componeng::renderer::MeshComponent>()
+    .each([](auto& transform, auto& mesh) { /* ... */ });
+
+// With entity ID (needed to add/remove/destroy entities)
+world.query<componeng::components::TransformComponent>()
+    .eachWithEntity([](ecs::EntityID e, auto& transform) {
+        if (shouldDie(e)) world.destroyEntity(e);
+    });
+
+// Exclude entities with a component
+world.query<componeng::components::TransformComponent>()
+    .exclude<componeng::components::ColliderComponent>()
+    .each([](auto& transform) { /* ... */ });
+
+// Parallel over the thread pool
+world.query<mygame::HealthComponent>()
+    .eachParallel(state.world->threadPool(),
+        [](mygame::HealthComponent& h) { /* ... */ });
+```
+
+> `eachParallel` is great for large entity counts, but don't write to the same
+> component from multiple threads without synchronization.
+
+---
+
+## 6. Working with resources
+
+Resources are singletons shared across systems, stored in the World by type.
+
+### Built-in resources
+
+| Resource | Purpose |
+|----------|---------|
+| `resources::InputState` | Raw keyboard / mouse state |
+| `resources::ActionState` | Mapped actions (MoveForward, Jump, Sprint...) |
+| `resources::MainCamera` | Entity ID of the active camera |
+| `renderer::AssetManager` | Loaded shaders, textures, meshes, materials |
+| `audio::AudioManager` | Sound playback |
+| `renderer::api::IRenderDevice` | GPU backend (OpenGL) |
+
+### Accessing resources
+
+```cpp
+auto& input  = state.world->getResource<componeng::resources::InputState>();
+auto& actions= state.world->getResource<componeng::resources::ActionState>();
+auto& cam    = state.world->getResource<componeng::camera::MainCamera>();
+
+if (actions.down(componeng::resources::Action::MoveForward)) { /* ... */ }
+float mx = input.getMouseDeltaX();
+float my = input.getMouseDeltaY();
+```
+
+### Setting resources
+
+```cpp
+ecs::EntityID camera = world.createEntity();
+world.addComponents(camera,
+    componeng::components::TransformComponent{},
+    camera::CameraComponent{.fov = 45.0f, .aspectRatio = 16.0f/9.0f,
+                            .nearPlane = 0.1f, .farPlane = 10000.0f});
+world.setResource(componeng::resources::MainCamera{camera});
+```
+
+Or set a custom resource:
+
+```cpp
+struct GameSettings { float volume = 0.8f; };
+world.setResource(GameSettings{});
+auto& settings = world.getResource<GameSettings>();
+```
+
+---
+
+## 7. Working with assets
+
+`renderer::AssetManager` loads shaders, textures, meshes, and materials on first
+access and caches them by name. All access is static.
+
+Load assets early in `init()`:
+
+```cpp
+using namespace componeng::renderer;
+
+AssetManager::loadShader(
+    "assets/shaders/forest.vert",
+    "assets/shaders/forest.frag",
+    nullptr, "forest");
+AssetManager::loadTexture("assets/textures/grass.png", true, "grass");
+AssetManager::loadMesh("assets/models/tree.obj", "tree");
+
+// Register a material (shader + texture pair)
+AssetManager::registerMaterial<renderer::DiffuseMaterial>(
+    "grass_mat", "forest", "grass");
+```
+
+Access by ID:
+
+```cpp
+auto& assetManager = world.getResource<renderer::AssetManager>();
+core::HandleID meshID   = assetManager.getMeshID("tree");
+core::HandleID texID    = assetManager.getTextureID("grass");
+core::HandleID shaderID = assetManager.getShaderID("forest");
+core::HandleID matID    = assetManager.getMaterialID("grass_mat");
+```
+
+### Materials
+
+`MaterialComponent.materialName` refers to a registered material name. At render
+time the engine resolves it to a shader + texture + vertex layout.
+
+`DiffuseMaterial` (built-in) writes per-instance data: `instanceModel` (mat4) and
+`instanceColor` (vec4). The diffuse shader reads:
+
+- `uniform mat4 viewProj`
+- `layout(location = 3) in mat4 instanceModel`
+- `layout(location = 7) in vec4 instanceColor`
+- `uniform sampler2D Tex`
+- `uniform vec3 lightDir`
+- `uniform vec3 lightColor`
+
+Write a custom `IMaterial` subclass to add more per-instance attributes or uniforms
+(e.g., wind speed for grass, normal maps, PBR parameters).
+
+### Attaching assets to an entity
+
+```cpp
+ecs::EntityID tree = world.createEntity();
+world.addComponents(tree,
+    componeng::components::TransformComponent{
+        .position = {10.0f, 0.0f, -5.0f},
+        .scale    = {2.0f, 2.0f, 2.0f}
+    },
+    componeng::renderer::MeshComponent{
+        .meshName = "tree",   // resolved to meshID at runtime
+        .visible  = true
+    },
+    componeng::renderer::MaterialComponent{
+        .materialName = "grass_mat"
+    },
+    componeng::renderer::ColorComponent{
+        .color = {1.0f, 1.0f, 1.0f, 1.0f}
+    }
+);
+```
+
+Note: `MeshComponent.meshName` and `MaterialComponent.materialName` are serialized
+names; the engine resolves them to `meshID`/`materialID` handles. You can also set
+the handles directly if you load assets yourself.
+
+---
+
+## 8. Physics
+
+The `PhysicsSystem` runs in the Simulation group at a fixed 60 Hz timestep with an
+accumulator. It does gravity integration, broad-phase (currently O(n²)), narrow-phase
+(AABB/AABB, sphere/sphere, AABB/sphere), and impulse-based collision response.
+
+Make an entity physical:
+
+```cpp
+world.addComponents(entity,
+    componeng::components::TransformComponent{.position = {0, 10, 0}},
+    componeng::physics::RigidBodyComponent{
+        .type = componeng::physics::RigidBodyComponent::Dynamic,
+        .mass = 1.0f,
+        .restitution = 0.5f
+    },
+    componeng::physics::ColliderComponent{
+        .type = componeng::physics::ColliderType::Box,
+        .transform = componeng::components::TransformComponent{}
+    }
+);
+```
+
+RigidBody types: `Static`, `Dynamic`, `Kinematic`. Collider types: `Box`, `Sphere`.
+
+Collision events are emitted via the event bus (`collision_event.hpp`); systems can
+read them with `world.getEvents<CollisionEvent>()`.
+
+---
+
+## 9. Audio
+
+Audio uses miniaudio. The `AudioManager` is a resource; sounds are registered by name
+and played via `AudioComponent`.
+
+```cpp
+auto& audio = world.getResource<componeng::audio::AudioManager>();
+audio.registerSound("assets/audio/boop.wav", "boop");
+
+ecs::EntityID snd = world.createEntity();
+world.addComponents(snd,
+    componeng::components::TransformComponent{.position = {0,0,0}},
+    componeng::audio::AudioComponent{
+        .audioName = "boop",
+        .loop = true,
+        .isPlaying = false,
+        .is3D = true,
+        .minDistance = 1.0f,
+        .maxDistance = 100.0f
+    }
+);
+```
+
+---
+
+## 10. Events
+
+The double-buffered event bus decouples systems.
+
+```cpp
+struct DamageEvent {
+    ecs::EntityID target;
+    ecs::EntityID attacker;
+    float amount;
+};
+
+// Emit
+state.world->emitEvent<mygame::DamageEvent>({target, attacker, 10.0f});
+
+// Receive (next frame's read buffer)
+const auto& events = state.world->getEvents<mygame::DamageEvent>();
+for (const auto& e : events) {
+    auto& hp = state.world->getComponent<mygame::HealthComponent>(e.target);
+    hp.current -= e.amount;
+}
+```
+
+---
+
+## 11. Complete example: a small scene
+
+This puts it all together — a camera, a ground plane, some crates, and a player
+controller.
+
+```cpp
+// main.cpp
+#include "componeng/core/engine.hpp"
+#include "componeng/core/game.hpp"
+#include "componeng/components/transform_component.hpp"
+#include "componeng/renderer/component/mesh_component.hpp"
+#include "componeng/renderer/component/material_component.hpp"
+#include "componeng/renderer/component/color_component.hpp"
+#include "componeng/renderer/asset_manager.hpp"
+#include "componeng/physics/rigidbody_component.hpp"
+#include "componeng/physics/collider_component.hpp"
+#include "componeng/camera/main_camera.hpp"
+#include "player_controller.hpp"
+
+using namespace componeng;
+
+class Game : public core::IGame {
+public:
+    void init(ecs::World& world) override {
+        using namespace componeng::renderer;
+        using namespace componeng::physics;
+
+        // Load assets
+        AssetManager::loadShader("assets/shaders/diffuse.vert",
+                                 "assets/shaders/diffuse.frag",
+                                 nullptr, "default");
+        AssetManager::loadTexture("assets/textures/white.png", false, "white");
+        AssetManager::registerMaterial<DiffuseMaterial>("default_diffuse", "default", "white");
+        AssetManager::loadMesh("assets/models/cube.obj", "cube");
+
+        // Main camera
+        ecs::EntityID cam = world.createEntity();
+        world.addComponents(cam,
+            core::TransformComponent{.position = {0, 5, 10}, .rotation = {0,0,0}},
+            camera::CameraComponent{.fov = 45.0f, .aspectRatio = 16.0f/9.0f,
+                                    .nearPlane = 0.1f, .farPlane = 10000.0f});
+        world.setResource(camera::MainCamera{cam});
+
+        // Ground
+        ecs::EntityID ground = world.createEntity();
+        world.addComponents(ground,
+            core::TransformComponent{.position = {0,-1,0}, .scale = {20,1,20}},
+            MeshComponent{.meshName = "cube", .visible = true},
+            MaterialComponent{.materialName = "default_diffuse"},
+            ColorComponent{.color = {0.4f, 0.6f, 0.4f, 1.0f}},
+            RigidBodyComponent{.type = RigidBodyComponent::Static},
+            ColliderComponent{.type = ColliderType::Box});
+
+        // 50 crates
+        for (int i = 0; i < 50; ++i) {
+            ecs::EntityID crate = world.createEntity();
+            float x = (i % 10) * 2.5f - 12.5f;
+            float z = (i / 10) * 2.5f - 12.5f;
+            world.addComponents(crate,
+                core::TransformComponent{.position = {x, 2, z}, .scale = {1,1,1}},
+                MeshComponent{.meshName = "cube", .visible = true},
+                MaterialComponent{.materialName = "default_diffuse"},
+                ColorComponent{.color = {0.8f, 0.5f, 0.3f, 1.0f}},
+                RigidBodyComponent{.type = RigidBodyComponent::Dynamic,
+                                   .mass = 1.0f, .restitution = 0.4f},
+                ColliderComponent{.type = ColliderType::Box});
+        }
+
+        world.registerSystem<PlayerController>(ecs::SystemGroup::Simulation);
+    }
+
+    void shutdown(ecs::World& world) override {}
+};
+
+int main() {
+    componeng::core::Engine::get().init();
+    Game game;
+    componeng::core::Engine::get().run(game);
+    componeng::core::Engine::get().shutdown();
+    return 0;
+}
+```
+
+The `PlayerController` system (from the example) reads `InputState`/`ActionState`
+and `MainCamera`, then moves the camera transform with WASD + mouse.
+
+---
+
+## 12. Scene serialization
+
+Scenes can be saved to / loaded from JSON:
+
+```cpp
+#include "componeng/ecs/scene_serializer.hpp"
+
+SceneSerializer::save(world, "assets/scenes/my_scene.json");
+SceneSerializer::load(world, "assets/scenes/my_scene.json");
+```
+
+Components are serialized via the `SERIALIZABLE_COMPONENT` macro and a field list
+(see `transform_component.hpp` for the pattern). Runtime-only handles
+(`meshID`, `materialID`, etc.) are not serialized — only the name fields are.
+
+---
+
+## 13. High-quality forest scene: what's needed
+
+The engine is a solid foundation, but a "super high quality forest" (dense grass,
+good lighting, shadows, large view distance) exceeds what it currently renders.
+Below is a breakdown of what a forest scene needs and where ComponEng stands today.
+
+### A. Geometry & instancing (what the engine already supports well)
+
+A forest is fundamentally an instancing problem: thousands of trees + millions of
+grass blades, mostly identical meshes at different positions/scales.
+
+| Feature | Engine status | Notes |
+|---------|---------------|-------|
+| GPU instancing (`glDrawElementsInstanced`) | ✅ Supported | `RenderSystem` batches by (mesh, texture, shader) and draws instanced |
+| Dynamic batching | ✅ Supported | `BatchingSystem` groups visible entities per draw key |
+| Frustum culling | ✅ Supported | `CullingSystem` rejects entities outside the view frustum |
+| Per-instance model + color | ✅ Supported | `DiffuseMaterial` writes `instanceModel` + `instanceColor` |
+| LOD (levels of detail) | ❌ Not present | Need multiple meshes per tree and a system that picks by distance |
+| Billboard / impostor grass | ❌ Not present | Grass should fade to camera-facing quads at distance |
+
+**What to add for a forest:**
+- A `GrassComponent` / `LODComponent` storing LOD levels, billboard flag, wind parameters.
+- A system that, per frame, chooses mesh/LOD based on camera distance and populates
+  separate instance buffers per LOD level.
+- Grass: thousands of quads, camera-facing (billboarded) in the vertex shader, with
+  a wind uniform bending them. Use instancing + per-instance position/scale/color.
+- Trees: use real meshes up close, switch to impostors/billboards beyond ~100 m.
+
+### B. Lighting (needs the most work)
+
+Current lighting: the diffuse shader has one directional light (`lightDir`, `lightColor`)
+plus a hardcoded 0.1 ambient term. That's "flat daytime" lighting — fine for a demo,
+not for a forest.
+
+| Feature | Engine status | What's needed |
+|---------|---------------|---------------|
+| Directional light (sun/moon) | ⚠️ Partial | `DirectionalLightComponent` exists but the shader only takes one hardcoded lightDir/color |
+| Point lights | ❌ Not used by renderer | `PointLightComponent` exists but nothing consumes it |
+| Shadows (shadow maps) | ❌ Not present | Need depth-pass rendering + shadow-map samplers in shaders |
+| Ambient light / environment | ❌ Not present | Add `ambientColor` uniform, or a skybox + IBL |
+| Fog | ❌ Not present | Add fog uniform + distance-based fade in fragment shader |
+| Normal maps / PBR | ❌ Not present | `DiffuseMaterial` is Lambert-only |
+
+**Recommended lighting upgrade for a forest:**
+1. Extend `DiffuseMaterial` (or add a `PbrMaterial`) to accept uniforms:
+   - `lightDir`, `lightColor` (directional sun)
+   - `ambientColor` (sky light)
+   - `fogColor`, `fogDensity` / `fogStart`, `fogEnd`
+   - optional `lightViewProj` + shadow sampler
+2. Add a `LightSystem` that aggregates `DirectionalLightComponent` / `PointLightComponent`
+   into a `Lighting` resource consumed by the shader.
+3. Render a shadow-map pass: render the scene from the light's perspective into a depth
+   texture, then sample it in the diffuse shader for PCF-filtered shadows.
+4. Add a skybox (skybox shaders already exist in `assets/shaders/skybox.*`) as the
+   background and ambient source.
+5. Add fog so distant trees fade into the skybox (critical for large forests and
+   performance via early culling).
+
+### C. Materials & texturing
+
+- `MaterialComponent` supports one texture + one shader per material. A forest needs:
+  - Albedo (tree bark, grass, ground)
+  - Normal maps (bark detail, grass clumps)
+  - Possibly roughness/metallic if you go PBR
+- Texture arrays or atlases would let you batch many different tree/grass types in
+  one draw call instead of switching textures.
+
+### D. Terrain
+
+The engine has no terrain system. For a forest you need:
+- A heightmap-based terrain mesh (or imported `.obj` terrain)
+- A `TerrainComponent` with height lookup (for placing trees/grass on the surface
+  and for player collision)
+- Ground texture splatting (grass/dirt/rock layers)
+
+### E. Animation (wind)
+
+- Grass and leaves should sway. Add a `time` uniform to a custom material/vertex
+  shader and offset vertices by `sin(time + position)`. The water shader already
+  shows this pattern (`uniform float time`, wave math).
+
+### F. Performance considerations for a forest
+
+| Technique | Why it matters |
+|-----------|----------------|
+| Frustum culling (already present) | Don't render trees behind the camera |
+| LOD + impostors | Far trees = cheap billboards |
+| Occlusion culling | Trees behind other trees/terrain |
+| Instancing per (mesh, material) | Minimize draw calls |
+| Thread pool for instance-data builds | `eachParallel` exists; use it for grass |
+| Far-plane / fog | Limits visible geometry |
+
+---
+
+## 14. Quick reference: built-in types
+
+```cpp
+// Math
+componeng::core::Vec3, Vec4, Mat4, Vec2
+componeng::core::radians(deg), normalize(), cross(), dot(), lookAt(), perspective()
+
+// Components
+componeng::components::TransformComponent
+componeng::renderer::MeshComponent, MaterialComponent, ColorComponent
+componeng::renderer::DirectionalLightComponent, PointLightComponent
+componeng::camera::CameraComponent
+componeng::physics::RigidBodyComponent, ColliderComponent
+componeng::audio::AudioComponent
+
+// Resources
+componeng::resources::InputState, ActionState, MainCamera
+componeng::renderer::AssetManager (static)
+componeng::audio::AudioManager
+
+// Systems
+componeng::ecs::ISystem, SystemState, SystemGroup::{Initialization,Simulation,Presentation}
+```
+
+### Where to find things
+
+```
+include/componeng/
+├── core/              engine.hpp, game.hpp, transform_component.hpp, types.hpp, window.hpp
+├── ecs/               world.hpp, system.hpp, query.hpp, scene_serializer.hpp
+├── components/        (builtin components)
+├── renderer/          asset_manager.hpp, render_system.hpp,
+│   ├── component/     material_component.hpp, mesh_component.hpp, light_component.hpp
+│   ├── asset/         diffuse.hpp, shader.hpp, mesh.hpp, texture.hpp, material.hpp
+│   ├── batching/      batching_system.hpp, batch_map.hpp
+│   ├── culling/       culling_system.hpp, frustum.hpp
+│   └── backend/       opengl (gl_shader, gl_texture, gl_mesh, gl_render_device)
+├── physics/           physics_system.hpp, collision_detection.hpp
+├── audio/             audio_system.hpp, audio_manager.hpp
+├── camera/            camera_system.hpp, main_camera.hpp, camera_component.hpp
+└── resources/         input_state.hpp, action_state.hpp, main_camera.hpp
+```
+
+Happy building! If you're planning the forest scene specifically, start by adding
+fog + a second directional-light uniform to the diffuse shader, then build an
+instanced grass system with billboard falloff — those two changes give 80% of the
+"forest feel" with the least engine work.

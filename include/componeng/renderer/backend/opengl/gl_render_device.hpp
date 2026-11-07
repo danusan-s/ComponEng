@@ -28,6 +28,9 @@ public:
   void init(void *windowHandle) override;
   void setViewport(int x, int y, int w, int h) override;
   void setScissor(int x, int y, int w, int h) override;
+  void setActiveTextureUnit(uint32_t unit) override;
+  void setCullEnabled(bool enabled) override;
+  void setDepthFunc(api::DepthFunc func) override;
   void clear(float r, float g, float b, float a) override;
   void present(void *windowHandle) override;
   int checkErrors() const override;

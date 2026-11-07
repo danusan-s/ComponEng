@@ -183,6 +183,9 @@ public:
   virtual size_t indexCount() const = 0;
 };
 
+/** Depth comparison used by the depth test. */
+enum class DepthFunc { Less, LessEqual };
+
 /**
  * @brief API-agnostic render device interface.
  *
@@ -216,6 +219,15 @@ public:
   virtual std::unique_ptr<ITexture> createTexture() = 0;
   virtual std::unique_ptr<IMesh> createMesh() = 0;
   virtual std::unique_ptr<IBuffer> createBuffer() = 0;
+
+  /** Enable or disable back-face culling. */
+  virtual void setCullEnabled(bool enabled) = 0;
+
+  /** Set the depth comparison function. */
+  virtual void setDepthFunc(DepthFunc func) = 0;
+
+  /** Set the active texture unit for subsequent texture binds. */
+  virtual void setActiveTextureUnit(uint32_t unit) = 0;
 
   /**
    * Configure instance vertex attributes on the currently bound mesh.

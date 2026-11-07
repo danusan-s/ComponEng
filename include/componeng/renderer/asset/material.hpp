@@ -27,6 +27,12 @@ public:
     return m_textureID;
   }
 
+  // PBR texture IDs (default 0 = not used). Overridden by PbrMaterial.
+  virtual core::HandleID getNormalMapID() const { return 0; }
+  virtual core::HandleID getMetallicMapID() const { return 0; }
+  virtual core::HandleID getRoughnessMapID() const { return 0; }
+  virtual core::HandleID getAOMapID() const { return 0; }
+
   void setUniform(const char *name, core::UniformMap::mapped_type value) {
     if (!m_knownUniforms.empty() &&
         m_knownUniforms.find(core::Name(name)) == m_knownUniforms.end()) {

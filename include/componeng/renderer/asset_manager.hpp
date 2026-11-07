@@ -3,6 +3,7 @@
 #include "componeng/core/types.hpp"
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset/mesh.hpp"
+#include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/asset/shader.hpp"
 #include "componeng/renderer/asset/texture.hpp"
 
@@ -51,6 +52,36 @@ public:
     const Shader &shader = getShader(shaderID);
     material->setVertexLayout(shader.reflectInstanceLayout());
     material->setKnownUniforms(shader.reflectActiveUniformNames());
+
+    m_materialResources.push_back(std::move(material));
+    core::HandleID id = m_materialResources.size();
+    m_materials[name] = id;
+  }
+
+  /** Register a PBR material with albedo + optional normal/metallic/roughness/AO maps. */
+  template <typename T>
+  void registerPbrMaterial(const char *name, const char *shaderName,
+                           const char *albedoName,
+                           const char *normalName = nullptr,
+                           const char *metallicName = nullptr,
+                           const char *roughnessName = nullptr,
+                           const char *aoName = nullptr) {
+    core::HandleID shaderID = getShaderID(shaderName);
+    core::HandleID albedoID = getTextureID(albedoName);
+    auto material = std::make_unique<T>(shaderID, albedoID);
+
+    const Shader &shader = getShader(shaderID);
+    material->setVertexLayout(shader.reflectInstanceLayout());
+    material->setKnownUniforms(shader.reflectActiveUniformNames());
+
+    if (normalName && textureExists(normalName))
+      static_cast<T *>(material.get())->setNormalMapID(getTextureID(normalName));
+    if (metallicName && textureExists(metallicName))
+      static_cast<T *>(material.get())->setMetallicMapID(getTextureID(metallicName));
+    if (roughnessName && textureExists(roughnessName))
+      static_cast<T *>(material.get())->setRoughnessMapID(getTextureID(roughnessName));
+    if (aoName && textureExists(aoName))
+      static_cast<T *>(material.get())->setAOMapID(getTextureID(aoName));
 
     m_materialResources.push_back(std::move(material));
     core::HandleID id = m_materialResources.size();
