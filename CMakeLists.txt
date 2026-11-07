@@ -61,13 +61,11 @@ target_compile_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-g>
     $<$<CONFIG:Debug>:-fsanitize=address>
     $<$<CONFIG:Release>:-ffast-math>
-    $<$<CONFIG:Release>:-flto>
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Release>:-march=native>
 )
 target_link_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-fsanitize=address>
-    $<$<CONFIG:Release>:-flto>
 )
 
 # PRIVATE: don't force these diagnostics onto example/ and tests
