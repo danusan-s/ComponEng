@@ -10,9 +10,9 @@ An ECS-based game engine built in C++ with OpenGL. A simple extensible engine pr
 
 https://github.com/user-attachments/assets/2e074537-c737-4367-95d1-6cd4d009cc22
 
-Other examples are featured in [ComponEx](https://www.github.com/danusan-s/ComponEx).
+Other examples are featured in [ComponEx](https://www.github.com/danusan-s/ComponEx). Click the thumbnail below to view the showcase.
 
-https://github.com/user-attachments/assets/0fe70ef7-1afc-413b-b596-6269bc489d8b
+[![Forest Showcase](https://img.youtube.com/vi/Ovrz6mkdAUg/maxresdefault.jpg)](https://youtu.be/Ovrz6mkdAUg)
 
 ## Overview
 
