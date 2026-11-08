@@ -160,6 +160,7 @@ set(TEST_SOURCES
     tests/test_material_bindings.cpp
     tests/test_utils.cpp
     tests/test_world.cpp
+    tests/test_audio.cpp
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})

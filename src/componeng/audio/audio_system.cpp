@@ -13,6 +13,9 @@ namespace componeng::audio {
 
 void AudioSystem::onUpdate(const ecs::SystemState &state) {
   auto &audioManager = state.world->getResource<AudioManager>();
+  if (!audioManager.isInitialized()) {
+    return;
+  }
 
   auto &mainCamera = state.world->getResource<camera::MainCamera>();
   if (state.world->hasComponent<componeng::core::TransformComponent>(
@@ -42,16 +45,27 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
   state.world->query<AudioComponent, core::TransformComponent>().each(
       [&](AudioComponent &audio, core::TransformComponent &transform) {
         if (audio.audioID == core::INVALID_HANDLE) {
-          audio.audioID = audioManager.createSound(audio.audioName);
+          // Not registered yet: wait quietly, it may be registered later.
+          if (!audioManager.hasSound(audio.audioName)) {
+            return;
+          }
+          audio.audioID =
+              audioManager.createSound(audio.audioName, audio.is3D, false);
+          if (audio.audioID == core::INVALID_HANDLE) {
+            return;
+          }
+          if (audio.playOnAwake) {
+            audio.play = true;
+          }
+        }
+        if (!audioManager.isValid(audio.audioID)) {
+          return;
         }
         auto &sound = audioManager.getSound(audio.audioID);
 
-        if (sound.isPlaying() && audio.is3D) {
-          sound.setPosition(transform.position.x, transform.position.y,
-                            transform.position.z);
-          return;
-        }
-
+        sound.setVolume(audio.volume)
+            .setPitch(audio.pitch)
+            .setLooping(audio.loop);
         if (audio.is3D) {
           sound
               .setPosition(transform.position.x, transform.position.y,
@@ -59,13 +73,19 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
               .set3D(audio.minDistance, audio.maxDistance);
         }
 
-        sound.setVolume(audio.volume)
-            .setPitch(audio.pitch)
-            .setLooping(audio.loop ? MA_TRUE : MA_FALSE);
-
-        if (audioManager.playSound(audio.audioID)) {
-          audio.isPlaying = true;
+        // Follow the requested state. A sound that was playing last frame and
+        // is silent now without being asked to stop has reached its end.
+        bool playing = sound.isPlaying();
+        if (audio.play && !playing) {
+          if (audio.isPlaying && !audio.loop) {
+            audio.play = false;
+          } else {
+            audioManager.playSound(audio.audioID);
+          }
+        } else if (!audio.play && playing) {
+          audioManager.stopSound(audio.audioID);
         }
+        audio.isPlaying = sound.isPlaying();
       });
 
   audioManager.cleanupFinishedSounds();

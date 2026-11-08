@@ -577,12 +577,14 @@ read them with `world.getEvents<CollisionEvent>()`.
 
 ## 9. Audio
 
-Audio uses miniaudio. The `AudioManager` is a resource; sounds are registered by name
-and played via `AudioComponent`.
+Audio uses miniaudio. The `AudioManager` is a resource: register a sound file once
+under a name, then play it through an `AudioComponent` or directly.
 
 ```cpp
 auto& audio = world.getResource<componeng::audio::AudioManager>();
 audio.registerSound("assets/audio/boop.wav", "boop");
+// Long files (music, ambience) can stream from disk instead of living in memory:
+audio.registerSound("assets/audio/wind.mp3", "wind", /*stream=*/true);
 
 ecs::EntityID snd = world.createEntity();
 world.addComponents(snd,
@@ -590,13 +592,31 @@ world.addComponents(snd,
     componeng::audio::AudioComponent{
         .audioName = "boop",
         .loop = true,
-        .isPlaying = false,
         .is3D = true,
         .minDistance = 1.0f,
         .maxDistance = 100.0f
     }
 );
 ```
+
+`AudioComponent` is driven by its `play` flag. `playOnAwake` (default true) sets it when
+the sound is created; after that, set `play = true` to start or resume and `false` to
+pause. `isPlaying` reports what is audible. A sound that is not looping clears `play`
+when it ends. Volume, pitch and loop are re-read every frame, so they can be changed
+live. With `is3D = false` the sound ignores the listener (music, ambience); with
+`is3D = true` it is positioned from the entity's transform.
+
+For one-shots, skip the component:
+
+```cpp
+audio.playOneShot("boop", /*volume=*/0.8f);                   // not positioned
+audio.playOneShotAt("boop", x, y, z, 0.8f, 1.0f, 1.0f, 50.0f); // at a point
+```
+
+Lower level: `createSound(name, spatialized, autoRelease)` returns a handle and
+`getSound(id)` the `Sound` to configure; instances made with `autoRelease` (the default)
+are reclaimed once they have played to the end, others live until `releaseSound(id)`.
+`setMasterVolume()` scales everything.
 
 ---
 
