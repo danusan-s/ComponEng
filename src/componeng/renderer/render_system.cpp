@@ -145,8 +145,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   ecs::EntityID mainCameraID =
       state.world->getResource<camera::MainCamera>().entity;
 
-  core::Vec3 &cameraPos =
-      state.world->getComponent<core::TransformComponent>(mainCameraID)
+  const core::Vec3 &cameraPos =
+      state.world->readComponent<core::TransformComponent>(mainCameraID)
           .position;
   core::Mat4 &viewProj =
       state.world->getComponent<camera::CameraComponent>(mainCameraID)
@@ -160,8 +160,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   core::Vec3 lightDir = DEFAULT_LIGHT_DIR;
   core::Vec3 lightColor = DEFAULT_LIGHT_COLOR;
 
-  state.world->query<renderer::DirectionalLightComponent>().each(
-      [&](renderer::DirectionalLightComponent &l) {
+  state.world->query().read<renderer::DirectionalLightComponent>().each(
+      [&](const renderer::DirectionalLightComponent &l) {
         lightDir = l.direction;
         lightColor = l.color;
       });
@@ -198,8 +198,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   // depth. Only the first SkyboxComponent is drawn.
   // ------------------------------------------------------------------
   bool skyDrawn = false;
-  state.world->query<renderer::SkyboxComponent>().each(
-      [&](renderer::SkyboxComponent &sky) {
+  state.world->query().read<renderer::SkyboxComponent>().each(
+      [&](const renderer::SkyboxComponent &sky) {
         if (skyDrawn) {
           return;
         }

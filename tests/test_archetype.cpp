@@ -40,7 +40,7 @@ TEST(ArchetypeTest, AddEntityIncreasesCount) {
   EXPECT_EQ(arch.getEntityCount(), 2u);
 }
 
-TEST(ArchetypeTest, GetColumnReturnsValidColumn) {
+TEST(ArchetypeTest, ReadColumnReturnsValidColumn) {
   componeng::ecs::ComponentRegistry reg = makeRegistry();
   componeng::ecs::Signature sig;
   sig.set(reg.getComponentID<Pos>());
@@ -49,7 +49,7 @@ TEST(ArchetypeTest, GetColumnReturnsValidColumn) {
   arch.init(sig, reg);
   arch.addEntity(0);
 
-  auto &col = arch.getColumn(reg.getComponentID<Pos>());
+  auto &col = arch.readColumn(reg.getComponentID<Pos>());
   EXPECT_EQ(col.m_count, 1u);
   EXPECT_EQ(col.m_stride, sizeof(Pos));
 }
@@ -63,12 +63,12 @@ TEST(ArchetypeTest, GetReturnsCorrectComponent) {
   arch.init(sig, reg);
   arch.addEntity(0);
 
-  Pos &p = arch.get<Pos>(reg.getComponentID<Pos>(), 0);
+  Pos &p = arch.write<Pos>(reg.getComponentID<Pos>(), 0);
   p.x = 1.0f;
   p.y = 2.0f;
   p.z = 3.0f;
 
-  Pos &p2 = arch.get<Pos>(reg.getComponentID<Pos>(), 0);
+  Pos &p2 = arch.write<Pos>(reg.getComponentID<Pos>(), 0);
   EXPECT_FLOAT_EQ(p2.x, 1.0f);
   EXPECT_FLOAT_EQ(p2.y, 2.0f);
   EXPECT_FLOAT_EQ(p2.z, 3.0f);
@@ -128,7 +128,7 @@ TEST(ArchetypeTest, ThrowsOnInvalidColumn) {
   arch.init(sig, reg);
   arch.addEntity(0);
 
-  EXPECT_THROW(arch.getColumn(reg.getComponentID<Vel>()), std::runtime_error);
+  EXPECT_THROW(arch.readColumn(reg.getComponentID<Vel>()), std::runtime_error);
 }
 
 TEST(ArchetypeTest, MultiComponentArchetype) {
@@ -141,12 +141,73 @@ TEST(ArchetypeTest, MultiComponentArchetype) {
   arch.init(sig, reg);
   arch.addEntity(0);
 
-  Pos &p = arch.get<Pos>(reg.getComponentID<Pos>(), 0);
+  Pos &p = arch.write<Pos>(reg.getComponentID<Pos>(), 0);
   p.x = 5.0f;
 
-  Vel &v = arch.get<Vel>(reg.getComponentID<Vel>(), 0);
+  Vel &v = arch.write<Vel>(reg.getComponentID<Vel>(), 0);
   v.vx = 1.0f;
 
-  EXPECT_FLOAT_EQ(arch.get<Pos>(reg.getComponentID<Pos>(), 0).x, 5.0f);
-  EXPECT_FLOAT_EQ(arch.get<Vel>(reg.getComponentID<Vel>(), 0).vx, 1.0f);
+  EXPECT_FLOAT_EQ(arch.write<Pos>(reg.getComponentID<Pos>(), 0).x, 5.0f);
+  EXPECT_FLOAT_EQ(arch.write<Vel>(reg.getComponentID<Vel>(), 0).vx, 1.0f);
+}
+
+TEST(ArchetypeTest, ColumnVersionTracksWrites) {
+  componeng::ecs::ComponentRegistry reg = makeRegistry();
+  componeng::ecs::Signature sig;
+  sig.set(reg.getComponentID<Pos>());
+  const auto pos = reg.getComponentID<Pos>();
+
+  componeng::ecs::Archetype arch;
+  arch.init(sig, reg);
+  EXPECT_EQ(arch.columnVersion(pos), 0u);
+
+  // Adding a row changes the column.
+  arch.addEntity(0);
+  const auto afterAdd = arch.columnVersion(pos);
+  EXPECT_GT(afterAdd, 0u);
+
+  // Reading does not.
+  (void)arch.readColumn(pos);
+  (void)arch.read<Pos>(pos, 0);
+  EXPECT_EQ(arch.columnVersion(pos), afterAdd);
+
+  // Taking a writer does.
+  arch.write<Pos>(pos, 0).x = 1.0f;
+  const auto afterWrite = arch.columnVersion(pos);
+  EXPECT_GT(afterWrite, afterAdd);
+  arch.writeColumn(pos);
+  EXPECT_GT(arch.columnVersion(pos), afterWrite);
+
+  // Removing a row changes it too.
+  const auto beforeRemove = arch.columnVersion(pos);
+  arch.removeEntityAtRow(0);
+  EXPECT_GT(arch.columnVersion(pos), beforeRemove);
+}
+
+TEST(ArchetypeTest, ColumnVersionsAreIndependentPerComponent) {
+  componeng::ecs::ComponentRegistry reg = makeRegistry();
+  componeng::ecs::Signature sig;
+  sig.set(reg.getComponentID<Pos>());
+  sig.set(reg.getComponentID<Vel>());
+  const auto pos = reg.getComponentID<Pos>();
+  const auto vel = reg.getComponentID<Vel>();
+
+  componeng::ecs::Archetype arch;
+  arch.init(sig, reg);
+  arch.addEntity(0);
+
+  const auto velBefore = arch.columnVersion(vel);
+  arch.writeColumn(pos);
+  EXPECT_EQ(arch.columnVersion(vel), velBefore);
+}
+
+TEST(ArchetypeTest, ReadColumnThrowsOnMissingComponent) {
+  componeng::ecs::ComponentRegistry reg = makeRegistry();
+  componeng::ecs::Signature sig;
+  sig.set(reg.getComponentID<Pos>());
+  componeng::ecs::Archetype arch;
+  arch.init(sig, reg);
+  EXPECT_THROW(arch.writeColumn(reg.getComponentID<Vel>()), std::runtime_error);
+  EXPECT_THROW(arch.columnVersion(reg.getComponentID<Vel>()),
+               std::runtime_error);
 }

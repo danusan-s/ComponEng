@@ -67,8 +67,8 @@ private:
     for (ComponentID c = 0; c < MAX_COMPONENTS; ++c) {
       if (!carried.test(c))
         continue;
-      auto &src = oldArchetype->getColumn(c);
-      auto &dst = newArchetype.getColumn(c);
+      const auto &src = oldArchetype->readColumn(c);
+      auto &dst = newArchetype.writeColumn(c);
       std::memcpy(dst.at(newRow), src.at(oldRow), src.m_stride);
     }
 
@@ -116,6 +116,11 @@ public:
     (this->registerComponent<Components>(), ...);
   }
 
+  /**
+   * Mutable access to an entity's component. Counts as a write: it bumps the
+   * version of that component's column in the entity's archetype. Use
+   * readComponent when the data is only inspected.
+   */
   template <typename T> T &getComponent(EntityID entity) {
     EntityRecord record = m_entityManager.getRecord(entity);
     ComponentID componentID = m_componentRegistry.getComponentID<T>();
@@ -125,11 +130,25 @@ public:
       throw std::runtime_error("Entity does not have component");
     }
 
-    return archetype->get<T>(componentID, record.row);
+    return archetype->write<T>(componentID, record.row);
+  }
+
+  /** Read-only counterpart of getComponent; leaves column versions alone. */
+  template <typename T> const T &readComponent(EntityID entity) {
+    EntityRecord record = m_entityManager.getRecord(entity);
+    ComponentID componentID = m_componentRegistry.getComponentID<T>();
+
+    Archetype *archetype = archetypeOf(record);
+    if (!archetype || !archetype->m_signature.test(componentID)) {
+      throw std::runtime_error("Entity does not have component");
+    }
+
+    return archetype->read<T>(componentID, record.row);
   }
 
   /** Like getComponent, but returns nullptr instead of throwing when the
-   *  entity lacks T. One lookup, where hasComponent + getComponent is two. */
+   *  entity lacks T. One lookup, where hasComponent + getComponent is two.
+   *  Counts as a write, like getComponent. */
   template <typename T> T *tryGetComponent(EntityID entity) {
     EntityRecord record = m_entityManager.getRecord(entity);
     ComponentID componentID = m_componentRegistry.getComponentID<T>();
@@ -139,7 +158,20 @@ public:
       return nullptr;
     }
 
-    return &archetype->get<T>(componentID, record.row);
+    return &archetype->write<T>(componentID, record.row);
+  }
+
+  /** Read-only counterpart of tryGetComponent. */
+  template <typename T> const T *tryReadComponent(EntityID entity) {
+    EntityRecord record = m_entityManager.getRecord(entity);
+    ComponentID componentID = m_componentRegistry.getComponentID<T>();
+
+    Archetype *archetype = archetypeOf(record);
+    if (!archetype || !archetype->m_signature.test(componentID)) {
+      return nullptr;
+    }
+
+    return &archetype->read<T>(componentID, record.row);
   }
 
   template <typename T> void addComponent(EntityID entity, T component) {
@@ -176,7 +208,7 @@ public:
     migrateEntityToArchetype(record.row, oldSig, newSig, oldArchetype,
                              newArchetype, newRow);
 
-    (new (newArchetype.getColumn(m_componentRegistry.getComponentID<Ts>())
+    (new (newArchetype.writeColumn(m_componentRegistry.getComponentID<Ts>())
               .at(newRow)) Ts(std::forward<Ts>(components)),
      ...);
 
@@ -210,7 +242,7 @@ public:
     migrateEntityToArchetype(record.row, oldSig, newSig, oldArchetype,
                              newArchetype, newRow);
 
-    std::memcpy(newArchetype.getColumn(componentID).at(newRow), componentData,
+    std::memcpy(newArchetype.writeColumn(componentID).at(newRow), componentData,
                 info.size);
 
     record.archetypeId = newArchetypeId;
@@ -287,11 +319,21 @@ public:
     return m_eventBus.getEvents<T>();
   }
 
-  template <typename... Ts> Query<Ts...> query() {
+  /**
+   * Starts a query. Declare the components it touches, then iterate:
+   *
+   *   world.query().read<Mesh>().write<Transform>().each(
+   *       [](const Mesh &m, Transform &t) { ... });
+   *
+   * read<> components reach the callback as const references and leave column
+   * versions alone; write<> components arrive as mutable references and bump
+   * the version of every column the query touches. Callback arguments follow
+   * declaration order.
+   */
+  Query<> query() {
     std::array<Archetype, MAX_ARCHETYPES> &archetypes =
         m_archetypeManager.getArchetypes();
-    return Query<Ts...>(archetypes, m_archetypeManager.count(),
-                        m_componentRegistry);
+    return Query<>(archetypes, m_archetypeManager.count(), m_componentRegistry);
   }
 
   template <typename T>

@@ -71,8 +71,8 @@ TEST(WorldTest, DestroyEveryEntityLeavesArchetypeEmpty) {
   }
 
   int visited = 0;
-  world->query<TransformComponent>().each(
-      [&](TransformComponent &) { ++visited; });
+  world->query().read<TransformComponent>().each(
+      [&](const TransformComponent &) { ++visited; });
   EXPECT_EQ(visited, 0);
 }
 

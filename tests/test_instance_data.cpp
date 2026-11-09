@@ -93,49 +93,6 @@ TEST(TransformToMatrix, UnrotatedIsExactlyTranslationTimesScale) {
   EXPECT_EQ(m[1][0], 0.0f);
 }
 
-// --- TransformMatrixCache ---------------------------------------------------
-
-TEST(TransformMatrixCache, ReturnsTheSameMatrixAsToMatrix) {
-  TransformMatrixCache cache;
-  const TransformComponent t{{1, 2, 3}, {10, 20, 30}, {1, 2, 3}};
-  // Same function, but under -ffast-math -march=native two inlined copies may
-  // fuse multiply-adds differently and differ by an ulp, so compare within the
-  // file's tolerance rather than bit for bit.
-  EXPECT_TRUE(SameMat4(cache.get(5, t), t.toMatrix()));
-}
-
-TEST(TransformMatrixCache, ReusesEntryWhileTransformIsUnchanged) {
-  TransformMatrixCache cache;
-  const TransformComponent t{{1, 2, 3}, {10, 20, 30}, {1, 2, 3}};
-  const Mat4 *first = &cache.get(7, t);
-  const Mat4 *second = &cache.get(7, t);
-  EXPECT_EQ(first, second);
-}
-
-TEST(TransformMatrixCache, RebuildsWhenAnyComponentChanges) {
-  TransformMatrixCache cache;
-  TransformComponent t{{1, 2, 3}, {10, 20, 30}, {1, 2, 3}};
-  cache.get(3, t);
-
-  // Each of the nine floats must invalidate the entry on its own.
-  float *fields[] = {&t.position.x, &t.position.y, &t.position.z,
-                     &t.rotation.x, &t.rotation.y, &t.rotation.z,
-                     &t.scale.x,    &t.scale.y,    &t.scale.z};
-  for (float *field : fields) {
-    *field += 1.0f;
-    EXPECT_TRUE(SameMat4(cache.get(3, t), t.toMatrix(), 0.0f));
-  }
-}
-
-TEST(TransformMatrixCache, EntitiesDoNotShareEntries) {
-  TransformMatrixCache cache;
-  const TransformComponent a{{1, 0, 0}, {0, 0, 0}, {1, 1, 1}};
-  const TransformComponent b{{2, 0, 0}, {0, 0, 0}, {1, 1, 1}};
-  EXPECT_EQ(cache.get(1, a)[3][0], 1.0f);
-  EXPECT_EQ(cache.get(2, b)[3][0], 2.0f);
-  EXPECT_EQ(cache.get(1, a)[3][0], 1.0f);
-}
-
 // --- InstanceWriter ---------------------------------------------------------
 
 TEST(InstanceWriter, WritesEachAttributeAtItsOffset) {
@@ -254,9 +211,9 @@ TEST(MaterialInstanceData, LegacyBuildInstanceDataStillWorks) {
 
   std::vector<float> data(layout.stride / sizeof(float), 0.0f);
   InstanceWriter writer(layout, data.data());
-  TransformMatrixCache cache;
+  const Mat4 model = world->getComponent<TransformComponent>(e).toMatrix();
   InstanceContext ctx(*world, e, world->getComponent<TransformComponent>(e),
-                      cache);
+                      model);
   material.writeInstanceData(ctx, writer);
 
   EXPECT_EQ(data[16], 0.5f);
@@ -278,9 +235,9 @@ TEST(MaterialInstanceData, DiffuseWritesModelAndColor) {
 
   std::vector<float> data(layout.stride / sizeof(float), 0.0f);
   InstanceWriter writer(layout, data.data());
-  TransformMatrixCache cache;
+  const Mat4 model = world->getComponent<TransformComponent>(e).toMatrix();
   InstanceContext ctx(*world, e, world->getComponent<TransformComponent>(e),
-                      cache);
+                      model);
   material.writeInstanceData(ctx, writer);
 
   const Mat4 expected = referenceModelMatrix(t);
@@ -303,9 +260,9 @@ TEST(MaterialInstanceData, DiffuseDefaultsColorToWhiteWithoutComponent) {
 
   std::vector<float> data(layout.stride / sizeof(float), 0.0f);
   InstanceWriter writer(layout, data.data());
-  TransformMatrixCache cache;
+  const Mat4 model = world->getComponent<TransformComponent>(e).toMatrix();
   InstanceContext ctx(*world, e, world->getComponent<TransformComponent>(e),
-                      cache);
+                      model);
   material.writeInstanceData(ctx, writer);
 
   for (int i = 16; i < 20; ++i) {
@@ -570,14 +527,14 @@ TEST(InstanceSlots, DiffuseWritesToWhereTheCurrentLayoutPutsItsAttributes) {
   layoutB.stride = 80;
 
   DiffuseMaterial material(1, 1);
-  TransformMatrixCache cache;
+  const Mat4 model = world->getComponent<TransformComponent>(e).toMatrix();
 
   // Before any layout arrives the slots are invalid: nothing is written.
   {
     std::vector<float> data(20, -1.0f);
     InstanceWriter writer(layoutB, data.data());
     InstanceContext ctx(*world, e, world->getComponent<TransformComponent>(e),
-                        cache);
+                        model);
     material.writeInstanceData(ctx, writer);
     EXPECT_TRUE(std::all_of(data.begin(), data.end(),
                             [](float f) { return f == -1.0f; }));
@@ -590,7 +547,7 @@ TEST(InstanceSlots, DiffuseWritesToWhereTheCurrentLayoutPutsItsAttributes) {
   std::vector<float> data(20, 0.0f);
   InstanceWriter writer(layoutB, data.data());
   InstanceContext ctx(*world, e, world->getComponent<TransformComponent>(e),
-                      cache);
+                      model);
   material.writeInstanceData(ctx, writer);
 
   EXPECT_EQ(data[0], 0.1f);

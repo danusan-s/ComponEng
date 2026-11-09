@@ -188,8 +188,8 @@ public:
 #include "componeng/ecs/world.hpp"
 
 void HealthSystem::onUpdate(const componeng::ecs::SystemState& state) {
-    // Query all entities with HealthComponent
-    state.world->query<mygame::HealthComponent>().each(
+    // Query all entities with HealthComponent (we modify it, so write<>)
+    state.world->query().write<mygame::HealthComponent>().each(
         [](mygame::HealthComponent& health) {
             if (health.current <= 0.0f) {
                 health.current = 0.0f;
@@ -268,14 +268,26 @@ void MySystem::onUpdate(const ecs::SystemState& state) {
 ## Using Queries
 
 Queries let you iterate over entities that have a specific set of components.
+Every component in a query is declared either `read<>` (you only look at it;
+the callback gets a `const` reference) or `write<>` (you may modify it; the
+callback gets a mutable reference). Writing marks the component's storage as
+changed (it bumps the column's version number); reading does not, so prefer
+`read<>` whenever you do not modify the data.
 
 ### Basic Query
 
 ```cpp
-// Query all entities with HealthComponent
-world.query<mygame::HealthComponent>().each(
+// Read-only: the callback receives a const reference
+world.query().read<mygame::HealthComponent>().each(
+    [](const mygame::HealthComponent& health) {
+        // Inspect each entity
+    }
+);
+
+// Mutable: the callback receives a mutable reference
+world.query().write<mygame::HealthComponent>().each(
     [](mygame::HealthComponent& health) {
-        // Process each entity
+        health.current += 1.0f;
     }
 );
 ```
@@ -284,22 +296,30 @@ world.query<mygame::HealthComponent>().each(
 
 ```cpp
 // Query entities with BOTH TransformComponent AND HealthComponent
-world.query<componeng::components::TransformComponent, mygame::HealthComponent>()
-    .each([](componeng::components::TransformComponent& transform,
+world.query()
+    .read<componeng::components::TransformComponent>()
+    .write<mygame::HealthComponent>()
+    .each([](const componeng::components::TransformComponent& transform,
               mygame::HealthComponent& health) {
         // Process entities with both components
     });
 ```
+
+Callback arguments follow the order you declare the components in. `read<>` and
+`write<>` each accept several types (`.read<A, B>()`) and can be chained in any
+order. A component can only be declared once per query; if you need to both read
+and modify it, declare it `write<>`.
 
 ### Query with Entity ID
 
 If you need the entity ID (e.g., for adding/removing components):
 
 ```cpp
-world.query<componeng::components::TransformComponent, mygame::HealthComponent>()
+world.query()
+    .read<componeng::components::TransformComponent, mygame::HealthComponent>()
     .eachWithEntity([](ecs::EntityID entity,
-                        componeng::components::TransformComponent& transform,
-                        mygame::HealthComponent& health) {
+                        const componeng::components::TransformComponent& transform,
+                        const mygame::HealthComponent& health) {
         if (health.current <= 0) {
             // Can now destroy entity if needed
         }
@@ -312,7 +332,8 @@ Exclude entities that have certain components:
 
 ```cpp
 // Query all entities with TransformComponent EXCEPT those with ColliderComponent
-world.query<componeng::components::TransformComponent>()
+world.query()
+    .write<componeng::components::TransformComponent>()
     .exclude<componeng::components::ColliderComponent>()
     .each([](componeng::components::TransformComponent& transform) {
         // ...
@@ -324,7 +345,8 @@ world.query<componeng::components::TransformComponent>()
 For large numbers of entities, use `eachParallel` to distribute work across threads:
 
 ```cpp
-world.query<mygame::HealthComponent>()
+world.query()
+    .write<mygame::HealthComponent>()
     .eachParallel(state.world->threadPool(),
         [](mygame::HealthComponent& health) {
             // Processed in parallel
@@ -742,7 +764,7 @@ int main() {
 
 ```cpp
 void PowerUpSystem::onUpdate(const ecs::SystemState& state) {
-    state.world->query<mygame::PowerUpComponent>().each(
+    state.world->query().write<mygame::PowerUpComponent>().each(
         [state](mygame::PowerUpComponent& powerUp) {
             powerUp.duration -= state.deltaTime;
             if (powerUp.duration <= 0) {
@@ -773,8 +795,8 @@ ecs::EntityID createEnemy(ecs::World& world, const Vec3& position) {
 
 ```cpp
 void MovementSystem::onUpdate(const ecs::SystemState& state) {
-    state.world->query<TransformComponent, VelocityComponent>().each(
-        [state](TransformComponent& transform, VelocityComponent& velocity) {
+    state.world->query().write<TransformComponent>().read<VelocityComponent>().each(
+        [state](TransformComponent& transform, const VelocityComponent& velocity) {
             transform.position += velocity.linear * state.deltaTime;
         }
     );

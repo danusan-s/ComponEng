@@ -11,6 +11,7 @@
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
 #include "componeng/renderer/component/procedural_instances_component.hpp"
+#include "componeng/renderer/transform_matrix_cache.hpp"
 
 namespace componeng::renderer {
 
@@ -33,8 +34,15 @@ void CullingSystem::onUpdate(const ecs::SystemState &state) {
   // The result goes into `culled`, leaving the application's `visible` flag
   // alone. BatchingSystem resolves names to ids on an entity's first frame;
   // until then there is nothing to measure, so it is drawn.
-  auto test = [&](core::TransformComponent &t, renderer::MeshComponent &m,
-                  renderer::MaterialComponent &mat) {
+  // Model matrices are cached per archetype and rebuilt only when the
+  // Transform column's version moved, so a static scene costs one version
+  // compare per archetype here instead of a toMatrix() per entity per frame.
+  // Refreshed serially up front; the parallel body below only reads.
+  const TransformMatrixCache &matrices = refreshTransformMatrices(*state.world);
+
+  auto test = [&](renderer::MeshComponent &m,
+                  const renderer::MaterialComponent &mat,
+                  const core::Mat4 &model) {
     if (m.meshID == 0 || mat.materialID == 0) {
       m.culled = false;
       return;
@@ -42,31 +50,53 @@ void CullingSystem::onUpdate(const ecs::SystemState &state) {
 
     const Mesh &mesh = assets.getMesh(m.meshID);
     const float padding = assets.getMaterial(mat.materialID).getBoundsPadding();
-    const Aabb world = transformAabb(mesh.bounds(), t.toMatrix(), padding);
+    const Aabb world = transformAabb(mesh.bounds(), model, padding);
     m.culled = !frustum.isBoxInFrustum(world.min, world.max);
   };
 
+  // Transform stays in these queries though the body only needs the cached
+  // matrix: it guarantees every archetype matched is one refreshTransform-
+  // Matrices() covered (it refreshes exactly Transform + Mesh archetypes).
+  //
   // Every renderable entity is tested against the frustum using its mesh's own
   // bounds under its transform, so culling works with or without a physics
   // collider.
-  state.world
-      ->query<core::TransformComponent, renderer::MeshComponent,
-              renderer::MaterialComponent>()
+  state.world->query()
+      .read<core::TransformComponent>()
+      .write<renderer::MeshComponent>()
+      .read<renderer::MaterialComponent>()
       .exclude<ProceduralInstancesComponent>()
-      .eachParallel(state.world->threadPool(), test);
+      .eachChunkParallel(state.world->threadPool(), [&](const auto &chunk) {
+        const core::Mat4 *models = matrices.models(chunk.archetypeId());
+        renderer::MeshComponent *meshes =
+            chunk.template data<renderer::MeshComponent>();
+        const renderer::MaterialComponent *materials =
+            chunk.template data<renderer::MaterialComponent>();
+        for (std::size_t row = chunk.begin(); row < chunk.end(); ++row) {
+          test(meshes[row], materials[row], models[row]);
+        }
+      });
 
   // Procedural entities place their instances in the shader, so the mesh's
   // bounds only mean something if they opted in.
-  state.world
-      ->query<core::TransformComponent, renderer::MeshComponent,
-              renderer::MaterialComponent, ProceduralInstancesComponent>()
-      .each([&](core::TransformComponent &t, renderer::MeshComponent &m,
-                renderer::MaterialComponent &mat,
-                ProceduralInstancesComponent &procedural) {
-        if (procedural.cull) {
-          test(t, m, mat);
-        } else {
-          m.culled = false;
+  state.world->query()
+      .read<core::TransformComponent>()
+      .write<renderer::MeshComponent>()
+      .read<renderer::MaterialComponent, ProceduralInstancesComponent>()
+      .eachChunk([&](const auto &chunk) {
+        const core::Mat4 *models = matrices.models(chunk.archetypeId());
+        renderer::MeshComponent *meshes =
+            chunk.template data<renderer::MeshComponent>();
+        const renderer::MaterialComponent *materials =
+            chunk.template data<renderer::MaterialComponent>();
+        const ProceduralInstancesComponent *procedurals =
+            chunk.template data<ProceduralInstancesComponent>();
+        for (std::size_t row = chunk.begin(); row < chunk.end(); ++row) {
+          if (procedurals[row].cull) {
+            test(meshes[row], materials[row], models[row]);
+          } else {
+            meshes[row].culled = false;
+          }
         }
       });
 }

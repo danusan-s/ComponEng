@@ -17,9 +17,13 @@ namespace componeng::physics {
 
 struct EntityPhysicsData {
   ecs::EntityID entity;
-  core::TransformComponent *transform;
+  const core::TransformComponent *transform;
+  // Non-null only for bodies that can be moved (those with a RigidBody).
+  // Colliders without one are only read, so their Transform column is never
+  // marked written and downstream caches keyed on its version stay valid.
+  core::TransformComponent *writableTransform;
   RigidBodyComponent *rigidbody;
-  ColliderComponent *collider;
+  const ColliderComponent *collider;
 };
 
 struct CollisionPair {
@@ -86,10 +90,10 @@ static void resolveCollision(EntityPhysicsData &a, EntityPhysicsData &b,
   core::Vec3 correction = correctionMagnitude * info.normal;
 
   if (a.rigidbody && a.rigidbody->type == RigidBodyComponent::Type::Dynamic) {
-    a.transform->position -= correction * inverseMassA;
+    a.writableTransform->position -= correction * inverseMassA;
   }
   if (b.rigidbody && b.rigidbody->type == RigidBodyComponent::Type::Dynamic) {
-    b.transform->position += correction * inverseMassB;
+    b.writableTransform->position += correction * inverseMassB;
   }
 }
 
@@ -104,7 +108,8 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
     m_accumulatedTime -= fixedTimeStep;
 
     ecs::ThreadPool &pool = state.world->threadPool();
-    state.world->query<core::TransformComponent, RigidBodyComponent>()
+    state.world->query()
+        .write<core::TransformComponent, RigidBodyComponent>()
         .eachParallel(pool, [&](core::TransformComponent &transform,
                                 RigidBodyComponent &rigidbody) {
           if (rigidbody.type == RigidBodyComponent::Type::Static)
@@ -117,21 +122,27 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
 
     std::vector<EntityPhysicsData> colliders;
 
-    state.world
-        ->query<core::TransformComponent, RigidBodyComponent,
-                ColliderComponent>()
-        .eachWithEntity(
-            [&](ecs::EntityID entity, core::TransformComponent &transform,
-                RigidBodyComponent &rigidbody, ColliderComponent &collider) {
-              colliders.push_back({entity, &transform, &rigidbody, &collider});
-            });
-
-    state.world->query<core::TransformComponent, ColliderComponent>()
-        .exclude<RigidBodyComponent>()
+    // Transform and RigidBody are written (the resolver moves bodies and
+    // changes their velocity); colliders are only inspected.
+    state.world->query()
+        .write<core::TransformComponent, RigidBodyComponent>()
+        .read<ColliderComponent>()
         .eachWithEntity([&](ecs::EntityID entity,
                             core::TransformComponent &transform,
-                            ColliderComponent &collider) {
-          colliders.push_back({entity, &transform, nullptr, &collider});
+                            RigidBodyComponent &rigidbody,
+                            const ColliderComponent &collider) {
+          colliders.push_back(
+              {entity, &transform, &transform, &rigidbody, &collider});
+        });
+
+    state.world->query()
+        .read<core::TransformComponent, ColliderComponent>()
+        .exclude<RigidBodyComponent>()
+        .eachWithEntity([&](ecs::EntityID entity,
+                            const core::TransformComponent &transform,
+                            const ColliderComponent &collider) {
+          colliders.push_back(
+              {entity, &transform, nullptr, nullptr, &collider});
         });
 
     size_t n = colliders.size();

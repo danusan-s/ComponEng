@@ -105,7 +105,7 @@ TEST(SerializationTest, ArchetypeMigrationPreservesLongStrings) {
   arch1.init(sig1, reg);
 
   arch1.addEntity(1);
-  void *slot1 = arch1.getColumn(meshCID).at(0);
+  void *slot1 = arch1.writeColumn(meshCID).at(0);
   new (slot1) MeshComponent();
   static_cast<MeshComponent *>(slot1)->meshName =
       "very_long_mesh_name_that_exceeds_sso_for_testing_purposes";
@@ -116,16 +116,17 @@ TEST(SerializationTest, ArchetypeMigrationPreservesLongStrings) {
   Archetype arch2;
   arch2.init(sig2, reg);
   arch2.addEntity(1);
-  std::memcpy(arch2.getColumn(meshCID).at(0), arch1.getColumn(meshCID).at(0),
-              arch1.getColumn(meshCID).m_stride);
+  std::memcpy(arch2.writeColumn(meshCID).at(0),
+              arch1.writeColumn(meshCID).at(0),
+              arch1.writeColumn(meshCID).m_stride);
   arch1.removeEntityAtRow(0);
 
   auto &moved =
-      static_cast<MeshComponent *>(arch2.getColumn(meshCID).at(0))->meshName;
+      static_cast<MeshComponent *>(arch2.writeColumn(meshCID).at(0))->meshName;
   EXPECT_EQ(moved, "very_long_mesh_name_that_exceeds_sso_for_testing_purposes");
 
   auto json = ComponentSerializer<MeshComponent>::serialize(
-      *static_cast<MeshComponent *>(arch2.getColumn(meshCID).at(0)));
+      *static_cast<MeshComponent *>(arch2.writeColumn(meshCID).at(0)));
   EXPECT_EQ(json["meshName"],
             "very_long_mesh_name_that_exceeds_sso_for_testing_purposes");
 }
@@ -141,7 +142,7 @@ TEST(SerializationTest, MultipleEntityMigrations) {
 
   for (int i = 0; i < 3; ++i) {
     arch1.addEntity(i + 10);
-    void *slot = arch1.getColumn(meshCID).at(i);
+    void *slot = arch1.writeColumn(meshCID).at(i);
     new (slot) MeshComponent();
     static_cast<MeshComponent *>(slot)->meshName = Name(
         ("entity_" + std::to_string(i) + "_with_a_long_name_to_test").c_str());
@@ -153,23 +154,25 @@ TEST(SerializationTest, MultipleEntityMigrations) {
   arch2.init(sig2, reg);
   // entity 10 is at row 0 in arch1; migrate it to arch2
   arch2.addEntity(10);
-  std::memcpy(arch2.getColumn(meshCID).at(0), arch1.getColumn(meshCID).at(0),
-              arch1.getColumn(meshCID).m_stride);
+  std::memcpy(arch2.writeColumn(meshCID).at(0),
+              arch1.writeColumn(meshCID).at(0),
+              arch1.writeColumn(meshCID).m_stride);
   arch1.removeEntityAtRow(0);
 
   // entity 11 is now at row 0 (entity 10 was at 0, removed, entity 12
   // was at row 2 and got swapped to row 0). entity 11 remains at row 1.
   arch2.addEntity(11);
-  std::memcpy(arch2.getColumn(meshCID).at(1), arch1.getColumn(meshCID).at(1),
-              arch1.getColumn(meshCID).m_stride);
+  std::memcpy(arch2.writeColumn(meshCID).at(1),
+              arch1.writeColumn(meshCID).at(1),
+              arch1.writeColumn(meshCID).m_stride);
   arch1.removeEntityAtRow(1);
 
   auto &moved =
-      static_cast<MeshComponent *>(arch2.getColumn(meshCID).at(0))->meshName;
+      static_cast<MeshComponent *>(arch2.writeColumn(meshCID).at(0))->meshName;
   EXPECT_EQ(moved, "entity_0_with_a_long_name_to_test");
 
   auto json = ComponentSerializer<MeshComponent>::serialize(
-      *static_cast<MeshComponent *>(arch2.getColumn(meshCID).at(0)));
+      *static_cast<MeshComponent *>(arch2.writeColumn(meshCID).at(0)));
   EXPECT_EQ(json["meshName"], "entity_0_with_a_long_name_to_test");
 }
 
@@ -210,8 +213,9 @@ TEST(SerializationTest, SceneRoundTripPreservesTransformAndColor) {
   ASSERT_TRUE(SceneSerializer::load(*world, path));
 
   int count = 0;
-  world->query<TransformComponent, MeshComponent, ColorComponent>().each(
-      [&](TransformComponent &t, MeshComponent &m, ColorComponent &c) {
+  world->query().read<TransformComponent, MeshComponent, ColorComponent>().each(
+      [&](const TransformComponent &t, const MeshComponent &m,
+          const ColorComponent &c) {
         ++count;
         EXPECT_EQ(t.position, Vec3(10.0f, -4.0f, 2.5f));
         EXPECT_EQ(t.rotation, Vec3(0.0f, 90.0f, 0.0f));

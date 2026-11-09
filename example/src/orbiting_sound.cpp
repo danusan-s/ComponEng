@@ -16,11 +16,11 @@ void OrbitingSound::onUpdate(const componeng::ecs::SystemState &state) {
       state.world->getResource<componeng::audio::AudioManager>();
 
   double time = state.world->getTime();
-  state.world
-      ->query<componeng::core::TransformComponent,
-              componeng::audio::AudioComponent>()
+  state.world->query()
+      .write<componeng::core::TransformComponent>()
+      .read<componeng::audio::AudioComponent>()
       .each([&](componeng::core::TransformComponent &transform,
-                componeng::audio::AudioComponent &audio) {
+                const componeng::audio::AudioComponent &audio) {
         float radius = 40.0f;
         float speed = 1.0f;
         float heightRange = 10.0f;

@@ -39,7 +39,7 @@ bool SceneSerializer::save(World &world, const std::string &filename) {
           continue;
         }
 
-        const void *componentPtr = archetype.getColumn(c).at(i);
+        const void *componentPtr = archetype.readColumn(c).at(i);
         entityJson[info.name] = info.serializer(componentPtr);
       }
 

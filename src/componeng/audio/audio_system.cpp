@@ -20,8 +20,8 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
   auto &mainCamera = state.world->getResource<camera::MainCamera>();
   if (state.world->hasComponent<componeng::core::TransformComponent>(
           mainCamera.entity)) {
-    auto &camTransform =
-        state.world->getComponent<componeng::core::TransformComponent>(
+    const auto &camTransform =
+        state.world->readComponent<componeng::core::TransformComponent>(
             mainCamera.entity);
     audioManager.setListenerPosition(camTransform.position.x,
                                      camTransform.position.y,
@@ -42,8 +42,11 @@ void AudioSystem::onUpdate(const ecs::SystemState &state) {
                                         up.z);
   }
 
-  state.world->query<AudioComponent, core::TransformComponent>().each(
-      [&](AudioComponent &audio, core::TransformComponent &transform) {
+  state.world->query()
+      .write<AudioComponent>()
+      .read<core::TransformComponent>()
+      .each([&](AudioComponent &audio,
+                const core::TransformComponent &transform) {
         if (audio.audioID == core::INVALID_HANDLE) {
           // Not registered yet: wait quietly, it may be registered later.
           if (!audioManager.hasSound(audio.audioName)) {

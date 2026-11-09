@@ -30,12 +30,12 @@ bool saveToFile = true;
 class Game : public IGame {
 public:
   void init(World &world) override {
-    constexpr float positionRange = 1000.0f;
+    constexpr float positionRange = 2000.0f;
     constexpr float scaleMin = 1.0f;
     constexpr float scaleMax = 5.0f;
     constexpr float massMin = 0.5f;
     constexpr float massMax = 5.0f;
-    constexpr int count = 2500; // count each for cube and sphere
+    constexpr int count = 20000; // count each for cube and sphere
 
     auto &audioManager = world.getResource<AudioManager>();
     audioManager.registerSound(
@@ -108,9 +108,9 @@ public:
     EntityID ground = world.createEntity();
     world.addComponents(
         ground,
-        TransformComponent{.position = Vec3(0.0f, -1000.0f, 0.0f),
+        TransformComponent{.position = Vec3(0.0f, -positionRange, 0.0f),
                            .rotation = Vec3(0.0f),
-                           .scale = Vec3(1000.0f, 1.0f, 1000.0f)},
+                           .scale = Vec3(positionRange, 1.0f, positionRange)},
         MeshComponent{.meshName = "cube"},
         MaterialComponent{.materialName = "default_diffuse"},
         ColorComponent{.color = Vec4(0.5f, 0.5f, 0.5f, 1.0f)},
@@ -147,7 +147,7 @@ public:
     EntityID cameraEntity = camera.entity;
     TransformComponent &playerPos =
         world.getComponent<TransformComponent>(cameraEntity);
-    playerPos.position = Vec3(-2250.0f, -600.0f, 0.0f);
+    playerPos.position = Vec3(-1.5 * positionRange, -0.5 * positionRange, 0.0f);
     playerPos.rotation = Vec3(0.0f, 0.0f, 0.0f);
   }
 

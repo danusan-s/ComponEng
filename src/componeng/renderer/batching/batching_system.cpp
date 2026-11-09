@@ -10,6 +10,7 @@
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
 #include "componeng/renderer/component/procedural_instances_component.hpp"
+#include "componeng/renderer/transform_matrix_cache.hpp"
 #include "componeng/utils/logger.hpp"
 
 namespace componeng::renderer {
@@ -26,6 +27,10 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
 
   renderQueue.clear();
   m_batchIndex.clear();
+
+  // Model matrices come from the shared cache: an archetype whose Transform
+  // column has not been written since last frame costs one version compare.
+  const TransformMatrixCache &matrices = refreshTransformMatrices(*state.world);
 
   // Entities of one archetype tend to arrive in runs sharing a mesh and
   // material (a forest of identical trees), so remember the last batch and
@@ -57,55 +62,67 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
     return material;
   };
 
-  state.world
-      ->query<core::TransformComponent, renderer::MeshComponent,
-              renderer::MaterialComponent>()
+  state.world->query()
+      .read<core::TransformComponent>()
+      .write<renderer::MeshComponent, renderer::MaterialComponent>()
       .exclude<ProceduralInstancesComponent>()
-      .eachWithEntity(
-          [&](ecs::EntityID entity, core::TransformComponent &transform,
-              renderer::MeshComponent &m, renderer::MaterialComponent &mat) {
-            IMaterial &material = resolve(m, mat);
+      .eachChunk([&](const auto &chunk) {
+        const core::Mat4 *models = matrices.models(chunk.archetypeId());
+        const core::TransformComponent *transforms =
+            chunk.template data<core::TransformComponent>();
+        renderer::MeshComponent *meshes =
+            chunk.template data<renderer::MeshComponent>();
+        renderer::MaterialComponent *materials =
+            chunk.template data<renderer::MaterialComponent>();
 
-            if (!m.visible || m.culled) {
-              return;
+        for (std::size_t row = chunk.begin(); row < chunk.end(); ++row) {
+          renderer::MeshComponent &m = meshes[row];
+          renderer::MaterialComponent &mat = materials[row];
+          IMaterial &material = resolve(m, mat);
+
+          if (!m.visible || m.culled) {
+            continue;
+          }
+
+          const DrawKey key{m.meshID, mat.materialID};
+          if (lastBatch == kNoBatch || !(key == lastKey)) {
+            auto [it, inserted] = m_batchIndex.try_emplace(key, kNoBatch);
+            if (inserted) {
+              it->second = renderQueue.openBatch(key.meshID, key.materialID,
+                                                 material.getShaderID(),
+                                                 material.getTextureID());
             }
+            lastKey = key;
+            lastBatch = it->second;
+            lastMaterial = &material;
+          }
 
-            const DrawKey key{m.meshID, mat.materialID};
-            if (lastBatch == kNoBatch || !(key == lastKey)) {
-              auto [it, inserted] = m_batchIndex.try_emplace(key, kNoBatch);
-              if (inserted) {
-                it->second = renderQueue.openBatch(key.meshID, key.materialID,
-                                                   material.getShaderID(),
-                                                   material.getTextureID());
-              }
-              lastKey = key;
-              lastBatch = it->second;
-              lastMaterial = &material;
-            }
+          RenderBatch &batch = renderQueue.batch(lastBatch);
+          const api::VertexLayout &layout = lastMaterial->getVertexLayout();
+          const std::size_t strideFloats = layout.stride / sizeof(float);
 
-            RenderBatch &batch = renderQueue.batch(lastBatch);
-            const api::VertexLayout &layout = lastMaterial->getVertexLayout();
-            const std::size_t strideFloats = layout.stride / sizeof(float);
+          // resize() zero-fills the new instance, so any attribute the
+          // material does not write reads as 0.
+          const std::size_t base = batch.instanceData.size();
+          batch.instanceData.resize(base + strideFloats);
 
-            // resize() zero-fills the new instance, so any attribute the
-            // material does not write reads as 0.
-            const std::size_t base = batch.instanceData.size();
-            batch.instanceData.resize(base + strideFloats);
-
-            InstanceWriter writer(layout, batch.instanceData.data() + base);
-            InstanceContext ctx(*state.world, entity, transform, m_matrixCache);
-            lastMaterial->writeInstanceData(ctx, writer);
-            ++batch.instanceCount;
-          });
+          InstanceWriter writer(layout, batch.instanceData.data() + base);
+          InstanceContext ctx(*state.world, chunk.entity(row), transforms[row],
+                              models[row]);
+          lastMaterial->writeInstanceData(ctx, writer);
+          ++batch.instanceCount;
+        }
+      });
 
   // Procedural entities: one batch each, no instance data. The shader places
   // every instance from gl_InstanceID.
-  state.world
-      ->query<core::TransformComponent, renderer::MeshComponent,
-              renderer::MaterialComponent, ProceduralInstancesComponent>()
-      .each([&](core::TransformComponent &, renderer::MeshComponent &m,
+  state.world->query()
+      .read<core::TransformComponent>()
+      .write<renderer::MeshComponent, renderer::MaterialComponent>()
+      .read<ProceduralInstancesComponent>()
+      .each([&](const core::TransformComponent &, renderer::MeshComponent &m,
                 renderer::MaterialComponent &mat,
-                ProceduralInstancesComponent &procedural) {
+                const ProceduralInstancesComponent &procedural) {
         IMaterial &material = resolve(m, mat);
 
         if (!m.visible || m.culled || procedural.count <= 0) {
@@ -135,7 +152,6 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
 void BatchingSystem::onDestroy(const ecs::SystemState &) {
   m_batchIndex.clear();
   m_reportedMaterials.clear();
-  m_matrixCache.clear();
 }
 
 } // namespace componeng::renderer

@@ -170,6 +170,7 @@ set(TEST_SOURCES
     tests/test_serialization.cpp
     tests/test_math.cpp
     tests/test_instance_data.cpp
+    tests/test_transform_matrix_cache.cpp
     tests/test_render_pipeline.cpp
     tests/test_culling.cpp
     tests/test_lod.cpp

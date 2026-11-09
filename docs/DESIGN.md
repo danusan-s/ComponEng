@@ -73,10 +73,11 @@ void destroyEntity(EntityID);                // Destroy entity
 void addComponent(EntityID, T);              // Add component to entity
 void removeComponent<T>(EntityID);           // Remove component
 bool hasComponent<T>(EntityID);              // Check component presence
-T& getComponent<T>(EntityID);               // Get component reference
+T& getComponent<T>(EntityID);               // Mutable reference (bumps column version)
+const T& readComponent<T>(EntityID);        // Read-only reference (no version bump)
 void registerComponent<T>();                 // Register component type
 void registerSystem<T>(group);               // Register system
-Query<Ts...> query();                        // Create typed query
+Query<> query();                             // Start a query; chain .read<>() / .write<>()
 void emit_event<T>(event);                   // Emit typed event
 T& get_resource<T>();                        // Get singleton resource
 ```
@@ -166,8 +167,7 @@ Entities with identical component sets are grouped into archetypes:
 │                   Archetype                     │
 ├─────────────────────────────────────────────────┤
 │  m_columns: vector<ComponentColumn>             │
-│  m_entityToRow: unordered_map<EntityID, size_t> │
-│  m_rowToEntity: unordered_map<size_t, EntityID> │
+│  m_rowToEntity: vector<EntityID>                │
 │  m_signature: Signature                         │
 └─────────────────────────────────────────────────┘
 ```
@@ -176,6 +176,20 @@ Entities with identical component sets are grouped into archetypes:
 - Uses aligned allocation for proper type alignment
 - Stores components as raw bytes with calculated stride
 - Uses swap-remove for O(1) removal
+- Carries a monotonic `ColumnVersion` (`uint64_t`, starts at 0) that is bumped
+  whenever the column is, or may have been, written
+
+**Column versions and access** - an archetype hands out columns two ways:
+```cpp
+const ComponentColumn& readColumn(ComponentID) const;  // no version change
+ComponentColumn&       writeColumn(ComponentID);       // bumps the version
+ColumnVersion          columnVersion(ComponentID) const;
+```
+Adding or removing a row also bumps every affected column. A consumer that
+remembers the version it last saw can detect "something wrote to this column"
+by comparing for inequality. Versions are per column, per archetype: they say
+*that* a column was written, not which rows. The counter is not atomic; it is
+only bumped on the thread that starts a write, never inside a parallel loop.
 
 **Entity Movement Flow**:
 ```
@@ -190,30 +204,84 @@ Entity with signature {Transform, Mesh}
 
 ### 7. Query System (`ecs/query.hpp`)
 
-Type-safe iteration over entities matching component requirements:
+Type-safe iteration over entities matching component requirements. A query
+declares, per component, whether it only *reads* it or may *write* it:
 
 ```cpp
-// Query all entities with Transform AND Mesh components
-auto query = world.query<TransformComponent, MeshComponent>();
+// Transform is read-only, Mesh may be modified
+auto query = world.query()
+                 .read<TransformComponent>()
+                 .write<MeshComponent>();
 
-// Iterate with callback
-query.each([](TransformComponent& t, MeshComponent& m) {
+// Callback parameters follow declaration order:
+// `const T&` for read<>, `T&` for write<>
+query.each([](const TransformComponent& t, MeshComponent& m) {
     // Process entity
 });
 
 // Iterate with EntityID
-query.eachWithEntity([](EntityID e, TransformComponent& t, MeshComponent& m) {
+query.eachWithEntity([](EntityID e, const TransformComponent& t, MeshComponent& m) {
     // Process entity with ID
 });
 
 // Parallel execution using ThreadPool
-query.eachParallel(threadPool, [](TransformComponent& t, MeshComponent& m) {
+query.eachParallel(threadPool, [](const TransformComponent& t, MeshComponent& m) {
     // Process in parallel
 });
 
-// Exclude entities with certain components
+// Exclude entities with certain components (does not appear in the callback)
 query.exclude<ColliderComponent>();
 ```
+
+`read<>` and `write<>` take any number of types and can be chained in any
+order. A component may be declared only once; to read and write the same type,
+declare it `write<>` (declaring it twice is a compile error).
+
+**Versioning.** Each time a query runs, every `write<>` column of every
+matching, non-empty archetype has its version bumped once (not per row), up
+front on the calling thread. `read<>` columns are never touched, and neither
+are archetypes the query does not match or that have no entities. For range-for
+iteration the bump happens when iteration enters an archetype.
+
+**Chunks.** `eachChunk(fn)` (and `eachChunkParallel(pool, fn)`) hand the
+callback one archetype at a time instead of one entity at a time, as a
+`QueryChunk`. It exposes what only the archetype knows: `size()` (rows),
+`archetypeId()`, `entity(row)`, `version<T>()` (T's current column version), and
+`data<T>()`, T's column as a contiguous array indexed by row (`const T*` for
+`read<>`, `T*` for `write<>`). Loop `for (row = chunk.begin(); row <
+chunk.end(); ++row)`; in the parallel variant each task gets a sub-range.
+
+```cpp
+world.query().read<TransformComponent>().write<MeshComponent>().eachChunk(
+    [](const auto& chunk) {
+        const TransformComponent* t = chunk.template data<TransformComponent>();
+        MeshComponent* m = chunk.template data<MeshComponent>();
+        for (size_t row = chunk.begin(); row < chunk.end(); ++row) { /* ... */ }
+    });
+```
+
+A write declaration is a statement of intent: the version is bumped even if the
+callback ends up not changing anything. Declare `read<>` wherever you only look.
+
+#### Transform matrix cache (`renderer/transform_matrix_cache.hpp`)
+
+Culling and batching both need each renderable's model matrix. The shared
+`TransformMatrixCache` (a World resource, filled by `refreshTransformMatrices`)
+keeps those matrices per archetype, row-aligned with the Transform column, and
+remembers the Transform column version they were built from:
+
+- **Version unchanged** - nothing wrote the column or added/removed a row, so
+  every matrix is valid. The archetype costs one integer compare, however many
+  entities it holds.
+- **Version changed** - the version is per column, not per entity, so it cannot
+  say which rows moved. Each row's nine transform floats are compared with what
+  its matrix was built from, and only differing rows are rebuilt.
+
+The skip relies on write access bumping the version *before* data is touched
+(`write<>()` queries, `getComponent<T>()`, `addComponent`, ...). Keeping a
+`TransformComponent&` across frames and writing through it later bypasses that.
+Anything that only inspects a transform should use `read<>()` or
+`readComponent<T>()` so it does not invalidate the cache for its archetype.
 
 ### 8. System Architecture (`ecs/system.hpp`, `ecs/system_manager.hpp`)
 

@@ -29,7 +29,6 @@ public:
 private:
   // (mesh, material) -> index of its batch in this frame's RenderQueue.
   std::unordered_map<DrawKey, uint32_t, DrawKeyHash> m_batchIndex;
-  TransformMatrixCache m_matrixCache;
   // Materials already reported for declaring instance attributes on a
   // procedural batch, so the error is logged once, not every frame.
   std::unordered_set<core::HandleID> m_reportedMaterials;

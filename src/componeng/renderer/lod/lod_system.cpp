@@ -11,13 +11,15 @@ namespace componeng::renderer {
 void LodSystem::onUpdate(const ecs::SystemState &state) {
   ecs::World &world = *state.world;
   const core::Vec3 cam = world
-                             .getComponent<core::TransformComponent>(
+                             .readComponent<core::TransformComponent>(
                                  world.getResource<camera::MainCamera>().entity)
                              .position;
 
-  world.query<core::TransformComponent, MeshComponent, LodComponent>()
+  world.query()
+      .read<core::TransformComponent>()
+      .write<MeshComponent, LodComponent>()
       .eachParallel(world.threadPool(),
-                    [cam](core::TransformComponent &transform,
+                    [cam](const core::TransformComponent &transform,
                           MeshComponent &mesh, LodComponent &lod) {
                       const float dx = transform.position.x - cam.x;
                       const float dy = transform.position.y - cam.y;

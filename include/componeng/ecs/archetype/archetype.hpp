@@ -95,15 +95,42 @@ public:
     return moved;
   }
 
-  ComponentColumn &getColumn(ComponentID c) {
+  /**
+   * Read-only access to a component's column. Does not touch its version, so
+   * it is the right call for anything that only looks at the data.
+   */
+  const ComponentColumn &readColumn(ComponentID c) const {
     if (!m_signature.test(c)) {
       throw std::runtime_error("Archetype: Component not in archetype");
     }
     return m_columns[columnOf(c)];
   }
 
-  template <typename T> T &get(ComponentID c, std::size_t row) {
-    return getColumn(c).get<T>(row);
+  /**
+   * Mutable access to a component's column. Bumps the column's version, so
+   * call it when the caller is about to write (or hand out writers), not as a
+   * general-purpose accessor.
+   */
+  ComponentColumn &writeColumn(ComponentID c) {
+    if (!m_signature.test(c)) {
+      throw std::runtime_error("Archetype: Component not in archetype");
+    }
+    ComponentColumn &column = m_columns[columnOf(c)];
+    column.markWritten();
+    return column;
+  }
+
+  /** Current version of a component's column. */
+  ColumnVersion columnVersion(ComponentID c) const {
+    return readColumn(c).version();
+  }
+
+  template <typename T> const T &read(ComponentID c, std::size_t row) const {
+    return readColumn(c).get<T>(row);
+  }
+
+  template <typename T> T &write(ComponentID c, std::size_t row) {
+    return writeColumn(c).get<T>(row);
   }
 
   EntityID getEntityForRow(std::size_t row) const {

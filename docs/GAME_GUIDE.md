@@ -175,7 +175,7 @@ public:
 #include "componeng/ecs/world.hpp"
 
 void HealthSystem::onUpdate(const componeng::ecs::SystemState& state) {
-    state.world->query<mygame::HealthComponent>().each(
+    state.world->query().write<mygame::HealthComponent>().each(
         [](mygame::HealthComponent& health) {
             if (health.current <= 0.0f) health.current = 0.0f;
         }
@@ -227,35 +227,43 @@ double time = state.world->getTime(); // total elapsed time
 ## 5. Using queries
 
 Queries iterate entities that have a specific set of components. They're the
-primary way systems find their data.
+primary way systems find their data. Declare each component as `read<>` (you
+only look at it; you get a `const` reference) or `write<>` (you may change it;
+you get a mutable reference and its storage is marked as changed). Callback
+arguments follow declaration order.
 
 ```cpp
-// All entities with a Transform
-world.query<componeng::components::TransformComponent>().each(
-    [](componeng::components::TransformComponent& t) { /* ... */ }
+// All entities with a Transform, read-only
+world.query().read<componeng::components::TransformComponent>().each(
+    [](const componeng::components::TransformComponent& t) { /* ... */ }
 );
 
-// Entities with Transform AND Mesh
-world.query<componeng::components::TransformComponent,
-             componeng::renderer::MeshComponent>()
-    .each([](auto& transform, auto& mesh) { /* ... */ });
+// Entities with Transform (read) AND Mesh (modified)
+world.query()
+    .read<componeng::components::TransformComponent>()
+    .write<componeng::renderer::MeshComponent>()
+    .each([](const auto& transform, auto& mesh) { /* ... */ });
 
 // With entity ID (needed to add/remove/destroy entities)
-world.query<componeng::components::TransformComponent>()
-    .eachWithEntity([](ecs::EntityID e, auto& transform) {
+world.query().read<componeng::components::TransformComponent>()
+    .eachWithEntity([](ecs::EntityID e, const auto& transform) {
         if (shouldDie(e)) world.destroyEntity(e);
     });
 
 // Exclude entities with a component
-world.query<componeng::components::TransformComponent>()
+world.query().write<componeng::components::TransformComponent>()
     .exclude<componeng::components::ColliderComponent>()
     .each([](auto& transform) { /* ... */ });
 
 // Parallel over the thread pool
-world.query<mygame::HealthComponent>()
+world.query().write<mygame::HealthComponent>()
     .eachParallel(state.world->threadPool(),
         [](mygame::HealthComponent& h) { /* ... */ });
 ```
+
+A component may be declared only once per query; to both read and modify it,
+declare it `write<>`. Outside queries, `world.getComponent<T>(e)` is a mutable
+(write) access and `world.readComponent<T>(e)` is the read-only one.
 
 > `eachParallel` is great for large entity counts, but don't write to the same
 > component from multiple threads without synchronization.

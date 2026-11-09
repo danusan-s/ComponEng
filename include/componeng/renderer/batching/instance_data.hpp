@@ -17,83 +17,32 @@ class World;
 namespace componeng::renderer {
 
 /**
- * @brief Memoises TransformComponent::toMatrix() per entity.
- *
- * Transform fields are public and written directly, so there is no setter to
- * hang a dirty flag on. Instead each entry remembers the position, rotation
- * and scale it was built from and is reused only when all nine floats still
- * match. That makes it correct by construction (a stale matrix is impossible,
- * even across entity-id reuse) while a static entity costs nine compares
- * instead of trigonometry.
- */
-class TransformMatrixCache {
-public:
-  const core::Mat4 &get(ecs::EntityID entity,
-                        const core::TransformComponent &transform) {
-    if (entity >= m_entries.size()) {
-      m_entries.resize(static_cast<std::size_t>(entity) + 1);
-    }
-    Entry &e = m_entries[entity];
-    if (!e.valid || !sameTransform(e, transform)) {
-      e.position = transform.position;
-      e.rotation = transform.rotation;
-      e.scale = transform.scale;
-      e.model = transform.toMatrix();
-      e.valid = true;
-    }
-    return e.model;
-  }
-
-  void clear() {
-    m_entries.clear();
-  }
-
-private:
-  struct Entry {
-    core::Vec3 position;
-    core::Vec3 rotation;
-    core::Vec3 scale;
-    core::Mat4 model;
-    bool valid = false;
-  };
-
-  static bool sameTransform(const Entry &e, const core::TransformComponent &t) {
-    return e.position.x == t.position.x && e.position.y == t.position.y &&
-           e.position.z == t.position.z && e.rotation.x == t.rotation.x &&
-           e.rotation.y == t.rotation.y && e.rotation.z == t.rotation.z &&
-           e.scale.x == t.scale.x && e.scale.y == t.scale.y &&
-           e.scale.z == t.scale.z;
-  }
-
-  std::vector<Entry> m_entries;
-};
-
-/**
  * @brief What a material gets to work with when writing one entity's
- * per-instance data. The transform is handed over already fetched (the
- * batching query has it in hand), so a material needs no component lookup
- * for the common case.
+ * per-instance data. The transform and its model matrix are handed over
+ * already fetched (the batching pass has both in hand, the matrix from the
+ * TransformMatrixCache), so a material needs no component lookup for the
+ * common case.
  */
 class InstanceContext {
 public:
   InstanceContext(ecs::World &worldRef, ecs::EntityID entityID,
                   const core::TransformComponent &transformRef,
-                  TransformMatrixCache &matrices)
+                  const core::Mat4 &modelMatrix)
       : world(worldRef), entity(entityID), transform(transformRef),
-        m_matrices(matrices) {
+        m_model(modelMatrix) {
   }
 
   ecs::World &world;
   ecs::EntityID entity;
   const core::TransformComponent &transform;
 
-  /** Model matrix for this entity, from the per-entity cache. */
+  /** Model matrix for this entity, as built from `transform`. */
   const core::Mat4 &modelMatrix() const {
-    return m_matrices.get(entity, transform);
+    return m_model;
   }
 
 private:
-  TransformMatrixCache &m_matrices;
+  const core::Mat4 &m_model;
 };
 
 /**
