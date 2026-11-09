@@ -1,5 +1,8 @@
 #include "componeng/core/debug_ui.hpp"
 
+// With the debug UI compiled out the header supplies empty inline versions.
+#ifndef COMPONENG_DISABLE_DEBUG_UI
+
 #include "componeng/utils/logger.hpp"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
@@ -62,6 +65,12 @@ void DebugUI::addValue(const std::string &label, float v) {
   ImGui::Text("%s: %.2f", label.c_str(), v);
 }
 
+bool DebugUI::addSection(const std::string &label) {
+  if (!s_frameActive)
+    return false;
+  return ImGui::CollapsingHeader(label.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+}
+
 void DebugUI::addVec3(const std::string &label, const Vec3 &v) {
   if (!s_frameActive)
     return;
@@ -76,3 +85,5 @@ void DebugUI::addSlider(const std::string &label, float *v, float min,
 }
 
 } // namespace componeng::core
+
+#endif // COMPONENG_DISABLE_DEBUG_UI

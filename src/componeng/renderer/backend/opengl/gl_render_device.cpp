@@ -10,6 +10,46 @@ namespace componeng::renderer::opengl {
 
 // windowHandle is unused here: the caller has already made the GL context
 // current, and glad resolves entry points from it. Other backends need it.
+void GLRenderDevice::beginGpuTimer() {
+  if (!m_gpuCreated) {
+    glGenQueries(kGpuQueryCount, m_gpuQueries);
+    m_gpuCreated = true;
+  }
+  // Every slot still waiting on the GPU: skip this frame's measurement rather
+  // than overwrite a query that is in flight.
+  if (m_gpuPending[m_gpuNext]) {
+    m_gpuSpanOpen = false;
+    return;
+  }
+  glBeginQuery(GL_TIME_ELAPSED, m_gpuQueries[m_gpuNext]);
+  m_gpuSpanOpen = true;
+}
+
+void GLRenderDevice::endGpuTimer() {
+  if (m_gpuSpanOpen) {
+    glEndQuery(GL_TIME_ELAPSED);
+    m_gpuPending[m_gpuNext] = true;
+    m_gpuNext = (m_gpuNext + 1) % kGpuQueryCount;
+    m_gpuSpanOpen = false;
+  }
+
+  // Collect finished spans, oldest first so the newest completed one wins.
+  for (int i = 0; i < kGpuQueryCount; ++i) {
+    const int slot = (m_gpuNext + i) % kGpuQueryCount;
+    if (!m_gpuPending[slot])
+      continue;
+    GLint available = 0;
+    glGetQueryObjectiv(m_gpuQueries[slot], GL_QUERY_RESULT_AVAILABLE,
+                       &available);
+    if (!available)
+      continue;
+    GLuint64 nanoseconds = 0;
+    glGetQueryObjectui64v(m_gpuQueries[slot], GL_QUERY_RESULT, &nanoseconds);
+    m_gpuTimeMs = static_cast<double>(nanoseconds) * 1e-6;
+    m_gpuPending[slot] = false;
+  }
+}
+
 void GLRenderDevice::init(void * /*windowHandle*/) {
   if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
     LOG_ERROR("Failed to initialize GLAD");

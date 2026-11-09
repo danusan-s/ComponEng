@@ -90,6 +90,12 @@ public:
   void updateSystems(float deltaTime);
   void destroySystems();
   ThreadPool &threadPool();
+
+  /** Calls fn(name, ms) for each system's last onUpdate time; see
+   *  SystemManager::forEachSystemTiming. */
+  template <typename Fn> void forEachSystemTiming(Fn &&fn) const {
+    m_systemManager.forEachSystemTiming(std::forward<Fn>(fn));
+  }
   renderer::api::IRenderDevice &getRenderDevice();
   void setWindowHandle(void *handle);
   void *getWindowHandle() const;

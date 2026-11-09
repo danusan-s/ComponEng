@@ -37,6 +37,12 @@ public:
   void present(void *windowHandle) override;
   int checkErrors() const override;
 
+  void beginGpuTimer() override;
+  void endGpuTimer() override;
+  double lastGpuTimeMs() const override {
+    return m_gpuTimeMs;
+  }
+
   std::unique_ptr<api::IShader> createShader() override;
   std::unique_ptr<api::ITexture> createTexture() override;
   std::unique_ptr<api::IMesh> createMesh() override;
@@ -59,6 +65,19 @@ private:
   // Core-profile GL refuses to draw without a VAO bound, even one with no
   // attributes. Created once in init() and kept for the life of the context.
   unsigned int m_fullscreenVao = 0;
+
+  // GPU timer: a small ring of GL_TIME_ELAPSED queries. A query's result is
+  // only read once the GPU reports it available, so reading never stalls the
+  // pipeline; with several in flight a result normally lands 2-3 frames after
+  // its span. The queries are not deleted explicitly: they go with the GL
+  // context, and the device can outlive it during shutdown.
+  static constexpr int kGpuQueryCount = 4;
+  unsigned int m_gpuQueries[kGpuQueryCount] = {};
+  bool m_gpuPending[kGpuQueryCount] = {};
+  int m_gpuNext = 0;          // slot the next span will use
+  bool m_gpuSpanOpen = false; // begin() issued a query that end() must close
+  bool m_gpuCreated = false;
+  double m_gpuTimeMs = -1.0;
 };
 
 } // namespace componeng::renderer::opengl

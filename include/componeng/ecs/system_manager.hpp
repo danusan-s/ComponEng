@@ -5,13 +5,40 @@
 
 #include <array>
 #include <assert.h>
+#include <chrono>
 #include <memory>
 #include <queue>
+#include <string>
 #include <typeindex>
 #include <unordered_map>
 #include <vector>
 
+#if defined(__GNUC__) || defined(__clang__)
+#include <cstdlib>
+#include <cxxabi.h>
+#endif
+
 namespace componeng::ecs {
+
+namespace detail {
+
+/** "N10componeng8renderer14CullingSystemE" -> "CullingSystem". */
+inline std::string readableSystemName(const char *mangled) {
+  std::string name = mangled;
+#if defined(__GNUC__) || defined(__clang__)
+  int status = 0;
+  if (char *demangled =
+          abi::__cxa_demangle(mangled, nullptr, nullptr, &status)) {
+    if (status == 0)
+      name = demangled;
+    std::free(demangled);
+  }
+#endif
+  const std::size_t scope = name.rfind("::");
+  return scope == std::string::npos ? name : name.substr(scope + 2);
+}
+
+} // namespace detail
 
 enum class SystemGroup { Initialization, Simulation, Presentation };
 
@@ -29,6 +56,8 @@ using SystemID = size_t;
 struct SystemRecord {
   const char *typeName;
   std::shared_ptr<ISystem> system;
+  std::string displayName;   // typeName without namespace or mangling
+  double lastUpdateMs = 0.0; // wall time of the most recent onUpdate
 };
 
 class SystemGroupManager {
@@ -45,7 +74,8 @@ public:
       throw std::runtime_error("System already registered in this group.");
     }
     auto system = std::make_shared<T>();
-    m_systems.push_back({typeIndex.name(), system});
+    m_systems.push_back({typeIndex.name(), system,
+                         detail::readableSystemName(typeIndex.name()), 0.0});
     m_dependencies.push_back({});
     m_typeToIndex[typeIndex] = m_systems.size() - 1;
     return system;
@@ -120,10 +150,26 @@ public:
     if (!m_executionOrderBuilt) {
       buildExecutionOrder();
     }
-    for (auto const &sysRec : m_systems) {
-      auto const &system = sysRec.system;
-      system->onUpdate(state);
+#ifdef COMPONENG_DISABLE_DEBUG_UI
+    // The timings only feed the debug UI; skip the clock reads without it.
+    for (auto &sysRec : m_systems)
+      sysRec.system->onUpdate(state);
+#else
+    using Clock = std::chrono::steady_clock;
+    for (auto &sysRec : m_systems) {
+      const auto start = Clock::now();
+      sysRec.system->onUpdate(state);
+      sysRec.lastUpdateMs =
+          std::chrono::duration<double, std::milli>(Clock::now() - start)
+              .count();
     }
+#endif
+  }
+
+  /** Calls fn(name, lastUpdateMs) for each system, in execution order. */
+  template <typename Fn> void forEachTiming(Fn &&fn) const {
+    for (const auto &sysRec : m_systems)
+      fn(sysRec.displayName.c_str(), sysRec.lastUpdateMs);
   }
 
   void destroyAll(SystemState &state) {
@@ -188,6 +234,17 @@ public:
     for (SystemGroupManager &group : m_systemGroups) {
       group.destroyAll(state);
     }
+  }
+
+  /**
+   * Calls fn(name, ms) for every system with how long its onUpdate took in the
+   * most recent updateAll(), groups in order and systems in execution order
+   * within each. The order is stable once systems are created, so a caller can
+   * keep per-system state indexed by position.
+   */
+  template <typename Fn> void forEachSystemTiming(Fn &&fn) const {
+    for (const SystemGroupManager &group : m_systemGroups)
+      group.forEachTiming(fn);
   }
 };
 

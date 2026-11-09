@@ -36,10 +36,19 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/ecs/*.cpp"
     "src/componeng/utils/*.cpp"
 )
+# The ImGui debug overlay (frame timings, camera info, ...). Turn it off with
+# -DCOMPONENG_DEBUG_UI=OFF for builds that should carry none of it: ImGui is not
+# compiled, DebugUI becomes empty inlines, and the engine skips the per-frame
+# timing and GPU timer-query work.
+option(COMPONENG_DEBUG_UI "Build the ImGui debug UI" ON)
+
 file(GLOB ENGINE_THIRD_PARTY_SOURCES
     "src/third_party/glad/*.c"
-    "src/third_party/imgui/*.cpp"
 )
+if (COMPONENG_DEBUG_UI)
+  file(GLOB IMGUI_SOURCES "src/third_party/imgui/*.cpp")
+  list(APPEND ENGINE_THIRD_PARTY_SOURCES ${IMGUI_SOURCES})
+endif()
 
 # Remove main.cpp if it exists in src/
 list(FILTER ENGINE_FIRST_PARTY_SOURCES EXCLUDE REGEX ".*main\\.cpp$")
@@ -48,6 +57,13 @@ set(ENGINE_SOURCES ${ENGINE_FIRST_PARTY_SOURCES} ${ENGINE_THIRD_PARTY_SOURCES})
 
 # Create STATIC library instead of executable
 add_library(ComponEng STATIC ${ENGINE_SOURCES})
+
+# PUBLIC so games that include debug_ui.hpp see the same setting the library
+# was built with.
+if (NOT COMPONENG_DEBUG_UI)
+  message(STATUS "Debug UI disabled (COMPONENG_DEBUG_UI=OFF)")
+  target_compile_definitions(ComponEng PUBLIC COMPONENG_DISABLE_DEBUG_UI)
+endif()
 
 # Include directories (PUBLIC so game can access them)
 target_include_directories(ComponEng

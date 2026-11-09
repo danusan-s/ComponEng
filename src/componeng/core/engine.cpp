@@ -31,7 +31,133 @@
 #include "componeng/utils/logger.hpp"
 #include "componeng/utils/utils.hpp"
 
+#include <algorithm>
+#include <chrono>
+#include <string>
+#include <vector>
+
 namespace componeng::core {
+namespace {
+
+/**
+ * Averages samples over a window and shows the last completed average.
+ *
+ * add() accumulates every frame; publish() turns what has accumulated into the
+ * displayed value and starts a new window. A number that only changes a couple
+ * of times a second is readable at any frame rate, which a per-frame moving
+ * average is not (at hundreds of fps it still redraws different digits every
+ * frame). Negative samples mean "no data" and are ignored; `value` stays
+ * negative until the first window completes.
+ */
+struct Smoothed {
+  double value = -1.0;
+
+  void add(double sample) {
+    if (sample < 0.0)
+      return;
+    m_sum += sample;
+    ++m_count;
+  }
+
+  void publish() {
+    if (m_count > 0)
+      value = m_sum / static_cast<double>(m_count);
+    m_sum = 0.0;
+    m_count = 0;
+  }
+
+private:
+  double m_sum = 0.0;
+  int m_count = 0;
+};
+
+/**
+ * Per-frame CPU and GPU timings for the debug UI.
+ *
+ *  - CPU frame: from the start of the frame to just before the buffer swap,
+ *    i.e. all systems plus submitting the UI. Includes the time spent issuing
+ *    GL calls, but not waiting at the swap.
+ *  - Swap + events: the swap and event polling. Large here means the CPU is
+ *    waiting on the GPU (or the driver), i.e. the frame is GPU-bound.
+ *  - GPU frame: GPU time for the frame's commands, measured with timer
+ *    queries (a few frames behind, see IRenderDevice::beginGpuTimer).
+ *  - Per system: each system's onUpdate wall time.
+ *
+ * Each frame's samples are accumulated and the displayed numbers refresh every
+ * kWindowSeconds with the average over that window (and once right after the
+ * first frame, so the panel is not blank at start-up).
+ */
+class FrameTimings {
+public:
+  static constexpr double kWindowSeconds = 0.5;
+
+  void record(const ecs::World &world, double deltaSeconds, double cpuMs,
+              double swapMs, double gpuMs) {
+    m_cpu.add(cpuMs);
+    m_swap.add(swapMs);
+    m_gpu.add(gpuMs);
+
+    std::size_t i = 0;
+    world.forEachSystemTiming([&](const char *name, double ms) {
+      if (i >= m_systems.size())
+        m_systems.push_back({name, {}});
+      m_systems[i++].ms.add(ms);
+    });
+
+    m_elapsed += deltaSeconds;
+    if (!m_published || m_elapsed >= kWindowSeconds) {
+      m_cpu.publish();
+      m_swap.publish();
+      m_gpu.publish();
+      for (SystemTime &s : m_systems)
+        s.ms.publish();
+      m_elapsed = 0.0;
+      m_published = true;
+    }
+  }
+
+  void show() const {
+    if (!DebugUI::addSection("Frame timing (ms)"))
+      return;
+    DebugUI::addValue("CPU frame", static_cast<float>(m_cpu.value));
+    if (m_gpu.value >= 0.0)
+      DebugUI::addValue("GPU frame", static_cast<float>(m_gpu.value));
+    else
+      DebugUI::addText("GPU frame", "n/a");
+    DebugUI::addValue("Swap + events", static_cast<float>(m_swap.value));
+
+    if (!DebugUI::addSection("System CPU (ms), slowest first"))
+      return;
+    std::vector<const SystemTime *> order;
+    order.reserve(m_systems.size());
+    for (const SystemTime &s : m_systems) {
+      if (s.ms.value >= 0.0) // appeared since the last refresh
+        order.push_back(&s);
+    }
+    std::sort(order.begin(), order.end(),
+              [](const SystemTime *a, const SystemTime *b) {
+                return a->ms.value > b->ms.value;
+              });
+    for (const SystemTime *s : order)
+      DebugUI::addValue(s->name, static_cast<float>(s->ms.value));
+  }
+
+private:
+  struct SystemTime {
+    std::string name;
+    Smoothed ms;
+  };
+
+  double m_elapsed = 0.0;
+  bool m_published = false;
+
+  Smoothed m_cpu;
+  Smoothed m_swap;
+  Smoothed m_gpu;
+  std::vector<SystemTime> m_systems;
+};
+
+} // namespace
 
 void Engine::init() {
   m_world.init();
@@ -161,6 +287,12 @@ void Engine::run(IGame &game) {
 
   LOG_INFO("Starting main loop");
 
+  using Clock = std::chrono::steady_clock;
+  const auto msBetween = [](Clock::time_point a, Clock::time_point b) {
+    return std::chrono::duration<double, std::milli>(b - a).count();
+  };
+  FrameTimings timings;
+
   while (!m_window.shouldClose()) {
     double currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
@@ -175,17 +307,30 @@ void Engine::run(IGame &game) {
       accumulator = 0.0f;
     }
 
+    auto &device = m_world.getRenderDevice();
+    const auto cpuStart = Clock::now();
+
     DebugUI::beginFrame();
+    if constexpr (DebugUI::kEnabled)
+      device.beginGpuTimer();
     m_world.updateSystems(deltaTime);
     DebugUI::addValue("FPS", 1.0f / deltaTime);
     DebugUI::addValue("Avg FPS", avgFPS);
+    timings.show();
     DebugUI::endFrame();
+    if constexpr (DebugUI::kEnabled)
+      device.endGpuTimer();
 
+    const auto cpuEnd = Clock::now();
     m_window.swapBuffers();
     m_world.swapInputBuffers();
     m_window.pollEvents();
 
-    m_world.getRenderDevice().checkErrors();
+    device.checkErrors();
+    if constexpr (DebugUI::kEnabled) {
+      timings.record(m_world, deltaTime, msBetween(cpuStart, cpuEnd),
+                     msBetween(cpuEnd, Clock::now()), device.lastGpuTimeMs());
+    }
   }
 
   LOG_INFO("Exiting main loop");

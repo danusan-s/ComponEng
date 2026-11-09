@@ -380,6 +380,27 @@ public:
   /** Check for API errors and log them. Returns error count. */
   virtual int checkErrors() const = 0;
 
+  /**
+   * GPU timing. Everything submitted between beginGpuTimer() and
+   * endGpuTimer() is timed on the GPU. The result is not available until the
+   * GPU has finished that work, so lastGpuTimeMs() reports a frame that is a
+   * few frames old rather than stalling to wait for the current one. One
+   * begin/end pair per frame; they must not nest.
+   *
+   * Optional: the defaults do nothing and report "unavailable", so devices
+   * without timer queries (and test fakes) need not implement them.
+   */
+  virtual void beginGpuTimer() {
+  }
+  virtual void endGpuTimer() {
+  }
+
+  /** Milliseconds of GPU work in the most recent completed timed span, or a
+   *  negative value if none has completed (or timing is unsupported). */
+  virtual double lastGpuTimeMs() const {
+    return -1.0;
+  }
+
   // Factory methods
   virtual std::unique_ptr<IShader> createShader() = 0;
   virtual std::unique_ptr<ITexture> createTexture() = 0;
