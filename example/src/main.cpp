@@ -35,7 +35,7 @@ public:
     constexpr float scaleMax = 5.0f;
     constexpr float massMin = 0.5f;
     constexpr float massMax = 5.0f;
-    constexpr int count = 1000;
+    constexpr int count = 2500; // count each for cube and sphere
 
     auto &audioManager = world.getResource<AudioManager>();
     audioManager.registerSound(

@@ -21,7 +21,7 @@ exe="${1:?usage: $0 <executable> [seconds] [startup-delay-ms]}"
 seconds="${2:-20}"
 delay_ms="${3:-4000}"
 
-for tool in perf stackcollapse-perf.pl flamegraph.pl; do
+for tool in perf prime-run stackcollapse-perf.pl flamegraph.pl; do
   command -v "$tool" > /dev/null || { echo "missing: $tool" >&2; exit 1; }
 done
 
@@ -32,7 +32,7 @@ mkdir -p "$out"
 # dominate a short capture and has nothing to do with steady-state frames.
 timeout -s INT "$((seconds + delay_ms / 1000))" \
   perf record -D "$delay_ms" -F 999 -g --user-callchains -e cpu-clock:u \
-  -o "$out/perf.data" -- "$exe" > "$out/run.log" 2>&1 || true
+  -o "$out/perf.data" -- prime-run "$exe" > "$out/run.log" 2>&1 || true
 
 [ -s "$out/perf.data" ] || { echo "perf recorded nothing; see $out/run.log" >&2; exit 1; }
 

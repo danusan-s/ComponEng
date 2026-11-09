@@ -251,7 +251,8 @@ TEST_F(SystemScene, WithoutPlayOnAwakeItStaysSilentUntilAsked) {
 }
 
 TEST_F(SystemScene, StoppingPausesAndAskingAgainResumes) {
-  spawn(AudioComponent{.audioName = "long", .playOnAwake = false, .loop = true});
+  spawn(
+      AudioComponent{.audioName = "long", .playOnAwake = false, .loop = true});
   for (int i = 0; i < 3; ++i) {
     audio().play = true;
     tick(0.05f);
@@ -263,7 +264,8 @@ TEST_F(SystemScene, StoppingPausesAndAskingAgainResumes) {
 }
 
 TEST_F(SystemScene, ASoundThatEndsClearsPlayAndCanBeTriggeredAgain) {
-  spawn(AudioComponent{.audioName = "blip", .playOnAwake = true, .loop = false});
+  spawn(
+      AudioComponent{.audioName = "blip", .playOnAwake = true, .loop = false});
   tick(0.5f);
   tick(); // notices the sound has ended
   EXPECT_FALSE(audio().play);
@@ -287,7 +289,8 @@ TEST_F(SystemScene, AmbientSoundsDoNotAccumulateInstances) {
 }
 
 TEST_F(SystemScene, AnUnregisteredNameWaitsInsteadOfFailing) {
-  spawn(AudioComponent{.audioName = "later", .playOnAwake = true, .loop = true});
+  spawn(
+      AudioComponent{.audioName = "later", .playOnAwake = true, .loop = true});
   tick();
   EXPECT_EQ(audio().audioID, core::INVALID_HANDLE);
 

@@ -4,6 +4,7 @@
 #include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/events/collision_event.hpp"
+#include "componeng/physics/broad_phase.hpp"
 #include "componeng/physics/collider_component.hpp"
 #include "componeng/physics/collision_detection.hpp"
 #include "componeng/physics/physics_config.hpp"
@@ -137,31 +138,43 @@ void PhysicsSystem::onUpdate(const ecs::SystemState &state) {
     if (n < 2)
       continue;
 
+    // Broad phase: sweep and prune on AABBs to find candidate pairs.
+    std::vector<Aabb> bounds(n);
+    for (size_t i = 0; i < n; ++i)
+      bounds[i] =
+          computeColliderAabb(*colliders[i].collider, *colliders[i].transform);
+    const std::vector<std::pair<size_t, size_t>> candidates =
+        sweepAndPrune(bounds);
+    const size_t numCandidates = candidates.size();
+    if (numCandidates == 0)
+      continue;
+
+    // Narrow phase: test candidates in parallel chunks.
     size_t numThreads = state.world->threadPool().threadCount();
-    size_t chunkSize = std::max(size_t(1), n / numThreads);
+    size_t chunkSize = std::max(size_t(1), numCandidates / numThreads);
 
     std::vector<std::vector<CollisionPair>> threadCollisions(numThreads);
 
     std::vector<std::future<void>> futures;
     for (size_t t = 0; t < numThreads; ++t) {
-      size_t iStart = t * chunkSize;
-      size_t iEnd = (t == numThreads - 1) ? n : iStart + chunkSize;
+      size_t pStart = t * chunkSize;
+      size_t pEnd = (t == numThreads - 1) ? numCandidates : pStart + chunkSize;
 
-      if (iStart >= n - 1)
+      if (pStart >= numCandidates)
         break;
 
-      futures.push_back(state.world->threadPool().submit([&, t, iStart,
-                                                          iEnd]() {
-        for (size_t i = iStart; i < iEnd; ++i) {
-          for (size_t k = i + 1; k < n; ++k) {
-            CollisionInfo info;
-            if (!testCollision(*colliders[i].collider, *colliders[i].transform,
-                               *colliders[k].collider, *colliders[k].transform,
-                               info))
-              continue;
+      futures.push_back(state.world->threadPool().submit([&, t, pStart,
+                                                          pEnd]() {
+        for (size_t p = pStart; p < pEnd; ++p) {
+          const size_t i = candidates[p].first;
+          const size_t k = candidates[p].second;
+          CollisionInfo info;
+          if (!testCollision(*colliders[i].collider, *colliders[i].transform,
+                             *colliders[k].collider, *colliders[k].transform,
+                             info))
+            continue;
 
-            threadCollisions[t].push_back({i, k, info});
-          }
+          threadCollisions[t].push_back({i, k, info});
         }
       }));
     }

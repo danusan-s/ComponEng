@@ -150,6 +150,7 @@ set(TEST_SOURCES
     tests/test_archetype.cpp
     tests/test_query.cpp
     tests/test_collision.cpp
+    tests/test_broad_phase.cpp
     tests/test_serialization.cpp
     tests/test_math.cpp
     tests/test_instance_data.cpp
