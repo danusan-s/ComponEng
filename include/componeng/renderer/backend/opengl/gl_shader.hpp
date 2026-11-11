@@ -4,6 +4,7 @@
 #include "glad/glad.h"
 
 #include <unordered_map>
+#include <vector>
 
 namespace componeng::renderer::opengl {
 
@@ -24,6 +25,13 @@ public:
                  const char *geometryPath = nullptr) override;
   void use() const override;
   void release() override;
+
+  void beginGpuTimer() const override;
+  void endGpuTimer() const override;
+  void collectGpuTimer() const override;
+  double lastGpuTimeMs() const override {
+    return m_gpuTimeMs;
+  }
 
   void setFloat(const char *name, float value) const override;
   void setInteger(const char *name, int value) const override;
@@ -49,6 +57,23 @@ private:
 
   GLuint m_id = 0;
   mutable std::unordered_map<core::Name, GLint> m_uniformLocationCache;
+
+  // GPU timer: one slot per in-flight frame. Each timed span is a pair of
+  // GL_TIMESTAMP queries (start, end), because GL_TIME_ELAPSED cannot be used
+  // here: the device's whole-frame timer keeps one active and they cannot
+  // nest. A slot's result is only read once the GPU reports it available, so
+  // reading never stalls.
+  struct GpuSlot {
+    std::vector<GLuint> queries; // 2 per span: [start0, end0, start1, ...]
+    int spans = 0;
+    bool pending = false; // frame closed, result not read yet
+  };
+  static constexpr int kGpuSlotCount = 4;
+  mutable GpuSlot m_gpuSlots[kGpuSlotCount];
+  mutable int m_gpuCurrent = 0;        // slot the frame in progress records to
+  mutable bool m_gpuSpanOpen = false;  // begin() issued a start that end() closes
+  mutable double m_gpuTimeMs = -1.0;
+  void releaseGpuQueries();
 };
 
 } // namespace componeng::renderer::opengl

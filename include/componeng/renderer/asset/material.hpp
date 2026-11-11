@@ -151,6 +151,14 @@ public:
     return m_renderState;
   }
 
+  /** True when this material blends without writing depth. RenderSystem draws
+   *  such batches after all the others so they blend over a finished opaque
+   *  scene. */
+  bool isTransparent() const {
+    return m_renderState.blend != api::BlendMode::None &&
+           !m_renderState.depthWrite;
+  }
+
   /** Metres added on every side of an entity's bounding box when culling it.
    *  Needed when the vertex shader moves geometry outside the mesh's own
    *  bounds (billboards, wind sway, waves); otherwise such entities would be

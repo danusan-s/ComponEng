@@ -91,11 +91,23 @@ class FrameTimings {
 public:
   static constexpr double kWindowSeconds = 0.5;
 
-  void record(const ecs::World &world, double deltaSeconds, double cpuMs,
-              double swapMs, double gpuMs) {
+  void record(const ecs::World &world, const renderer::AssetManager &assets,
+              double deltaSeconds, double cpuMs, double swapMs, double gpuMs) {
     m_cpu.add(cpuMs);
     m_swap.add(swapMs);
     m_gpu.add(gpuMs);
+
+    assets.forEachShader(
+        [&](Name name, const renderer::Shader &shader) {
+          auto it = std::find_if(
+              m_shaders.begin(), m_shaders.end(),
+              [&](const SystemTime &s) { return s.name == name.c_str(); });
+          if (it == m_shaders.end()) {
+            m_shaders.push_back({name.c_str(), {}});
+            it = m_shaders.end() - 1;
+          }
+          it->ms.add(shader.lastGpuTimeMs());
+        });
 
     std::size_t i = 0;
     world.forEachSystemTiming([&](const char *name, double ms) {
@@ -110,6 +122,8 @@ public:
       m_swap.publish();
       m_gpu.publish();
       for (SystemTime &s : m_systems)
+        s.ms.publish();
+      for (SystemTime &s : m_shaders)
         s.ms.publish();
       m_elapsed = 0.0;
       m_published = true;
@@ -126,11 +140,22 @@ public:
       DebugUI::addText("GPU frame", "n/a");
     DebugUI::addValue("Swap + events", static_cast<float>(m_swap.value));
 
-    if (!DebugUI::addSection("System CPU (ms), slowest first"))
-      return;
+    if (DebugUI::addSection("System CPU (ms), slowest first"))
+      showSorted(m_systems);
+    if (DebugUI::addSection("Shader GPU (ms), slowest first"))
+      showSorted(m_shaders);
+  }
+
+private:
+  struct SystemTime {
+    std::string name;
+    Smoothed ms;
+  };
+
+  static void showSorted(const std::vector<SystemTime> &times) {
     std::vector<const SystemTime *> order;
-    order.reserve(m_systems.size());
-    for (const SystemTime &s : m_systems) {
+    order.reserve(times.size());
+    for (const SystemTime &s : times) {
       if (s.ms.value >= 0.0) // appeared since the last refresh
         order.push_back(&s);
     }
@@ -142,12 +167,6 @@ public:
       DebugUI::addValue(s->name, static_cast<float>(s->ms.value));
   }
 
-private:
-  struct SystemTime {
-    std::string name;
-    Smoothed ms;
-  };
-
   double m_elapsed = 0.0;
   bool m_published = false;
 
@@ -155,6 +174,7 @@ private:
   Smoothed m_swap;
   Smoothed m_gpu;
   std::vector<SystemTime> m_systems;
+  std::vector<SystemTime> m_shaders;
 };
 
 } // namespace
@@ -197,6 +217,20 @@ void Engine::init() {
 
   assetManager.registerMaterial<renderer::DiffuseMaterial>("default_diffuse",
                                                            "default", "white");
+
+  // Same shader as default_diffuse, but blended and without depth writes so
+  // things behind it show through. The entity's ColorComponent alpha sets the
+  // opacity. Culling is off so a thin plane is visible from both sides.
+  assetManager.registerMaterial<renderer::DiffuseMaterial>(
+      "transparent_diffuse", "default", "white");
+  {
+    renderer::api::RenderState state;
+    state.cull = renderer::api::CullMode::None;
+    state.depthWrite = false;
+    state.blend = renderer::api::BlendMode::Alpha;
+    assetManager.getMaterial(assetManager.getMaterialID("transparent_diffuse"))
+        .setRenderState(state);
+  }
 
   assetManager.loadShader(
       utils::Utils::getAssetPath("assets/shaders/pbr.vert").c_str(),
@@ -320,6 +354,8 @@ void Engine::run(IGame &game) {
     DebugUI::endFrame();
     if constexpr (DebugUI::kEnabled)
       device.endGpuTimer();
+    if constexpr (DebugUI::kEnabled)
+      m_world.getResource<renderer::AssetManager>().collectShaderTimings();
 
     const auto cpuEnd = Clock::now();
     m_window.swapBuffers();
@@ -328,7 +364,8 @@ void Engine::run(IGame &game) {
 
     device.checkErrors();
     if constexpr (DebugUI::kEnabled) {
-      timings.record(m_world, deltaTime, msBetween(cpuStart, cpuEnd),
+      timings.record(m_world, m_world.getResource<renderer::AssetManager>(),
+                     deltaTime, msBetween(cpuStart, cpuEnd),
                      msBetween(cpuEnd, Clock::now()), device.lastGpuTimeMs());
     }
   }

@@ -21,13 +21,13 @@ layout(std140) uniform FrameData {
 };
 
 out vec3 FragPos;
-out vec3 ObjectColor;
+out vec4 ObjectColor;
 out vec3 Normal;
 out vec2 TexCoords;
 
 void main()
 {
-    ObjectColor = instanceColor.rgb;
+    ObjectColor = instanceColor;
     FragPos = vec3(instanceModel * vec4(aPos, 1.0f));
     Normal = mat3(transpose(inverse(instanceModel))) * aNormal;
     TexCoords = aUV;

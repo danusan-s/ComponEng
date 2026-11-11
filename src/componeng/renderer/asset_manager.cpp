@@ -21,6 +21,11 @@ void AssetManager::loadShader(const char *vShaderFile, const char *fShaderFile,
   m_shaders[name] = id;
 }
 
+void AssetManager::collectShaderTimings() const {
+  for (const auto &shader : m_shaderResources)
+    shader->collectGpuTimer();
+}
+
 const Shader &AssetManager::getShader(core::HandleID id) const {
   return *m_shaderResources.at(id - 1);
 }

@@ -107,9 +107,94 @@ void GLShader::use() const {
 }
 
 void GLShader::release() {
+  releaseGpuQueries();
   if (m_id != 0) {
     glDeleteProgram(m_id);
     m_id = 0;
+  }
+}
+
+void GLShader::releaseGpuQueries() {
+  for (GpuSlot &slot : m_gpuSlots) {
+    if (!slot.queries.empty()) {
+      glDeleteQueries(static_cast<GLsizei>(slot.queries.size()),
+                      slot.queries.data());
+    }
+    slot = GpuSlot{};
+  }
+  m_gpuCurrent = 0;
+  m_gpuSpanOpen = false;
+  m_gpuTimeMs = -1.0;
+}
+
+void GLShader::beginGpuTimer() const {
+  if (m_gpuSpanOpen)
+    return; // already timing; spans do not nest
+  GpuSlot &slot = m_gpuSlots[m_gpuCurrent];
+  // Every slot is still waiting on the GPU: skip this span rather than
+  // overwrite queries that are in flight.
+  if (slot.pending)
+    return;
+
+  const std::size_t needed = static_cast<std::size_t>(slot.spans + 1) * 2;
+  if (slot.queries.size() < needed) {
+    const std::size_t have = slot.queries.size();
+    slot.queries.resize(needed);
+    glGenQueries(static_cast<GLsizei>(needed - have), &slot.queries[have]);
+  }
+  glQueryCounter(slot.queries[static_cast<std::size_t>(slot.spans) * 2],
+                 GL_TIMESTAMP);
+  m_gpuSpanOpen = true;
+}
+
+void GLShader::endGpuTimer() const {
+  if (!m_gpuSpanOpen)
+    return;
+  GpuSlot &slot = m_gpuSlots[m_gpuCurrent];
+  glQueryCounter(slot.queries[static_cast<std::size_t>(slot.spans) * 2 + 1],
+                 GL_TIMESTAMP);
+  ++slot.spans;
+  m_gpuSpanOpen = false;
+}
+
+void GLShader::collectGpuTimer() const {
+  endGpuTimer(); // a span left open belongs to this frame
+
+  // Close the frame. A frame in which the shader was unused is closed too
+  // (zero spans), so its 0 ms is reported in order, after older frames.
+  GpuSlot &current = m_gpuSlots[m_gpuCurrent];
+  if (!current.pending) {
+    current.pending = true;
+    m_gpuCurrent = (m_gpuCurrent + 1) % kGpuSlotCount;
+  }
+
+  // Collect finished frames, oldest first, stopping at the first one the GPU
+  // has not finished so results are never reported out of order.
+  for (int i = 0; i < kGpuSlotCount; ++i) {
+    GpuSlot &slot = m_gpuSlots[(m_gpuCurrent + i) % kGpuSlotCount];
+    if (!slot.pending)
+      continue;
+    if (slot.spans > 0) {
+      // Timestamps complete in submission order, so the last end implies all.
+      GLint available = 0;
+      glGetQueryObjectiv(slot.queries[static_cast<std::size_t>(slot.spans) * 2 - 1],
+                         GL_QUERY_RESULT_AVAILABLE, &available);
+      if (!available)
+        break;
+    }
+    GLuint64 nanoseconds = 0;
+    for (int s = 0; s < slot.spans; ++s) {
+      GLuint64 start = 0;
+      GLuint64 end = 0;
+      glGetQueryObjectui64v(slot.queries[static_cast<std::size_t>(s) * 2],
+                            GL_QUERY_RESULT, &start);
+      glGetQueryObjectui64v(slot.queries[static_cast<std::size_t>(s) * 2 + 1],
+                            GL_QUERY_RESULT, &end);
+      nanoseconds += end - start;
+    }
+    m_gpuTimeMs = static_cast<double>(nanoseconds) * 1e-6;
+    slot.spans = 0;
+    slot.pending = false;
   }
 }
 

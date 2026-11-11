@@ -9,6 +9,22 @@ void Shader::use() const {
   m_impl->use();
 }
 
+void Shader::beginGpuTimer() const {
+  m_impl->beginGpuTimer();
+}
+
+void Shader::endGpuTimer() const {
+  m_impl->endGpuTimer();
+}
+
+void Shader::collectGpuTimer() const {
+  m_impl->collectGpuTimer();
+}
+
+double Shader::lastGpuTimeMs() const {
+  return m_impl->lastGpuTimeMs();
+}
+
 void Shader::compile(const char *vertexSource, const char *fragmentSource,
                      const char *geometrySource) {
   m_impl->loadGLSL(vertexSource, fragmentSource, geometrySource);

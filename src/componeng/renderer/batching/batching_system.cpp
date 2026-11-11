@@ -90,7 +90,8 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
             if (inserted) {
               it->second = renderQueue.openBatch(key.meshID, key.materialID,
                                                  material.getShaderID(),
-                                                 material.getTextureID());
+                                                 material.getTextureID(),
+                                                 material.isTransparent());
             }
             lastKey = key;
             lastBatch = it->second;
@@ -140,7 +141,8 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
 
         const uint32_t index = renderQueue.openBatch(m.meshID, mat.materialID,
                                                      material.getShaderID(),
-                                                     material.getTextureID());
+                                                     material.getTextureID(),
+                                                     material.isTransparent());
         RenderBatch &batch = renderQueue.batch(index);
         batch.procedural = true;
         batch.instanceCount = static_cast<uint32_t>(procedural.count);

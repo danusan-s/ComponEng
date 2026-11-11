@@ -1,7 +1,7 @@
 #version 330 core
 
 in vec3 FragPos;
-in vec3 ObjectColor;
+in vec4 ObjectColor;
 in vec3 Normal;
 in vec2 TexCoords;
 
@@ -35,8 +35,10 @@ void main()
     vec3 ambient = ambi * lightColor;
 
     vec3 textureColor = texture(Tex, TexCoords).rgb;
-    vec3 result = (ambient + diffuse) * textureColor * ObjectColor;
+    vec3 result = (ambient + diffuse) * textureColor * ObjectColor.rgb;
 
-    FragColor = vec4(result, 1.0);
+    // Alpha comes from the entity's ColorComponent; it only has a visible
+    // effect with a material whose RenderState blends (see transparent_diffuse).
+    FragColor = vec4(result, ObjectColor.a);
 }
 

@@ -211,6 +211,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
         auto &cam =
             state.world->getComponent<camera::CameraComponent>(mainCameraID);
 
+        if constexpr (core::DebugUI::kEnabled)
+          shader.beginGpuTimer();
         shader.use();
         if (!shader.usesFrameData()) {
           setLooseFrameUniforms(shader, frame, viewProj);
@@ -238,6 +240,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
         renderDevice.drawFullscreenTriangle();
 
         renderDevice.setRenderState(api::RenderState{});
+        if constexpr (core::DebugUI::kEnabled)
+          shader.endGpuTimer();
       });
 
   int instancesRendered = 0;
@@ -254,6 +258,9 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   // fogColor). The shader keeps that value, so after such a material the
   // frame-wide uniforms must be sent again even on the same shader.
   bool materialOverrodeUniforms = false;
+  // GPU time is attributed per shader: a span runs from binding a shader until
+  // the next shader is bound (or the loop ends).
+  const Shader *timedShader = nullptr;
 
   for (std::size_t batchIndex = 0; batchIndex < renderQueue.size();
        ++batchIndex) {
@@ -270,6 +277,12 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
     const bool shaderChanged = material.getShaderID() != boundShader;
     if (shaderChanged) {
+      if constexpr (core::DebugUI::kEnabled) {
+        if (timedShader)
+          timedShader->endGpuTimer();
+        shader.beginGpuTimer();
+        timedShader = &shader;
+      }
       shader.use();
       boundShader = material.getShaderID();
     }
@@ -387,6 +400,11 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
     ++drawCalls;
     instancesRendered += batch.instanceCount;
+  }
+
+  if constexpr (core::DebugUI::kEnabled) {
+    if (timedShader)
+      timedShader->endGpuTimer();
   }
 
   // The queue is cleared by BatchingSystem at the start of next frame, which

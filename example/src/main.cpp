@@ -31,10 +31,13 @@ class Game : public IGame {
 public:
   void init(World &world) override {
     constexpr float positionRange = 2000.0f;
+    // Walls are a little taller than the arena so they overlap floor and roof
+    constexpr float wallHeight = positionRange * 1.1f;
     constexpr float scaleMin = 1.0f;
     constexpr float scaleMax = 5.0f;
     constexpr float massMin = 0.5f;
     constexpr float massMax = 5.0f;
+    constexpr float velocityRange = 50.0f;
     constexpr int count = 20000; // count each for cube and sphere
 
     auto &audioManager = world.getResource<AudioManager>();
@@ -55,6 +58,8 @@ public:
     std::uniform_real_distribution<float> randScale(scaleMin, scaleMax);
     std::uniform_real_distribution<float> randColor(0.0f, 1.0f);
     std::uniform_real_distribution<float> randMass(massMin, massMax);
+    std::uniform_real_distribution<float> randVelocity(-velocityRange,
+                                                       velocityRange);
 
     for (int i = 0; i < count; ++i) {
       EntityID entity = world.createEntity();
@@ -68,6 +73,9 @@ public:
               .rotation = Vec3(0.0f),
               .scale = Vec3(scale)},
           RigidBodyComponent{.type = RigidBodyComponent::Type::Dynamic,
+                             .velocity = Vec3(randVelocity(generator),
+                                              randVelocity(generator),
+                                              randVelocity(generator)),
                              .mass = randMass(generator),
                              .restitution = 1.0f},
           MaterialComponent{.materialName = "default_diffuse"},
@@ -91,7 +99,9 @@ public:
                              .rotation = Vec3(0.0f),
                              .scale = Vec3(scale)},
           RigidBodyComponent{.type = RigidBodyComponent::Type::Dynamic,
-                             .velocity = Vec3(0.0f, 0.0f, 0.0f),
+                             .velocity = Vec3(randVelocity(generator),
+                                              randVelocity(generator),
+                                              randVelocity(generator)),
                              .mass = randMass(generator),
                              .restitution = 1.0f},
           MaterialComponent{.materialName = "default_diffuse"},
@@ -105,10 +115,62 @@ public:
                                                    .scale = Vec3(1.0f)}});
     }
 
-    EntityID ground = world.createEntity();
+    EntityID floor = world.createEntity();
     world.addComponents(
-        ground,
+        floor,
         TransformComponent{.position = Vec3(0.0f, -positionRange, 0.0f),
+                           .rotation = Vec3(0.0f),
+                           .scale = Vec3(positionRange, 1.0f, positionRange)},
+        MeshComponent{.meshName = "cube"},
+        MaterialComponent{.materialName = "default_diffuse"},
+        ColorComponent{.color = Vec4(0.5f, 0.5f, 0.5f, 1.0f)},
+        RigidBodyComponent{.type = RigidBodyComponent::Type::Static,
+                           .restitution = 1.0f},
+        ColliderComponent{.type = ColliderType::Box,
+                          .transform =
+                              TransformComponent{.position = Vec3(0.0f),
+                                                 .rotation = Vec3(0.0f),
+                                                 .scale = Vec3(1.0f)}});
+
+    // Four walls enclosing the play area (scale = half extents)
+    struct WallSpec {
+      Vec3 position;
+      Vec3 scale;
+    };
+    // The x walls run one unit longer so the corners close.
+    const WallSpec walls[4] = {
+        {Vec3(-positionRange, 0.0f, 0.0f),
+         Vec3(1.0f, wallHeight, positionRange + 1.0f)},
+        {Vec3(positionRange, 0.0f, 0.0f),
+         Vec3(1.0f, wallHeight, positionRange + 1.0f)},
+        {Vec3(0.0f, 0.0f, -positionRange),
+         Vec3(positionRange - 1.0f, wallHeight, 1.0f)},
+        {Vec3(0.0f, 0.0f, positionRange),
+         Vec3(positionRange - 1.0f, wallHeight, 1.0f)},
+    };
+    for (const WallSpec &spec : walls) {
+      EntityID wall = world.createEntity();
+      world.addComponents(
+          wall,
+          TransformComponent{.position = spec.position,
+                             .rotation = Vec3(0.0f),
+                             .scale = spec.scale},
+          MeshComponent{.meshName = "cube"},
+          MaterialComponent{.materialName = "transparent_diffuse"},
+          ColorComponent{.color = Vec4(0.5f, 0.5f, 0.5f, 0.3f)},
+          RigidBodyComponent{.type = RigidBodyComponent::Type::Static,
+                             .restitution = 1.0f},
+          ColliderComponent{.type = ColliderType::Box,
+                            .transform =
+                                TransformComponent{.position = Vec3(0.0f),
+                                                   .rotation = Vec3(0.0f),
+                                                   .scale = Vec3(1.0f)}});
+    }
+
+    EntityID roof = world.createEntity();
+    world.addComponents(
+        roof,
+        TransformComponent{.position = Vec3(0.0f, positionRange, 0.0f),
                            .rotation = Vec3(0.0f),
                            .scale = Vec3(positionRange, 1.0f, positionRange)},
         MeshComponent{.meshName = "cube"},

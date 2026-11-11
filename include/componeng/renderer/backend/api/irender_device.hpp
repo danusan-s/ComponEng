@@ -125,6 +125,34 @@ public:
   /** Release GPU resources. */
   virtual void release() = 0;
 
+  /**
+   * Per-shader GPU timing. Work submitted between beginGpuTimer() and
+   * endGpuTimer() is attributed to this shader; a shader may be timed in
+   * several spans per frame and they are summed. collectGpuTimer() marks the
+   * end of a frame (call it once per frame for every shader, after the frame's
+   * commands are submitted) and picks up results the GPU has finished.
+   * Results arrive a few frames late rather than stalling, so lastGpuTimeMs()
+   * reports an older frame. Spans must not nest within one shader.
+   *
+   * Optional: the defaults do nothing and report "unavailable", so backends
+   * without timer queries (and test fakes) need not implement them. The
+   * methods are const, like use(), so they work on shaders held by const
+   * reference.
+   */
+  virtual void beginGpuTimer() const {
+  }
+  virtual void endGpuTimer() const {
+  }
+  virtual void collectGpuTimer() const {
+  }
+
+  /** Milliseconds of GPU work attributed to this shader in the most recent
+   *  completed frame (0 if it was not used), or a negative value if none has
+   *  completed yet (or timing is unsupported). */
+  virtual double lastGpuTimeMs() const {
+    return -1.0;
+  }
+
   // Uniform setters
   virtual void setFloat(const char *name, float value) const = 0;
   virtual void setInteger(const char *name, int value) const = 0;

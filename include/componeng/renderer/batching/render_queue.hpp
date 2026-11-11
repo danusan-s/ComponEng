@@ -27,6 +27,9 @@ struct RenderBatch {
   // and let the renderer notice shader/texture changes between draws.
   core::HandleID shaderID = 0;
   core::HandleID textureID = 0;
+  // Copied off the material (IMaterial::isTransparent); drawn after every
+  // opaque batch.
+  bool transparent = false;
 
   uint32_t instanceCount = 0;
   bool procedural = false;
@@ -48,7 +51,8 @@ public:
    *  references) are the stable handle: opening another batch may grow the
    *  pool. */
   uint32_t openBatch(core::HandleID meshID, core::HandleID materialID,
-                     core::HandleID shaderID, core::HandleID textureID) {
+                     core::HandleID shaderID, core::HandleID textureID,
+                     bool transparent = false) {
     if (m_active == m_pool.size()) {
       m_pool.emplace_back();
     }
@@ -57,6 +61,7 @@ public:
     batch.materialID = materialID;
     batch.shaderID = shaderID;
     batch.textureID = textureID;
+    batch.transparent = transparent;
     batch.instanceCount = 0;
     batch.procedural = false;
     batch.instanceData.clear();
@@ -67,8 +72,8 @@ public:
     return m_pool[index];
   }
 
-  /** Orders the open batches by shader, then texture, then material, then
-   *  mesh, so draws sharing GPU state are adjacent and the order is the same
+  /** Orders the open batches opaque first, transparent last, and within each
+   *  by shader, then texture, then material, then mesh, so draws sharing GPU state are adjacent and the order is the same
    *  every frame. Call once after the last openBatch(). */
   void sort() {
     m_order.resize(m_active);
@@ -78,8 +83,9 @@ public:
     std::sort(m_order.begin(), m_order.end(), [this](uint32_t a, uint32_t b) {
       const RenderBatch &x = m_pool[a];
       const RenderBatch &y = m_pool[b];
-      return std::tie(x.shaderID, x.textureID, x.materialID, x.meshID) <
-             std::tie(y.shaderID, y.textureID, y.materialID, y.meshID);
+      return std::tie(x.transparent, x.shaderID, x.textureID, x.materialID,
+                      x.meshID) < std::tie(y.transparent, y.shaderID,
+                                           y.textureID, y.materialID, y.meshID);
     });
   }
 

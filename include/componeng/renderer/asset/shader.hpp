@@ -38,6 +38,16 @@ public:
     return m_usesFrameData;
   }
 
+  /** Per-shader GPU timing (see IShader::beginGpuTimer). Time the work
+   *  submitted between begin and end against this shader; call
+   *  collectGpuTimer() once per frame to close it and read finished results. */
+  void beginGpuTimer() const;
+  void endGpuTimer() const;
+  void collectGpuTimer() const;
+  /** GPU milliseconds this shader used in the latest completed frame, or
+   *  negative if no result is available yet. Lags by a few frames. */
+  double lastGpuTimeMs() const;
+
   api::VertexLayout reflectInstanceLayout() const;
   std::vector<core::Name> reflectActiveUniformNames() const;
 

@@ -24,7 +24,7 @@ void DebugUI::init() {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
-  io.FontGlobalScale = 2.0f;
+  io.FontGlobalScale = 1.5f;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
   ImGui_ImplGlfw_InitForOpenGL(window, true);

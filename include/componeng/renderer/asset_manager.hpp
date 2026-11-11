@@ -40,6 +40,16 @@ public:
   const Shader &getShader(core::HandleID id) const;
   core::HandleID getShaderID(core::Name name) const;
 
+  /** Calls `fn(name, shader)` for every loaded shader, in no fixed order. */
+  template <typename Fn> void forEachShader(Fn &&fn) const {
+    for (const auto &[name, id] : m_shaders)
+      fn(name, *m_shaderResources[id - 1]);
+  }
+
+  /** Ends the frame's GPU timing for every shader and reads finished results
+   *  (Shader::collectGpuTimer). Call once per frame. */
+  void collectShaderTimings() const;
+
   /** Loads an image file as a texture. `alpha` keeps the file's alpha channel
    *  (RGBA); otherwise it is loaded as RGB. `desc` sets wrapping, filtering,
    *  mipmaps, anisotropy and colour space; the default matches the engine's
