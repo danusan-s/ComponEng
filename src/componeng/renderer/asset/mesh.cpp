@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <sstream>
+#include <vector>
 
 namespace componeng::renderer {
 
@@ -46,12 +48,18 @@ void Mesh::generateFromWavefrontObj(const std::string &data) {
   std::vector<std::array<float, 3>> normals;
   std::vector<std::array<float, 2>> texCoords;
 
+  // Set by the kIndexedMarker line: v, vt and vn entry i together make vertex
+  // i, and a face corner names a vertex by its v index alone (see below).
+  bool indexed = false;
+
   while (std::getline(stream, line)) {
     std::istringstream lineStream(line);
     std::string prefix;
     lineStream >> prefix;
 
-    if (prefix == "v") {
+    if (prefix == kIndexedMarker) {
+      indexed = true;
+    } else if (prefix == "v") {
       float x, y, z;
       lineStream >> x >> y >> z;
       positions.push_back({x, y, z});
@@ -63,6 +71,27 @@ void Mesh::generateFromWavefrontObj(const std::string &data) {
       float u, v;
       lineStream >> u >> v;
       texCoords.push_back({u, v});
+    } else if (prefix == "f" && indexed) {
+      // Indexed mesh: the file already shares vertices, so a corner is just a
+      // vertex number (the first of its v/vt/vn indices) and the face becomes
+      // triangles over those vertices, with no vertex made per corner.
+      std::vector<unsigned int> corners;
+      std::string vertexStr;
+      while (lineStream >> vertexStr) {
+        const int index = std::atoi(vertexStr.c_str()) - 1;
+        if (index < 0 || index >= static_cast<int>(positions.size())) {
+          LOG_ERROR("Invalid vertex index in indexed OBJ file: %s.",
+                    vertexStr.c_str());
+          corners.clear();
+          break;
+        }
+        corners.push_back(static_cast<unsigned int>(index));
+      }
+      for (size_t k = 1; k + 1 < corners.size(); ++k) {
+        m_indices.push_back(corners[0]);
+        m_indices.push_back(corners[k]);
+        m_indices.push_back(corners[k + 1]);
+      }
     } else if (prefix == "f") {
       std::string vertexStr;
       int faceVertCount = 0;
@@ -138,6 +167,25 @@ void Mesh::generateFromWavefrontObj(const std::string &data) {
         m_indices.push_back(static_cast<unsigned int>(m_vertices.size() / 8) -
                             1);
       }
+    }
+  }
+
+  if (indexed) {
+    if (normals.size() != positions.size() ||
+        texCoords.size() != positions.size()) {
+      LOG_ERROR("Indexed OBJ file has %zu positions but %zu normals and %zu "
+                "texture coordinates; they must match.",
+                positions.size(), normals.size(), texCoords.size());
+      m_indices.clear();
+      return;
+    }
+    m_vertices.reserve(positions.size() * 8);
+    for (size_t i = 0; i < positions.size(); ++i) {
+      m_vertices.insert(m_vertices.end(), positions[i].begin(),
+                        positions[i].end());
+      m_vertices.insert(m_vertices.end(), normals[i].begin(), normals[i].end());
+      m_vertices.insert(m_vertices.end(), texCoords[i].begin(),
+                        texCoords[i].end());
     }
   }
 }

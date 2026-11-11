@@ -11,6 +11,18 @@
 namespace componeng::renderer {
 
 /**
+ * First token of the line that marks an OBJ file as pre-indexed (a comment to
+ * any other OBJ reader). By default the loader makes one vertex per triangle
+ * corner, whatever the file shares. In a marked file entry i of `v`, `vt` and
+ * `vn` together are vertex i, and a face lists vertex numbers (`f 1/1/1 2/2/2
+ * 3/3/3`; the first number of each corner is the one used), so shared vertices
+ * stay shared and the order the file puts them in, which an offline tool can
+ * choose for the GPU's vertex cache, is the order they are uploaded in.
+ * tools/optimize_meshes.py writes such files.
+ */
+inline constexpr const char *kIndexedMarker = "#componeng_indexed";
+
+/**
  * @brief Mesh resource with vertex/index buffers.
  *
  * Parses Wavefront OBJ data and uploads to the GPU via the IMesh interface.
@@ -25,7 +37,7 @@ public:
   void uploadToGPU(api::IRenderDevice &device);
 
   // Helper to generate mesh data from Wavefront OBJ format (vertices, normals,
-  // texcoords)
+  // texcoords). Files carrying kIndexedMarker are loaded as indexed meshes.
   void generateFromWavefrontObj(const std::string &data);
 
   // Access to the underlying IMesh for render device operations
