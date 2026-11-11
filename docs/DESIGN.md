@@ -445,7 +445,8 @@ const auto& events = world.get_events<CollisionEvent>();
 ### Rendering Flow
 1. **Query**: Query all entities with TransformComponent, MeshComponent, MaterialComponent
 2. **LOD**: `LodSystem` picks each `LodComponent` entity's mesh from its distance
-   to the camera (or hides it beyond the last level)
+   to the camera, or from the fraction of the screen's height it covers when
+   the component has a `size` (or hides it beyond the last level)
 3. **Culling**: Test each entity's AABB against view frustum planes
 4. **Batching**: Group visible entities by (meshID, materialID); each entity's
    instance data is written directly into its batch's flat buffer, with the model

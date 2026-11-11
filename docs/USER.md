@@ -528,6 +528,27 @@ A `mesh[k]` of 0 means "no mesh at this level", so a part can exist only up
 close. Entities that form one object switch together if they share a position
 and ranges.
 
+To choose levels by how much of the screen an entity covers instead of by
+metres, set `lod.size` (the object's extent in model space) and a
+`screenHeight[k]` threshold per level. The entity's height on screen as a
+fraction of the screen's is `size * max(scale) / (2 * distance * tan(fov / 2))`,
+level `k` holds while it is at least `screenHeight[k]`, and a threshold of 0
+never gives up:
+
+```cpp
+renderer::LodComponent lod;
+lod.size = 6.0f;                                           // a 6 m tall tree
+lod.mesh[0] = assets.getMeshID("tree_lod0");
+lod.screenHeight[0] = renderer::lodScreenHeight(6.0f, 40.0f, 70.0f);   // until 40 m
+lod.mesh[1] = assets.getMeshID("tree_lod1");
+lod.screenHeight[1] = 0.0f;                                // never hidden
+```
+
+Unlike metres, this lets big objects keep their detail further away than small
+ones and follows the camera's field of view, and it does not depend on the
+window's resolution. `lodScreenHeight(worldSize, distance, fov)` gives the
+threshold for a switch at a distance you have in mind.
+
 ### Textures and buffers from memory
 
 Textures need not come from image files. `createTexture` takes pixels you

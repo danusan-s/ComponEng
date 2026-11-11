@@ -6,7 +6,8 @@ namespace componeng::renderer {
 
 /**
  * @brief Selects each LodComponent entity's mesh from its distance to the
- * camera.
+ * camera, or, if the component has a `size`, from how much of the screen's
+ * height the entity covers (see LodComponent).
  *
  * Runs in the Presentation group before CullingSystem, so culling sees the
  * chosen mesh's bounds.
