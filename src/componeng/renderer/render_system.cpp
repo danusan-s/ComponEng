@@ -192,57 +192,78 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   renderDevice.bindUniformBuffer(kFrameDataBinding, *m_frameBuffer);
 
   // ------------------------------------------------------------------
-  // Sky pass: drawn first, behind everything, as a full-screen triangle.
-  // The shader pins depth to exactly 1.0, so the depth test must accept equal
-  // depth, and there is nothing behind it to protect so it does not write
-  // depth. Only the first SkyboxComponent is drawn.
+  // Sky pass: a full-screen triangle behind everything. The shader pins depth
+  // to exactly 1.0, so the depth test must accept equal depth, and there is
+  // nothing behind it to protect so it does not write depth. Only the first
+  // SkyboxComponent is drawn.
+  //
+  // It is drawn after the opaque batches and before the blended / depth-less
+  // ones (see the loops below), not first: the sky shader is expensive, and
+  // with the depth test on, the pixels the opaque geometry already covers
+  // are rejected before it runs.
   // ------------------------------------------------------------------
-  bool skyDrawn = false;
-  state.world->query().read<renderer::SkyboxComponent>().each(
-      [&](const renderer::SkyboxComponent &sky) {
-        if (skyDrawn) {
-          return;
-        }
-        skyDrawn = true;
+  // GPU time is attributed per shader: a span runs from binding a shader until
+  // the next shader is bound (or nullptr, at the end of a pass). A shader can
+  // get several spans per frame (opaque, sky, blended passes); they are summed.
+  // Compiled out with the debug UI so no timer queries are issued.
+  const Shader *timedShader = nullptr;
+  auto timeShader = [&](const Shader *next) {
+    if constexpr (core::DebugUI::kEnabled) {
+      if (timedShader)
+        timedShader->endGpuTimer();
+      if (next)
+        next->beginGpuTimer();
+      timedShader = next;
+    }
+  };
 
-        const auto &assets = state.world->getResource<AssetManager>();
-        const Shader &shader =
-            assets.getShader(assets.getShaderID(sky.shaderName));
-        auto &cam =
-            state.world->getComponent<camera::CameraComponent>(mainCameraID);
+  auto drawSky = [&]() {
+    bool skyDrawn = false;
+    state.world->query().read<renderer::SkyboxComponent>().each(
+        [&](const renderer::SkyboxComponent &sky) {
+          if (skyDrawn) {
+            return;
+          }
+          skyDrawn = true;
 
-        if constexpr (core::DebugUI::kEnabled)
-          shader.beginGpuTimer();
-        shader.use();
-        if (!shader.usesFrameData()) {
-          setLooseFrameUniforms(shader, frame, viewProj);
-        }
+          const auto &assets = state.world->getResource<AssetManager>();
+          const Shader &shader =
+              assets.getShader(assets.getShaderID(sky.shaderName));
+          auto &cam =
+              state.world->getComponent<camera::CameraComponent>(mainCameraID);
 
-        // Projection x rotation-only view, inverted: turns a pixel back into
-        // the direction the camera sees through it. No camera translation, so
-        // the sky stays fixed relative to the camera's orientation.
-        shader.setMatrix4("invSkyViewProj",
-                          core::inverse(cam.projectionMatrix * cam.viewMatrix));
-        shader.setVector3f("skyColor", sky.color);
-        // The fog colour as horizon lets fogged ground fade into the sky.
-        shader.setVector3f(
-            "horizonColor",
-            sky.horizonFromFog
-                ? core::Vec3(fog.color.x, fog.color.y, fog.color.z)
-                : sky.horizonColor);
+          timeShader(&shader);
+          shader.use();
+          if (!shader.usesFrameData()) {
+            setLooseFrameUniforms(shader, frame, viewProj);
+          }
 
-        api::RenderState skyState;
-        skyState.cull = api::CullMode::None;
-        skyState.depthFunc = api::DepthFunc::LessEqual;
-        skyState.depthWrite = false;
-        renderDevice.setRenderState(skyState);
+          // Projection x rotation-only view, inverted: turns a pixel back into
+          // the direction the camera sees through it. No camera translation, so
+          // the sky stays fixed relative to the camera's orientation.
+          shader.setMatrix4(
+              "invSkyViewProj",
+              core::inverse(cam.projectionMatrix * cam.viewMatrix));
+          shader.setVector3f("skyColor", sky.color);
+          // The fog colour as horizon lets fogged ground fade into the sky.
+          shader.setVector3f(
+              "horizonColor",
+              sky.horizonFromFog
+                  ? core::Vec3(fog.color.x, fog.color.y, fog.color.z)
+                  : sky.horizonColor);
 
-        renderDevice.drawFullscreenTriangle();
+          api::RenderState skyState;
+          skyState.cull = api::CullMode::None;
+          skyState.depthFunc = api::DepthFunc::LessEqual;
+          skyState.depthWrite = false;
+          renderDevice.setRenderState(skyState);
 
-        renderDevice.setRenderState(api::RenderState{});
-        if constexpr (core::DebugUI::kEnabled)
-          shader.endGpuTimer();
-      });
+          renderDevice.drawFullscreenTriangle();
+
+          renderDevice.setRenderState(api::RenderState{});
+          timeShader(nullptr);
+        });
+  };
 
   int instancesRendered = 0;
   auto &renderQueue = state.world->getResource<RenderQueue>();
@@ -258,12 +279,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   // fogColor). The shader keeps that value, so after such a material the
   // frame-wide uniforms must be sent again even on the same shader.
   bool materialOverrodeUniforms = false;
-  // GPU time is attributed per shader: a span runs from binding a shader until
-  // the next shader is bound (or the loop ends).
-  const Shader *timedShader = nullptr;
 
-  for (std::size_t batchIndex = 0; batchIndex < renderQueue.size();
-       ++batchIndex) {
+  auto drawBatch = [&](std::size_t batchIndex) {
     const RenderBatch &batch = renderQueue.sorted(batchIndex);
     const core::HandleID meshID = batch.meshID;
     const core::HandleID materialID = batch.materialID;
@@ -277,12 +294,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
     const bool shaderChanged = material.getShaderID() != boundShader;
     if (shaderChanged) {
-      if constexpr (core::DebugUI::kEnabled) {
-        if (timedShader)
-          timedShader->endGpuTimer();
-        shader.beginGpuTimer();
-        timedShader = &shader;
-      }
+      timeShader(&shader);
       shader.use();
       boundShader = material.getShaderID();
     }
@@ -372,7 +384,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
                                         batch.instanceCount);
       ++drawCalls;
       instancesRendered += batch.instanceCount;
-      continue;
+      return;
     }
 
     // Reuse one GPU buffer per (mesh,material) combo across frames instead of
@@ -400,12 +412,39 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
     ++drawCalls;
     instancesRendered += batch.instanceCount;
+  };
+
+  // Batches with no blending and the depth test on are opaque: they go before
+  // the sky. Anything blended or drawn without depth testing (a lens flare, a
+  // transparent surface) must land on top of the sky, so it goes after. Each
+  // group keeps the queue's sorted order.
+  auto isOpaque = [&](std::size_t i) {
+    const api::RenderState &rs =
+        assetManager.getMaterial(renderQueue.sorted(i).materialID)
+            .getRenderState();
+    return rs.blend == api::BlendMode::None && rs.depthTest;
+  };
+
+  for (std::size_t i = 0; i < renderQueue.size(); ++i) {
+    if (isOpaque(i)) {
+      drawBatch(i);
+    }
   }
 
-  if constexpr (core::DebugUI::kEnabled) {
-    if (timedShader)
-      timedShader->endGpuTimer();
+  // Closes the last opaque shader's span; the sky pass opens its own.
+  timeShader(nullptr);
+  drawSky();
+  // The sky pass changed the bound shader; what the loop tracked is stale.
+  boundShader = core::INVALID_HANDLE;
+  boundAlbedo = core::INVALID_HANDLE;
+  materialOverrodeUniforms = false;
+
+  for (std::size_t i = 0; i < renderQueue.size(); ++i) {
+    if (!isOpaque(i)) {
+      drawBatch(i);
+    }
   }
+  timeShader(nullptr);
 
   // The queue is cleared by BatchingSystem at the start of next frame, which
   // lets its batch storage be reused instead of freed.

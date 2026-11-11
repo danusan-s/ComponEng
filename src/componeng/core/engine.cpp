@@ -97,17 +97,16 @@ public:
     m_swap.add(swapMs);
     m_gpu.add(gpuMs);
 
-    assets.forEachShader(
-        [&](Name name, const renderer::Shader &shader) {
-          auto it = std::find_if(
-              m_shaders.begin(), m_shaders.end(),
-              [&](const SystemTime &s) { return s.name == name.c_str(); });
-          if (it == m_shaders.end()) {
-            m_shaders.push_back({name.c_str(), {}});
-            it = m_shaders.end() - 1;
-          }
-          it->ms.add(shader.lastGpuTimeMs());
-        });
+    assets.forEachShader([&](Name name, const renderer::Shader &shader) {
+      auto it = std::find_if(
+          m_shaders.begin(), m_shaders.end(),
+          [&](const SystemTime &s) { return s.name == name.c_str(); });
+      if (it == m_shaders.end()) {
+        m_shaders.push_back({name.c_str(), {}});
+        it = m_shaders.end() - 1;
+      }
+      it->ms.add(shader.lastGpuTimeMs());
+    });
 
     std::size_t i = 0;
     world.forEachSystemTiming([&](const char *name, double ms) {

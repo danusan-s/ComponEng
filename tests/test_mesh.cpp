@@ -7,10 +7,11 @@ using namespace componeng::renderer;
 
 namespace {
 
-// Two triangles sharing an edge, as a plain OBJ: the loader makes a vertex per corner.
-const char *kPlain =
-    "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nvn 0 0 1\nvt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\n"
-    "f 1/1/1 2/2/1 3/3/1\nf 1/1/1 3/3/1 4/4/1\n";
+// Two triangles sharing an edge, as a plain OBJ: the loader makes a vertex per
+// corner.
+const char *kPlain = "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nvn 0 0 1\nvt 0 0\nvt "
+                     "1 0\nvt 1 1\nvt 0 1\n"
+                     "f 1/1/1 2/2/1 3/3/1\nf 1/1/1 3/3/1 4/4/1\n";
 
 // The same mesh, marked as indexed: vertex i is entry i of v, vt and vn.
 std::string indexedQuad() {
@@ -38,7 +39,8 @@ TEST(MeshLoader, IndexedObjKeepsSharedVerticesShared) {
   EXPECT_EQ(m.m_vertices.size() / 8, 4u);
   ASSERT_EQ(m.m_indices.size(), 6u);
   const unsigned expected[] = {0, 1, 2, 0, 2, 3};
-  for (int i = 0; i < 6; ++i) EXPECT_EQ(m.m_indices[i], expected[i]);
+  for (int i = 0; i < 6; ++i)
+    EXPECT_EQ(m.m_indices[i], expected[i]);
 }
 
 TEST(MeshLoader, IndexedVerticesAreUploadedInFileOrderWithTheirOwnAttributes) {
@@ -77,7 +79,8 @@ TEST(MeshLoader, IndexedQuadsAreSplitIntoTwoTriangles) {
                              "f 1/1/1 2/2/2 3/3/3 4/4/4\n");
   ASSERT_EQ(m.m_indices.size(), 6u);
   const unsigned expected[] = {0, 1, 2, 0, 2, 3};
-  for (int i = 0; i < 6; ++i) EXPECT_EQ(m.m_indices[i], expected[i]);
+  for (int i = 0; i < 6; ++i)
+    EXPECT_EQ(m.m_indices[i], expected[i]);
 }
 
 TEST(MeshLoader, IndexedFileWithMismatchedAttributeCountsIsRejected) {
@@ -91,9 +94,10 @@ TEST(MeshLoader, IndexedFileWithMismatchedAttributeCountsIsRejected) {
 
 TEST(MeshLoader, IndexedFaceNamingAMissingVertexAddsNothing) {
   Mesh m;
-  m.generateFromWavefrontObj(std::string(kIndexedMarker) +
-                             "\nv 0 0 0\nv 1 0 0\nv 1 1 0\n"
-                             "vt 0 0\nvt 1 0\nvt 1 1\nvn 0 0 1\nvn 0 0 1\nvn 0 0 1\n"
-                             "f 1/1/1 2/2/2 9/9/9\n");
+  m.generateFromWavefrontObj(
+      std::string(kIndexedMarker) +
+      "\nv 0 0 0\nv 1 0 0\nv 1 1 0\n"
+      "vt 0 0\nvt 1 0\nvt 1 1\nvn 0 0 1\nvn 0 0 1\nvn 0 0 1\n"
+      "f 1/1/1 2/2/2 9/9/9\n");
   EXPECT_TRUE(m.m_indices.empty());
 }

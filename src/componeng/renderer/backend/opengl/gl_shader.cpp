@@ -177,8 +177,9 @@ void GLShader::collectGpuTimer() const {
     if (slot.spans > 0) {
       // Timestamps complete in submission order, so the last end implies all.
       GLint available = 0;
-      glGetQueryObjectiv(slot.queries[static_cast<std::size_t>(slot.spans) * 2 - 1],
-                         GL_QUERY_RESULT_AVAILABLE, &available);
+      glGetQueryObjectiv(
+          slot.queries[static_cast<std::size_t>(slot.spans) * 2 - 1],
+          GL_QUERY_RESULT_AVAILABLE, &available);
       if (!available)
         break;
     }

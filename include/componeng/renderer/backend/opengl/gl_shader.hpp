@@ -70,8 +70,9 @@ private:
   };
   static constexpr int kGpuSlotCount = 4;
   mutable GpuSlot m_gpuSlots[kGpuSlotCount];
-  mutable int m_gpuCurrent = 0;        // slot the frame in progress records to
-  mutable bool m_gpuSpanOpen = false;  // begin() issued a start that end() closes
+  mutable int m_gpuCurrent = 0; // slot the frame in progress records to
+  mutable bool m_gpuSpanOpen =
+      false; // begin() issued a start that end() closes
   mutable double m_gpuTimeMs = -1.0;
   void releaseGpuQueries();
 };

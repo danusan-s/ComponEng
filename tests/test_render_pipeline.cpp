@@ -199,9 +199,10 @@ TEST(RenderPipeline, EachMaterialsStateIsInEffectForItsDraw) {
 
   const auto &draws = s->rec().draws;
   ASSERT_EQ(draws.size(), 2u);
-  // matA (shader a) sorts before matB (shader b).
-  EXPECT_EQ(draws[0].state, api::RenderState{});
-  EXPECT_EQ(draws[1].state, decal);
+  // matB's state is opaque, so it is drawn first (before the sky), matA's
+  // default (blended) state after it.
+  EXPECT_EQ(draws[0].state, decal);
+  EXPECT_EQ(draws[1].state, api::RenderState{});
 }
 
 // --- Sky ---------------------------------------------------------------------
@@ -214,7 +215,7 @@ bool hasUniform(Scene &s, int shader, const char *name) {
 } // namespace
 
 TEST(RenderPipeline,
-     SkyIsAFullscreenTriangleDrawnBeforeTheSceneWithItsOwnState) {
+     SkyIsAFullscreenTriangleWithItsOwnStateThatGeometryDoesNotInherit) {
   auto s = makeScene();
   // Note: no "cube" mesh exists in this scene. The sky needs no mesh.
   s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox"); // id 3
@@ -229,12 +230,72 @@ TEST(RenderPipeline,
   EXPECT_EQ(sky.state.depthFunc, api::DepthFunc::LessEqual);
   EXPECT_FALSE(sky.state.depthWrite);
 
-  EXPECT_EQ(s->rec().drawSequence,
-            (std::vector<std::string>{"fullscreen", "indexed"}))
-      << "the sky is drawn first";
   ASSERT_EQ(s->rec().draws.size(), 1u);
   EXPECT_EQ(s->rec().draws[0].state, api::RenderState{})
       << "scene geometry must not inherit the sky's state";
+}
+
+namespace {
+api::RenderState opaqueState() {
+  api::RenderState st;
+  st.blend = api::BlendMode::None;
+  return st;
+}
+} // namespace
+
+TEST(RenderPipeline, SkyIsDrawnAfterOpaqueGeometryAndBeforeBlendedGeometry) {
+  auto s = makeScene();
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  // matA stays blended (the default state), matB is opaque.
+  s->assets()
+      .getMaterial(s->assets().getMaterialID("matB"))
+      .setRenderState(opaqueState());
+  s->spawn("tri", "matA", 0); // blended, shader a: sorts first
+  s->spawn("tri", "matB", 1); // opaque, shader b
+  s->frame();
+
+  EXPECT_EQ(s->rec().drawSequence,
+            (std::vector<std::string>{"indexed", "fullscreen", "indexed"}))
+      << "opaque, then the sky, then the blended draw, whatever the shader "
+         "order";
+  ASSERT_EQ(s->rec().draws.size(), 2u);
+  EXPECT_EQ(s->rec().draws[0].state, opaqueState());
+  EXPECT_EQ(s->rec().draws[1].state, api::RenderState{});
+}
+
+TEST(RenderPipeline, GeometryWithoutADepthTestIsDrawnOverTheSky) {
+  auto s = makeScene();
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  api::RenderState overlay = opaqueState();
+  overlay.depthTest = false; // e.g. a lens flare
+  s->assets()
+      .getMaterial(s->assets().getMaterialID("matA"))
+      .setRenderState(overlay);
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_EQ(s->rec().drawSequence,
+            (std::vector<std::string>{"fullscreen", "indexed"}));
+}
+
+TEST(RenderPipeline, GeometryStillDrawsAfterTheSkyWithItsOwnShaderBound) {
+  // The sky binds its own shader; the next batch must bind its own again
+  // even if it is the shader the batch loop used last.
+  auto s = makeScene();
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  s->assets()
+      .getMaterial(s->assets().getMaterialID("matA"))
+      .setRenderState(opaqueState());
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matC", 1); // matC: shader a, blended: drawn after the sky
+  s->frame();
+
+  ASSERT_EQ(s->rec().draws.size(), 2u);
+  EXPECT_EQ(s->rec().draws[0].shaderId, s->rec().draws[1].shaderId);
+  EXPECT_EQ(s->rec().draws[1].shaderId, 1);
 }
 
 TEST(RenderPipeline, NoSkyEntityMeansNoSkyDraw) {

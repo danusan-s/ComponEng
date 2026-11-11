@@ -73,8 +73,9 @@ public:
   }
 
   /** Orders the open batches opaque first, transparent last, and within each
-   *  by shader, then texture, then material, then mesh, so draws sharing GPU state are adjacent and the order is the same
-   *  every frame. Call once after the last openBatch(). */
+   *  by shader, then texture, then material, then mesh, so draws sharing GPU
+   * state are adjacent and the order is the same every frame. Call once after
+   * the last openBatch(). */
   void sort() {
     m_order.resize(m_active);
     for (std::size_t i = 0; i < m_active; ++i) {
