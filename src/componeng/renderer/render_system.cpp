@@ -18,6 +18,7 @@
 #include "componeng/renderer/component/skybox_component.hpp"
 #include "componeng/renderer/frame_data.hpp"
 #include "componeng/resources/fog.hpp"
+#include "componeng/resources/render_settings.hpp"
 
 #include <algorithm>
 #include <string>
@@ -55,11 +56,15 @@ static void setShaderUniforms(const Shader &shader, const IMaterial &material) {
 
 // Binds the extra textures, texture buffers and uniform blocks a material
 // declared (IMaterial::setTexture and friends). Problems are reported once.
+// `depthOnly` is for a depth pre-pass program, which holds only the vertex
+// stage: a block or sampler that only the fragment shader reads is expected
+// to be missing there and is skipped without a report.
 static void bindMaterialResources(api::IRenderDevice &device,
                                   const AssetManager &assets,
                                   const Shader &shader,
                                   const IMaterial &material,
-                                  std::unordered_set<std::string> &reported) {
+                                  std::unordered_set<std::string> &reported,
+                                  bool depthOnly) {
   auto report = [&reported](const std::string &key, const char *message,
                             const std::string &name) {
     if (reported.insert(key).second) {
@@ -104,12 +109,39 @@ static void bindMaterialResources(api::IRenderDevice &device,
     }
     if (shader.bindUniformBlock(b.block.c_str(), binding)) {
       device.bindUniformBuffer(binding, assets.getBuffer(b.buffer));
-    } else {
+    } else if (!depthOnly) {
       report("block:" + b.block, "the shader declares no uniform block",
              b.block);
     }
     ++binding;
   }
+}
+
+// Pipeline state for an opaque material's depth-only pre-pass draw: the
+// material keeps its culling, everything else is fixed.
+static api::RenderState depthPrepassState(const api::RenderState &material) {
+  api::RenderState s;
+  s.cull = material.cull;
+  s.depthTest = true;
+  s.depthWrite = true;
+  s.depthFunc = api::DepthFunc::Less;
+  s.blend = api::BlendMode::None;
+  s.colorWrite = false;
+  return s;
+}
+
+// Pipeline state for an opaque material's shaded draw. After a pre-pass the
+// depth buffer already holds the nearest surface, so only fragments at exactly
+// that depth are shaded and nothing more is written to it.
+static api::RenderState opaqueColorState(const api::RenderState &material,
+                                         bool afterPrepass) {
+  api::RenderState s;
+  s.cull = material.cull;
+  s.depthTest = true;
+  s.depthWrite = !afterPrepass;
+  s.depthFunc = afterPrepass ? api::DepthFunc::Equal : api::DepthFunc::Less;
+  s.blend = api::BlendMode::None;
+  return s;
 }
 
 // Sends FrameData's values as loose uniforms, for shaders that predate the
@@ -156,6 +188,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   auto &fog = state.world->getResource<resources::Fog>();
 
   int drawCalls = 0;
+  int prepassDrawCalls = 0;
 
   core::Vec3 lightDir = DEFAULT_LIGHT_DIR;
   core::Vec3 lightColor = DEFAULT_LIGHT_COLOR;
@@ -280,119 +313,19 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   // frame-wide uniforms must be sent again even on the same shader.
   bool materialOverrodeUniforms = false;
 
-  auto drawBatch = [&](std::size_t batchIndex) {
-    const RenderBatch &batch = renderQueue.sorted(batchIndex);
-    const core::HandleID meshID = batch.meshID;
-    const core::HandleID materialID = batch.materialID;
-
-    auto &material = assetManager.getMaterial(materialID);
-    const api::VertexLayout &layout = material.getVertexLayout();
-    const Mesh &model = assetManager.getMesh(meshID);
-    const Shader &shader = assetManager.getShader(material.getShaderID());
-    const Texture2D &albedoTex =
-        assetManager.getTexture(material.getTextureID());
-
-    const bool shaderChanged = material.getShaderID() != boundShader;
-    if (shaderChanged) {
-      timeShader(&shader);
-      shader.use();
-      boundShader = material.getShaderID();
-    }
-
-    renderDevice.setRenderState(material.getRenderState());
-
-    if (shaderChanged || materialOverrodeUniforms) {
-      if (!shader.usesFrameData()) {
-        setLooseFrameUniforms(shader, frame, viewProj);
-      }
-      shader.setInteger("albedoMap", 0);
-    }
-
-    // Texture toggles (PBR materials use textures; diffuse may not)
-    const auto *pbr = dynamic_cast<const PbrMaterial *>(&material);
-    const bool isPbr = pbr != nullptr;
-    shader.setInteger("useTextures", isPbr ? 1 : 0);
-    shader.setInteger("useNormalMap", isPbr ? 1 : 0);
-
-    // Bind albedo to texture unit 0
-    if (material.getTextureID() != boundAlbedo) {
-      renderDevice.setActiveTextureUnit(0);
-      albedoTex.bind();
-      boundAlbedo = material.getTextureID();
-    }
-
-    // Bind PBR textures to units 1-4 if available
-    if (isPbr) {
-      renderDevice.setActiveTextureUnit(1);
-      if (pbr->getNormalMapID() != 0) {
-        const Texture2D &normalTex =
-            assetManager.getTexture(pbr->getNormalMapID());
-        normalTex.bind();
-      } else {
-        albedoTex.bind(); // fallback
-      }
-      shader.setInteger("normalMap", 1);
-
-      renderDevice.setActiveTextureUnit(2);
-      if (pbr->getMetallicMapID() != 0) {
-        const Texture2D &metallicTex =
-            assetManager.getTexture(pbr->getMetallicMapID());
-        metallicTex.bind();
-      } else {
-        albedoTex.bind();
-      }
-      shader.setInteger("metallicMap", 2);
-
-      renderDevice.setActiveTextureUnit(3);
-      if (pbr->getRoughnessMapID() != 0) {
-        const Texture2D &roughTex =
-            assetManager.getTexture(pbr->getRoughnessMapID());
-        roughTex.bind();
-      } else {
-        albedoTex.bind();
-      }
-      shader.setInteger("roughnessMap", 3);
-
-      renderDevice.setActiveTextureUnit(4);
-      if (pbr->getAOMapID() != 0) {
-        const Texture2D &aoTex = assetManager.getTexture(pbr->getAOMapID());
-        aoTex.bind();
-      } else {
-        albedoTex.bind();
-      }
-      shader.setInteger("aoMap", 4);
-
-      // Back to unit 0 so the albedo binding tracked above stays the one that
-      // later binds and draws see.
-      renderDevice.setActiveTextureUnit(0);
-    }
-
-    bindMaterialResources(renderDevice, assetManager, shader, material,
-                          m_reportedBindingProblems);
-
-    // Set material uniforms (fogColor etc. from PbrMaterial constructor)
-    setShaderUniforms(shader, material);
-
-    materialOverrodeUniforms = !material.getUniforms().empty();
-
-    model.getImpl().bind();
-
-    // Procedural batches carry no per-instance data: nothing to upload and no
-    // instance attributes to enable; the shader reads gl_InstanceID.
+  // Uploads every batch's instance data. Done once, ahead of both the
+  // pre-pass and the colour pass, which then only bind the buffers.
+  // One GPU buffer is reused per (mesh,material) combo across frames instead
+  // of creating/destroying one every draw call; it is only reallocated
+  // (setData) when a batch needs more room than it did before, otherwise
+  // updated in place (setSubData).
+  for (std::size_t i = 0; i < renderQueue.size(); ++i) {
+    const RenderBatch &batch = renderQueue.sorted(i);
     if (batch.procedural) {
-      renderDevice.drawIndexedInstanced(model.indexCount(),
-                                        batch.instanceCount);
-      ++drawCalls;
-      instancesRendered += batch.instanceCount;
-      return;
+      continue; // no per-instance data: the shader reads gl_InstanceID
     }
-
-    // Reuse one GPU buffer per (mesh,material) combo across frames instead of
-    // creating/destroying one every draw call; only reallocate (setData) when
-    // this batch needs more room than it did before, otherwise update the
-    // existing buffer in place (setSubData).
     std::unique_ptr<api::IBuffer> &buf =
-        m_instanceBuffers[DrawKey{meshID, materialID}];
+        m_instanceBuffers[DrawKey{batch.meshID, batch.materialID}];
     if (!buf) {
       buf = renderDevice.createBuffer();
     }
@@ -403,46 +336,189 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
     } else if (requiredBytes > 0) {
       buf->setSubData(0, batch.instanceData.data(), requiredBytes);
     }
+  }
 
-    renderDevice.setupInstanceAttributes(*buf, layout);
+  // The queue is sorted opaque first, transparent last.
+  std::size_t opaqueEnd = 0;
+  while (opaqueEnd < renderQueue.size() &&
+         !renderQueue.sorted(opaqueEnd).transparent) {
+    ++opaqueEnd;
+  }
 
-    renderDevice.drawIndexedInstanced(model.indexCount(), batch.instanceCount);
+  const bool prepassEnabled =
+      !state.world->hasResource<resources::RenderSettings>() ||
+      state.world->getResource<resources::RenderSettings>().depthPrepass;
+  const bool prepassed = prepassEnabled && opaqueEnd > 0;
 
-    renderDevice.unbindInstanceAttributes(layout);
+  // `depthOnly` draws the batch with the shader's depth variant (see
+  // Shader::depthVariant), for the pre-pass: only what the vertex stage needs
+  // is set up, and the albedo and PBR textures are skipped.
+  auto drawBatch = [&](std::size_t batchIndex, bool depthOnly) {
+    const RenderBatch &batch = renderQueue.sorted(batchIndex);
+    const core::HandleID meshID = batch.meshID;
+    const core::HandleID materialID = batch.materialID;
 
-    ++drawCalls;
-    instancesRendered += batch.instanceCount;
-  };
+    auto &material = assetManager.getMaterial(materialID);
+    const api::VertexLayout &layout = material.getVertexLayout();
+    const Mesh &model = assetManager.getMesh(meshID);
+    const Shader &colorShader = assetManager.getShader(material.getShaderID());
+    const Shader &shader = depthOnly ? colorShader.depthVariant() : colorShader;
 
-  // Batches with no blending and the depth test on are opaque: they go before
-  // the sky. Anything blended or drawn without depth testing (a lens flare, a
-  // transparent surface) must land on top of the sky, so it goes after. Each
-  // group keeps the queue's sorted order.
-  auto isOpaque = [&](std::size_t i) {
-    const api::RenderState &rs =
-        assetManager.getMaterial(renderQueue.sorted(i).materialID)
-            .getRenderState();
-    return rs.blend == api::BlendMode::None && rs.depthTest;
-  };
-
-  for (std::size_t i = 0; i < renderQueue.size(); ++i) {
-    if (isOpaque(i)) {
-      drawBatch(i);
+    const bool shaderChanged = material.getShaderID() != boundShader;
+    if (shaderChanged) {
+      // Pre-pass time is attributed to the shader the batch belongs to, not
+      // its depth variant, so a shader's timing covers all of its draws.
+      timeShader(&colorShader);
+      shader.use();
+      boundShader = material.getShaderID();
     }
+
+    if (depthOnly) {
+      renderDevice.setRenderState(
+          depthPrepassState(material.getRenderState()));
+    } else if (batch.transparent) {
+      renderDevice.setRenderState(material.getRenderState());
+    } else {
+      renderDevice.setRenderState(
+          opaqueColorState(material.getRenderState(), prepassed));
+    }
+
+    if (shaderChanged || materialOverrodeUniforms) {
+      if (!shader.usesFrameData()) {
+        setLooseFrameUniforms(shader, frame, viewProj);
+      }
+      if (!depthOnly) {
+        shader.setInteger("albedoMap", 0);
+      }
+    }
+
+    if (!depthOnly) {
+      // Texture toggles (PBR materials use textures; diffuse may not)
+      const auto *pbr = dynamic_cast<const PbrMaterial *>(&material);
+      const bool isPbr = pbr != nullptr;
+      shader.setInteger("useTextures", isPbr ? 1 : 0);
+      shader.setInteger("useNormalMap", isPbr ? 1 : 0);
+
+      const Texture2D &albedoTex =
+          assetManager.getTexture(material.getTextureID());
+
+      // Bind albedo to texture unit 0
+      if (material.getTextureID() != boundAlbedo) {
+        renderDevice.setActiveTextureUnit(0);
+        albedoTex.bind();
+        boundAlbedo = material.getTextureID();
+      }
+
+      // Bind PBR textures to units 1-4 if available
+      if (isPbr) {
+        renderDevice.setActiveTextureUnit(1);
+        if (pbr->getNormalMapID() != 0) {
+          const Texture2D &normalTex =
+              assetManager.getTexture(pbr->getNormalMapID());
+          normalTex.bind();
+        } else {
+          albedoTex.bind(); // fallback
+        }
+        shader.setInteger("normalMap", 1);
+
+        renderDevice.setActiveTextureUnit(2);
+        if (pbr->getMetallicMapID() != 0) {
+          const Texture2D &metallicTex =
+              assetManager.getTexture(pbr->getMetallicMapID());
+          metallicTex.bind();
+        } else {
+          albedoTex.bind();
+        }
+        shader.setInteger("metallicMap", 2);
+
+        renderDevice.setActiveTextureUnit(3);
+        if (pbr->getRoughnessMapID() != 0) {
+          const Texture2D &roughTex =
+              assetManager.getTexture(pbr->getRoughnessMapID());
+          roughTex.bind();
+        } else {
+          albedoTex.bind();
+        }
+        shader.setInteger("roughnessMap", 3);
+
+        renderDevice.setActiveTextureUnit(4);
+        if (pbr->getAOMapID() != 0) {
+          const Texture2D &aoTex = assetManager.getTexture(pbr->getAOMapID());
+          aoTex.bind();
+        } else {
+          albedoTex.bind();
+        }
+        shader.setInteger("aoMap", 4);
+
+        // Back to unit 0 so the albedo binding tracked above stays the one
+        // that later binds and draws see.
+        renderDevice.setActiveTextureUnit(0);
+      }
+    }
+
+    bindMaterialResources(renderDevice, assetManager, shader, material,
+                          m_reportedBindingProblems, depthOnly);
+
+    // Set material uniforms (fogColor etc. from PbrMaterial constructor)
+    setShaderUniforms(shader, material);
+
+    materialOverrodeUniforms = !material.getUniforms().empty();
+
+    model.getImpl().bind();
+
+    // Procedural batches carry no per-instance data: no instance attributes
+    // to enable; the shader reads gl_InstanceID.
+    if (batch.procedural) {
+      renderDevice.drawIndexedInstanced(model.indexCount(),
+                                        batch.instanceCount);
+    } else {
+      api::IBuffer &buf = *m_instanceBuffers.at(DrawKey{meshID, materialID});
+      renderDevice.setupInstanceAttributes(buf, layout);
+      renderDevice.drawIndexedInstanced(model.indexCount(),
+                                        batch.instanceCount);
+      renderDevice.unbindInstanceAttributes(layout);
+    }
+
+    if (depthOnly) {
+      ++prepassDrawCalls;
+    } else {
+      ++drawCalls;
+      instancesRendered += batch.instanceCount;
+    }
+  };
+
+  // Any pass changes the bound shader and what the loop tracks about it.
+  auto forgetBoundState = [&]() {
+    boundShader = core::INVALID_HANDLE;
+    boundAlbedo = core::INVALID_HANDLE;
+    materialOverrodeUniforms = false;
+  };
+
+  // Depth pre-pass: the opaque batches again, depth only. The colour pass
+  // below then shades just the pixel's nearest surface.
+  if (prepassed) {
+    for (std::size_t i = 0; i < opaqueEnd; ++i) {
+      drawBatch(i, /*depthOnly=*/true);
+    }
+    timeShader(nullptr);
+    forgetBoundState();
+  }
+
+  // Opaque batches go before the sky. Anything blended or drawn without depth
+  // testing (a lens flare, a transparent surface) must land on top of the sky,
+  // so it goes after. Each group keeps the queue's sorted order.
+  for (std::size_t i = 0; i < opaqueEnd; ++i) {
+    drawBatch(i, /*depthOnly=*/false);
   }
 
   // Closes the last opaque shader's span; the sky pass opens its own.
   timeShader(nullptr);
   drawSky();
   // The sky pass changed the bound shader; what the loop tracked is stale.
-  boundShader = core::INVALID_HANDLE;
-  boundAlbedo = core::INVALID_HANDLE;
-  materialOverrodeUniforms = false;
+  forgetBoundState();
 
-  for (std::size_t i = 0; i < renderQueue.size(); ++i) {
-    if (!isOpaque(i)) {
-      drawBatch(i);
-    }
+  for (std::size_t i = opaqueEnd; i < renderQueue.size(); ++i) {
+    drawBatch(i, /*depthOnly=*/false);
   }
   timeShader(nullptr);
 
@@ -451,6 +527,7 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
 
   core::DebugUI::addValue("Instances Rendered", instancesRendered);
   core::DebugUI::addValue("Draw Calls", drawCalls);
+  core::DebugUI::addValue("Prepass Draw Calls", prepassDrawCalls);
 }
 
 } // namespace componeng::renderer

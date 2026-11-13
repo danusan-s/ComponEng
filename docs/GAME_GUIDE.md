@@ -432,11 +432,32 @@ shader load if the sizes disagree. A shader that does not declare the block
 keeps working: it receives the same values as loose uniforms with the same
 names (`uniform mat4 viewProj;` and so on).
 
-#### Render state
+#### Material type and render state
 
-Each material carries a `RenderState` (culling, depth test/write/function and
-blending) that the renderer applies before drawing it. The default is back-face
-culling, depth test and write, and alpha blending.
+Each material has a `MaterialType` that decides which pass draws it:
+
+- `Opaque` (the default): drawn first, after a depth pre-pass, so each pixel runs
+  the fragment shader once. The renderer sets blending and depth for these
+  itself; the material's `RenderState` only contributes its culling mode. The
+  fragment shader must not `discard`, because the pre-pass cannot see it.
+- `Transparent`: drawn after the opaque geometry and the sky, with the
+  material's `RenderState` applied as given. Use it for anything blended, and
+  for overlays that ignore depth (`depthTest = false`).
+
+```cpp
+auto &glass = assetManager.getMaterial(assetManager.getMaterialID("glass"));
+glass.setType(renderer::MaterialType::Transparent);
+```
+
+The depth pre-pass runs each opaque shader's vertex stage again with an empty
+fragment shader, so a vertex shader used by an opaque material must declare
+`invariant gl_Position;` (the bundled shaders do) to get bit-identical depth in
+both passes; without it you may see speckled gaps. Turn the pre-pass off with
+`world.getResource<resources::RenderSettings>().depthPrepass = false`.
+
+Each material also carries a `RenderState` (culling, depth test/write/function
+and blending) that the renderer applies before drawing it. The default is
+back-face culling, depth test and write, and alpha blending.
 
 ```cpp
 renderer::api::RenderState state;

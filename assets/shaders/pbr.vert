@@ -38,6 +38,10 @@ out vec2 TexCoords;
 out vec3 ObjectColor;
 out vec3 WorldNormal;
 
+// Both the depth pre-pass and the colour pass run this stage; invariance makes
+// them compute exactly the same depth, which the "equal" depth test relies on.
+invariant gl_Position;
+
 void main()
 {
     ObjectColor = instanceColor.rgb;

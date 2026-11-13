@@ -7,6 +7,13 @@
 
 using namespace rscene;
 
+namespace {
+bool hasUniformIn(Scene &s, int shader, const char *name) {
+  const auto &v = s.rec().looseUniforms[shader];
+  return std::find(v.begin(), v.end(), name) != v.end();
+}
+} // namespace
+
 // --- Decoupling from the GL backend -----------------------------------------
 
 TEST(RenderPipeline, AssetsAreCreatedThroughTheDevice) {
@@ -173,6 +180,22 @@ TEST(RenderPipeline, LegacyShaderGetsTheSameValuesAsLooseUniforms) {
 
 // --- Render state -----------------------------------------------------------
 
+namespace {
+// What an Opaque material draws with when there is no depth pre-pass.
+api::RenderState opaqueState() {
+  api::RenderState st;
+  st.blend = api::BlendMode::None;
+  return st;
+}
+
+void makeTransparent(Scene &s, const char *material,
+                     const api::RenderState &state) {
+  auto &m = s.assets().getMaterial(s.assets().getMaterialID(material));
+  m.setType(MaterialType::Transparent);
+  m.setRenderState(state);
+}
+} // namespace
+
 TEST(RenderPipeline, FrameStartsFromBaselineStateBeforeClearing) {
   auto s = makeScene();
   s->spawn("tri", "matA");
@@ -187,11 +210,11 @@ TEST(RenderPipeline, EachMaterialsStateIsInEffectForItsDraw) {
   auto s = makeScene();
   api::RenderState decal;
   decal.cull = api::CullMode::None;
-  decal.blend = api::BlendMode::None;
+  decal.blend = api::BlendMode::Additive;
   decal.depthWrite = false;
-  s->assets()
-      .getMaterial(s->assets().getMaterialID("matB"))
-      .setRenderState(decal);
+  auto &matB = s->assets().getMaterial(s->assets().getMaterialID("matB"));
+  matB.setType(MaterialType::Transparent);
+  matB.setRenderState(decal);
 
   s->spawn("tri", "matA", 0);
   s->spawn("tri", "matB", 1);
@@ -199,10 +222,190 @@ TEST(RenderPipeline, EachMaterialsStateIsInEffectForItsDraw) {
 
   const auto &draws = s->rec().draws;
   ASSERT_EQ(draws.size(), 2u);
-  // matB's state is opaque, so it is drawn first (before the sky), matA's
-  // default (blended) state after it.
-  EXPECT_EQ(draws[0].state, decal);
-  EXPECT_EQ(draws[1].state, api::RenderState{});
+  // matA is opaque, so it is drawn first; matB is transparent and gets its
+  // state exactly as declared.
+  EXPECT_EQ(draws[0].state, opaqueState());
+  EXPECT_EQ(draws[1].state, decal);
+}
+
+// --- Material type -----------------------------------------------------------
+
+TEST(MaterialType, DefaultsToOpaqueAndOnlyTransparentIsTransparent) {
+  auto s = makeScene();
+  auto &m = s->assets().getMaterial(s->assets().getMaterialID("matA"));
+  EXPECT_EQ(m.getType(), MaterialType::Opaque);
+  EXPECT_FALSE(m.isTransparent());
+
+  // A blended, depth-write-off state no longer makes a material transparent
+  // by itself: the type says which pass it belongs to.
+  api::RenderState blended;
+  blended.depthWrite = false;
+  m.setRenderState(blended);
+  EXPECT_FALSE(m.isTransparent());
+
+  m.setType(MaterialType::Transparent);
+  EXPECT_TRUE(m.isTransparent());
+}
+
+TEST(MaterialType, OpaqueMaterialKeepsItsCullModeButNotItsBlending) {
+  auto s = makeScene();
+  api::RenderState st;
+  st.cull = api::CullMode::None;
+  st.blend = api::BlendMode::Alpha;
+  st.depthWrite = false;
+  s->assets()
+      .getMaterial(s->assets().getMaterialID("matA"))
+      .setRenderState(st);
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  api::RenderState expected = opaqueState();
+  expected.cull = api::CullMode::None;
+  EXPECT_EQ(s->rec().draws[0].state, expected);
+}
+
+// --- Depth pre-pass ----------------------------------------------------------
+
+namespace {
+void enablePrepass(Scene &s) {
+  s.world->getResource<resources::RenderSettings>().depthPrepass = true;
+}
+} // namespace
+
+TEST(DepthPrepass, OpaqueBatchesAreDrawnDepthOnlyThenShadedWhereDepthIsEqual) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matA", 1);
+  s->spawn("tri", "matB", 2);
+  s->frame();
+
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 4u) << "2 batches, each drawn in both passes";
+
+  for (int i = 0; i < 2; ++i) {
+    const api::RenderState &st = draws[i].state;
+    EXPECT_FALSE(st.colorWrite) << "pre-pass draw " << i;
+    EXPECT_TRUE(st.depthWrite) << "pre-pass draw " << i;
+    EXPECT_TRUE(st.depthTest);
+    EXPECT_EQ(st.depthFunc, api::DepthFunc::Less);
+    EXPECT_EQ(st.blend, api::BlendMode::None);
+  }
+  for (int i = 2; i < 4; ++i) {
+    const api::RenderState &st = draws[i].state;
+    EXPECT_TRUE(st.colorWrite) << "colour draw " << i;
+    EXPECT_FALSE(st.depthWrite) << "colour draw " << i;
+    EXPECT_EQ(st.depthFunc, api::DepthFunc::Equal);
+    EXPECT_EQ(st.blend, api::BlendMode::None);
+  }
+
+  // Same geometry, same instances, in the same order, in both passes.
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(draws[i].indexCount, draws[i + 2].indexCount);
+    EXPECT_EQ(draws[i].instanceCount, draws[i + 2].instanceCount);
+    EXPECT_EQ(draws[i].instanceFloats, draws[i + 2].instanceFloats);
+  }
+}
+
+TEST(DepthPrepass, UsesTheShadersDepthVariantNotTheShaderItself) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  s->spawn("tri", "matA", 0); // shader 1
+  s->spawn("tri", "matB", 1); // shader 2
+  s->frame();
+
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 4u);
+  EXPECT_GT(draws[0].shaderId, 2) << "a variant, created after the two shaders";
+  EXPECT_GT(draws[1].shaderId, 2);
+  EXPECT_NE(draws[0].shaderId, draws[1].shaderId);
+  EXPECT_EQ(draws[2].shaderId, 1);
+  EXPECT_EQ(draws[3].shaderId, 2);
+}
+
+TEST(DepthPrepass, DepthVariantsAreBuiltOnceNotEveryFrame) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matB", 1);
+  s->frame();
+  EXPECT_EQ(s->rec().shadersCreated, 4);
+  s->frame();
+  s->frame();
+  EXPECT_EQ(s->rec().shadersCreated, 4);
+}
+
+TEST(DepthPrepass, TransparentBatchesAreNotInThePrepass) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  makeTransparent(*s, "matB", api::RenderState{});
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matB", 1);
+  s->frame();
+
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 3u) << "matA twice, matB once";
+  EXPECT_FALSE(draws[0].state.colorWrite);
+  EXPECT_EQ(draws[1].state.depthFunc, api::DepthFunc::Equal);
+  EXPECT_EQ(draws[2].state, api::RenderState{})
+      << "transparent keeps its own state, depth-writing and blended";
+}
+
+TEST(DepthPrepass, SkyIsDrawnAfterTheColourPassNotBetweenThePasses) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_EQ(s->rec().drawSequence,
+            (std::vector<std::string>{"indexed", "indexed", "fullscreen"}));
+}
+
+TEST(DepthPrepass, NothingOpaqueMeansNoPrepass) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  makeTransparent(*s, "matA", api::RenderState{});
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  EXPECT_EQ(s->rec().draws[0].state, api::RenderState{});
+  EXPECT_EQ(s->rec().shadersCreated, 2) << "no depth variant needed";
+}
+
+TEST(DepthPrepass, DisabledByTheSettingOpaqueDrawsDepthWritingWithLess) {
+  auto s = makeScene(); // fixture default: off
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  EXPECT_EQ(s->rec().draws[0].state, opaqueState());
+  EXPECT_EQ(s->rec().shadersCreated, 2);
+}
+
+TEST(DepthPrepass, DepthVariantGetsLooseFrameUniformsWhenTheShaderHasNoBlock) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_TRUE(hasUniformIn(*s, 3, "viewProj")) << "variant of shader a";
+}
+
+TEST(DepthPrepass, FrameDataIsStillBoundForTheDepthVariantOfAShaderUsingIt) {
+  auto s = makeScene([](fake::Recorder &r) {
+    r.defaultShaderDeclaresFrameBlock = true;
+  });
+  enablePrepass(*s);
+  s->spawn("tri", "matA");
+  s->frame();
+
+  // Declaring the block means no loose frame uniforms for any program,
+  // including the variant (shader id 3).
+  EXPECT_FALSE(hasUniformIn(*s, 3, "viewProj"));
 }
 
 // --- Sky ---------------------------------------------------------------------
@@ -231,26 +434,16 @@ TEST(RenderPipeline,
   EXPECT_FALSE(sky.state.depthWrite);
 
   ASSERT_EQ(s->rec().draws.size(), 1u);
-  EXPECT_EQ(s->rec().draws[0].state, api::RenderState{})
+  EXPECT_EQ(s->rec().draws[0].state, opaqueState())
       << "scene geometry must not inherit the sky's state";
 }
-
-namespace {
-api::RenderState opaqueState() {
-  api::RenderState st;
-  st.blend = api::BlendMode::None;
-  return st;
-}
-} // namespace
 
 TEST(RenderPipeline, SkyIsDrawnAfterOpaqueGeometryAndBeforeBlendedGeometry) {
   auto s = makeScene();
   s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
-  // matA stays blended (the default state), matB is opaque.
-  s->assets()
-      .getMaterial(s->assets().getMaterialID("matB"))
-      .setRenderState(opaqueState());
+  // matA is blended, matB is opaque.
+  makeTransparent(*s, "matA", api::RenderState{});
   s->spawn("tri", "matA", 0); // blended, shader a: sorts first
   s->spawn("tri", "matB", 1); // opaque, shader b
   s->frame();
@@ -270,9 +463,7 @@ TEST(RenderPipeline, GeometryWithoutADepthTestIsDrawnOverTheSky) {
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   api::RenderState overlay = opaqueState();
   overlay.depthTest = false; // e.g. a lens flare
-  s->assets()
-      .getMaterial(s->assets().getMaterialID("matA"))
-      .setRenderState(overlay);
+  makeTransparent(*s, "matA", overlay);
   s->spawn("tri", "matA");
   s->frame();
 
@@ -286,9 +477,7 @@ TEST(RenderPipeline, GeometryStillDrawsAfterTheSkyWithItsOwnShaderBound) {
   auto s = makeScene();
   s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
-  s->assets()
-      .getMaterial(s->assets().getMaterialID("matA"))
-      .setRenderState(opaqueState());
+  makeTransparent(*s, "matC", api::RenderState{});
   s->spawn("tri", "matA", 0);
   s->spawn("tri", "matC", 1); // matC: shader a, blended: drawn after the sky
   s->frame();

@@ -2,7 +2,13 @@
 
 namespace componeng::renderer {
 
-Shader::Shader(api::IRenderDevice &device) : m_impl(device.createShader()) {
+// What the depth pre-pass runs for every fragment: nothing. The depth buffer
+// is written by the rasteriser, not by the shader.
+static constexpr const char *kDepthOnlyFragmentSource =
+    "#version 330 core\nvoid main() {}\n";
+
+Shader::Shader(api::IRenderDevice &device)
+    : m_device(&device), m_impl(device.createShader()) {
 }
 
 void Shader::use() const {
@@ -27,6 +33,10 @@ double Shader::lastGpuTimeMs() const {
 
 void Shader::compile(const char *vertexSource, const char *fragmentSource,
                      const char *geometrySource) {
+  m_vertexSource = vertexSource;
+  m_hasGeometry = geometrySource != nullptr;
+  m_geometrySource = m_hasGeometry ? geometrySource : "";
+  m_depthVariant.reset(); // built from the sources that were just replaced
   m_impl->loadGLSL(vertexSource, fragmentSource, geometrySource);
   m_usesFrameData = m_impl->bindUniformBlock(
       kFrameDataBlockName, kFrameDataBinding, sizeof(FrameData));
@@ -71,6 +81,15 @@ void Shader::setMatrix4(const char *name, const core::Mat4 &matrix) const {
 
 bool Shader::bindUniformBlock(const char *blockName, uint32_t binding) const {
   return m_impl->bindUniformBlock(blockName, binding);
+}
+
+const Shader &Shader::depthVariant() const {
+  if (!m_depthVariant) {
+    m_depthVariant = std::make_unique<Shader>(*m_device);
+    m_depthVariant->compile(m_vertexSource.c_str(), kDepthOnlyFragmentSource,
+                            m_hasGeometry ? m_geometrySource.c_str() : nullptr);
+  }
+  return *m_depthVariant;
 }
 
 api::VertexLayout Shader::reflectInstanceLayout() const {

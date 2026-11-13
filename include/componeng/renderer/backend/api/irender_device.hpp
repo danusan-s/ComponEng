@@ -346,7 +346,7 @@ public:
 enum class CullMode { None, Back, Front };
 
 /** Depth comparison used by the depth test. */
-enum class DepthFunc { Less, LessEqual };
+enum class DepthFunc { Less, LessEqual, Equal };
 
 /** How a fragment's colour is combined with what is already in the target. */
 enum class BlendMode {
@@ -369,11 +369,13 @@ struct RenderState {
   bool depthWrite = true;
   DepthFunc depthFunc = DepthFunc::Less;
   BlendMode blend = BlendMode::Alpha;
+  // False masks out every colour channel: the draw only touches depth.
+  bool colorWrite = true;
 
   bool operator==(const RenderState &o) const {
     return cull == o.cull && depthTest == o.depthTest &&
            depthWrite == o.depthWrite && depthFunc == o.depthFunc &&
-           blend == o.blend;
+           blend == o.blend && colorWrite == o.colorWrite;
   }
   bool operator!=(const RenderState &o) const {
     return !(*this == o);

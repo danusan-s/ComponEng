@@ -17,6 +17,7 @@
 #include "componeng/renderer/frame_data.hpp"
 #include "componeng/renderer/render_system.hpp"
 #include "componeng/resources/fog.hpp"
+#include "componeng/resources/render_settings.hpp"
 #include "componeng/utils/utils.hpp"
 
 #include <functional>
@@ -101,6 +102,10 @@ makeScene(const std::function<void(fake::Recorder &)> &configure = {},
   world.setResource<std::unique_ptr<api::IRenderDevice>>(std::move(base));
   world.setResource<AssetManager>(AssetManager(world.getRenderDevice()));
   world.setResource<resources::Fog>(resources::Fog{});
+  // Off by default so a test sees each batch drawn once; the depth pre-pass
+  // tests turn it on.
+  world.setResource<resources::RenderSettings>(
+      resources::RenderSettings{.depthPrepass = false});
 
   world.registerComponents<TransformComponent, MeshComponent, MaterialComponent,
                            ColorComponent, camera::CameraComponent,

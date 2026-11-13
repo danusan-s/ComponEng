@@ -28,6 +28,7 @@
 #include "componeng/renderer/lod/lod_system.hpp"
 #include "componeng/renderer/render_system.hpp"
 #include "componeng/resources/fog.hpp"
+#include "componeng/resources/render_settings.hpp"
 #include "componeng/utils/logger.hpp"
 #include "componeng/utils/utils.hpp"
 
@@ -227,8 +228,10 @@ void Engine::init() {
     state.cull = renderer::api::CullMode::None;
     state.depthWrite = false;
     state.blend = renderer::api::BlendMode::Alpha;
-    assetManager.getMaterial(assetManager.getMaterialID("transparent_diffuse"))
-        .setRenderState(state);
+    auto &transparent = assetManager.getMaterial(
+        assetManager.getMaterialID("transparent_diffuse"));
+    transparent.setType(renderer::MaterialType::Transparent);
+    transparent.setRenderState(state);
   }
 
   assetManager.loadShader(
@@ -245,6 +248,7 @@ void Engine::init() {
 
   // Set up fog resource
   m_world.setResource<resources::Fog>(resources::Fog{});
+  m_world.setResource<resources::RenderSettings>(resources::RenderSettings{});
 
   assetManager.loadMesh(
       utils::Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");

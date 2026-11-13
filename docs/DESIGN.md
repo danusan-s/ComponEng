@@ -455,11 +455,20 @@ const auto& events = world.get_events<CollisionEvent>();
    becomes one data-less batch of `count` instances instead (the shader places
    them from `gl_InstanceID`); the render step skips its buffer upload and
    instance attributes
-5. **Sorting**: Order batches by (shaderID, textureID, materialID, meshID) so
-   draws sharing GPU state are adjacent
-6. **Draw**: Bind the material's extra textures, texture buffers and uniform
+5. **Sorting**: Order batches opaque first, then by (shaderID, textureID,
+   materialID, meshID) so draws sharing GPU state are adjacent. "Opaque" is the
+   material's `MaterialType`
+6. **Upload**: Write each batch's instance data to its GPU buffer, once
+7. **Depth pre-pass** (`RenderSettings::depthPrepass`): Draw the opaque batches
+   with each shader's depth variant (its vertex stage plus an empty fragment
+   shader, `Shader::depthVariant`), colour writes off
+8. **Opaque colour pass**: Draw the opaque batches again, shaded, with depth
+   test `Equal` and depth writes off, so only the nearest surface at each pixel
+   runs the fragment shader. Then the sky
+9. **Transparent pass**: Draw `Transparent` batches with their own `RenderState`
+10. **Draw** (both passes): Bind the material's extra textures, texture buffers and uniform
    blocks (`IMaterial::setTexture` / `setBufferTexture` / `setUniformBuffer`),
-   upload each batch's buffer and use glDrawElementsInstanced for
+   and use glDrawElementsInstanced for
    single-draw-call rendering, skipping shader/texture rebinds that did not change
 
 ### RenderQueue (`renderer/batching/render_queue.hpp`)

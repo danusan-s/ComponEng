@@ -5,6 +5,7 @@
 #include "componeng/renderer/frame_data.hpp"
 
 #include <memory>
+#include <string>
 
 namespace componeng::renderer {
 
@@ -48,12 +49,26 @@ public:
    *  negative if no result is available yet. Lags by a few frames. */
   double lastGpuTimeMs() const;
 
+  /** This shader's vertex (and geometry) stage linked to a fragment shader
+   *  that does nothing, for the depth pre-pass. Because the vertex stage is
+   *  the same source, it takes the same attributes, uniforms and blocks as
+   *  this shader and computes the same gl_Position (declare
+   *  `invariant gl_Position;` so that is bit-exact). Compiled on first use. */
+  const Shader &depthVariant() const;
+
   api::VertexLayout reflectInstanceLayout() const;
   std::vector<core::Name> reflectActiveUniformNames() const;
 
 private:
+  api::IRenderDevice *m_device;
   std::unique_ptr<api::IShader> m_impl;
   bool m_usesFrameData = false;
+
+  // Kept so depthVariant() can recompile the vertex stage later.
+  std::string m_vertexSource;
+  std::string m_geometrySource;
+  bool m_hasGeometry = false;
+  mutable std::unique_ptr<Shader> m_depthVariant;
 };
 
 } // namespace componeng::renderer

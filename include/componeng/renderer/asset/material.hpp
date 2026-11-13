@@ -14,6 +14,21 @@
 
 namespace componeng::renderer {
 
+/**
+ * @brief Which pass a material is drawn in.
+ *
+ * Opaque: writes depth and fully covers what is behind it. Drawn first, after
+ * a depth pre-pass (see resources::RenderSettings), so each pixel is shaded
+ * once. The RenderSystem owns the blend and depth state of these draws: the
+ * material's RenderState supplies only the culling mode. The fragment shader
+ * must not `discard`, since the pre-pass would not know about it.
+ *
+ * Transparent: blended and/or ignores depth. Drawn after the opaque batches
+ * and the sky, with the material's RenderState applied exactly as given. Use
+ * it for anything blended, and for depth-less overlays (set depthTest = false).
+ */
+enum class MaterialType { Opaque, Transparent };
+
 class IMaterial {
 public:
   IMaterial(core::HandleID shaderID, core::HandleID textureID)
@@ -140,9 +155,19 @@ public:
     }
   }
 
+  /** Which pass this material is drawn in; see MaterialType. Default Opaque. */
+  void setType(MaterialType type) {
+    m_type = type;
+  }
+
+  MaterialType getType() const {
+    return m_type;
+  }
+
   /** Pipeline state (culling, depth, blending) this material draws with.
    *  Defaults to the engine baseline: back-face culling, depth test and
-   *  write, alpha blending. */
+   *  write, alpha blending. An Opaque material only contributes its culling
+   *  mode; the rest is decided by the RenderSystem (see MaterialType). */
   void setRenderState(const api::RenderState &state) {
     m_renderState = state;
   }
@@ -151,12 +176,10 @@ public:
     return m_renderState;
   }
 
-  /** True when this material blends without writing depth. RenderSystem draws
-   *  such batches after all the others so they blend over a finished opaque
-   *  scene. */
+  /** True for MaterialType::Transparent. RenderSystem draws such batches
+   *  after all the others so they blend over a finished opaque scene. */
   bool isTransparent() const {
-    return m_renderState.blend != api::BlendMode::None &&
-           !m_renderState.depthWrite;
+    return m_type == MaterialType::Transparent;
   }
 
   /** Metres added on every side of an entity's bounding box when culling it.
@@ -225,6 +248,7 @@ private:
   core::HandleID m_shaderID = 0;
   core::HandleID m_textureID = 0;
   api::VertexLayout m_vertexLayout;
+  MaterialType m_type = MaterialType::Opaque;
   api::RenderState m_renderState;
   float m_boundsPadding = 0.0f;
   core::UniformMap m_uniforms;

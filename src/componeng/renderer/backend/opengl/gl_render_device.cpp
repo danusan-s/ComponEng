@@ -91,8 +91,21 @@ void GLRenderDevice::applyRenderState(const api::RenderState &state,
     glDepthMask(state.depthWrite ? GL_TRUE : GL_FALSE);
   }
   if (force || state.depthFunc != cur.depthFunc) {
-    glDepthFunc(state.depthFunc == api::DepthFunc::LessEqual ? GL_LEQUAL
-                                                             : GL_LESS);
+    switch (state.depthFunc) {
+      case api::DepthFunc::Less:
+        glDepthFunc(GL_LESS);
+        break;
+      case api::DepthFunc::LessEqual:
+        glDepthFunc(GL_LEQUAL);
+        break;
+      case api::DepthFunc::Equal:
+        glDepthFunc(GL_EQUAL);
+        break;
+    }
+  }
+  if (force || state.colorWrite != cur.colorWrite) {
+    const GLboolean on = state.colorWrite ? GL_TRUE : GL_FALSE;
+    glColorMask(on, on, on, on);
   }
 
   if (force || state.blend != cur.blend) {
@@ -154,16 +167,22 @@ void GLRenderDevice::bindBufferTexture(uint32_t unit, api::IBuffer &buffer,
 }
 
 void GLRenderDevice::clear(float r, float g, float b, float a) {
-  // glClear honours the depth mask, so a state with depth writes off would
-  // leave last frame's depth in place. Clear with the mask on, then put the
-  // tracked state back.
+  // glClear honours the depth and colour masks, so a state with either off
+  // would leave last frame's contents in place. Clear with both on, then put
+  // the tracked state back.
   if (!m_state.depthWrite) {
     glDepthMask(GL_TRUE);
+  }
+  if (!m_state.colorWrite) {
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   }
   glClearColor(r, g, b, a);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   if (!m_state.depthWrite) {
     glDepthMask(GL_FALSE);
+  }
+  if (!m_state.colorWrite) {
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
   }
 }
 
