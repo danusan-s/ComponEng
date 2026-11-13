@@ -24,7 +24,7 @@ make build          # builds libComponEng.a + the Demo example + tests
 ./build/example/Demo
 ```
 
-Controls: WASD + Space/Shift to move, mouse to look, F11 to toggle cursor lock,
+Controls: WASD + Space/Shift to move, mouse to look, 0 to toggle cursor lock,
 Escape to quit.
 
 To make your own game, create a new executable target (or add to the example

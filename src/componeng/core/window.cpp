@@ -25,7 +25,7 @@ static void keyCallback(GLFWwindow *window, int key, int /*scancode*/,
   if (!engine)
     return;
 
-  if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
+  if (key == GLFW_KEY_0 && action == GLFW_PRESS) {
     if (isMouseLocked(window)) {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     } else {

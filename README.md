@@ -68,7 +68,7 @@ make build
 ./build/example/Demo
 ```
 
-Controls: WASD to move, Space to move up, Shift to move down, Mouse to look, F11 to toggle cursor lock, Escape to quit.
+Controls: WASD to move, Space to move up, Shift to move down, Mouse to look, 0 to toggle cursor lock, Escape to quit.
 
 ## Tests
 
