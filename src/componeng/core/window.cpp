@@ -8,6 +8,13 @@
 
 namespace componeng::core {
 
+// While the cursor is unlocked the position callback ignores movement, so the
+// stored mouseX/Y go stale; when the cursor locks again its first event reports
+// wherever the real cursor was left, which would read as one huge mouse delta.
+// Set on every lock (and at start-up), cleared by that first event, which
+// becomes the new baseline instead of a movement.
+static bool s_rebaseMouse = true;
+
 static bool isMouseLocked(GLFWwindow *window) {
   return glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
 }
@@ -30,9 +37,7 @@ static void keyCallback(GLFWwindow *window, int key, int /*scancode*/,
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     } else {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-      auto &state = engine->m_world.getResource<input::InputState>();
-      state.previous_state.mouseX = state.current_state.mouseX;
-      state.previous_state.mouseY = state.current_state.mouseY;
+      s_rebaseMouse = true;
     }
   }
 
@@ -80,11 +85,19 @@ static void cursorPosCallback(GLFWwindow *window, double xposIn,
   if (!engine)
     return;
 
-  input::RawInputState &inputState =
-      engine->m_world.getResource<input::InputState>().current_state;
+  input::InputState &input = engine->m_world.getResource<input::InputState>();
+  input::RawInputState &inputState = input.current_state;
 
   float xpos = static_cast<float>(xposIn);
   float ypos = static_cast<float>(yposIn);
+
+  if (s_rebaseMouse) {
+    // Start the delta from here: the frame's previous position is the stale
+    // one from before the unlock, so move it too.
+    input.previous_state.mouseX = xpos;
+    input.previous_state.mouseY = ypos;
+    s_rebaseMouse = false;
+  }
 
   inputState.mouseX = xpos;
   inputState.mouseY = ypos;
