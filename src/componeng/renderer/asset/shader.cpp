@@ -7,6 +7,26 @@ namespace componeng::renderer {
 static constexpr const char *kDepthOnlyFragmentSource =
     "#version 330 core\nvoid main() {}\n";
 
+std::string defineAfterVersion(const std::string &source, const char *name) {
+  const std::string define = std::string("#define ") + name + " 1\n";
+  // `#version` has to be the first directive, so the define goes after it.
+  std::size_t version = source.find("#version");
+  while (version != std::string::npos && version != 0 &&
+         source[version - 1] != '\n') {
+    version = source.find("#version", version + 1);
+  }
+  if (version == std::string::npos) {
+    return define + source;
+  }
+  std::size_t lineEnd = source.find('\n', version);
+  lineEnd = lineEnd == std::string::npos ? source.size() : lineEnd + 1;
+  std::string out = source.substr(0, lineEnd);
+  if (out.empty() || out.back() != '\n') {
+    out += '\n';
+  }
+  return out + define + source.substr(lineEnd);
+}
+
 Shader::Shader(api::IRenderDevice &device)
     : m_device(&device), m_impl(device.createShader()) {
 }
@@ -36,7 +56,10 @@ void Shader::compile(const char *vertexSource, const char *fragmentSource,
   m_vertexSource = vertexSource;
   m_hasGeometry = geometrySource != nullptr;
   m_geometrySource = m_hasGeometry ? geometrySource : "";
-  m_depthVariant.reset(); // built from the sources that were just replaced
+  m_fragmentSource = fragmentSource ? fragmentSource : "";
+  // Built from the sources that were just replaced.
+  m_depthVariant.reset();
+  m_alphaTestedDepthVariant.reset();
   m_impl->loadGLSL(vertexSource, fragmentSource, geometrySource);
   m_usesFrameData = m_impl->bindUniformBlock(
       kFrameDataBlockName, kFrameDataBinding, sizeof(FrameData));
@@ -90,6 +113,17 @@ const Shader &Shader::depthVariant() const {
                             m_hasGeometry ? m_geometrySource.c_str() : nullptr);
   }
   return *m_depthVariant;
+}
+
+const Shader &Shader::alphaTestedDepthVariant() const {
+  if (!m_alphaTestedDepthVariant) {
+    m_alphaTestedDepthVariant = std::make_unique<Shader>(*m_device);
+    m_alphaTestedDepthVariant->compile(
+        m_vertexSource.c_str(),
+        defineAfterVersion(m_fragmentSource, kDepthPrepassDefine).c_str(),
+        m_hasGeometry ? m_geometrySource.c_str() : nullptr);
+  }
+  return *m_alphaTestedDepthVariant;
 }
 
 api::VertexLayout Shader::reflectInstanceLayout() const {

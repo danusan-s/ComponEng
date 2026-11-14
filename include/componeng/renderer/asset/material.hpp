@@ -23,11 +23,20 @@ namespace componeng::renderer {
  * material's RenderState supplies only the culling mode. The fragment shader
  * must not `discard`, since the pre-pass would not know about it.
  *
+ * Cutout: opaque, except that the fragment shader may `discard` (an
+ * alpha-tested leaf card, a fence, a billboard). Drawn with the opaque batches
+ * and in the same state, and in the depth pre-pass too, but there with the
+ * shader's own fragment stage compiled under COMPONENG_DEPTH_PREPASS (see
+ * Shader::alphaTestedDepthVariant) so the holes are cut into the depth buffer.
+ * The colour pass then still shades only the nearest visible texel of each
+ * pixel, however many cards overlap there. The pre-pass binds the material's
+ * albedo texture and its own textures (setTexture), not the PBR set.
+ *
  * Transparent: blended and/or ignores depth. Drawn after the opaque batches
  * and the sky, with the material's RenderState applied exactly as given. Use
  * it for anything blended, and for depth-less overlays (set depthTest = false).
  */
-enum class MaterialType { Opaque, Transparent };
+enum class MaterialType { Opaque, Cutout, Transparent };
 
 class IMaterial {
 public:
@@ -166,14 +175,20 @@ public:
 
   /** Pipeline state (culling, depth, blending) this material draws with.
    *  Defaults to the engine baseline: back-face culling, depth test and
-   *  write, alpha blending. An Opaque material only contributes its culling
-   *  mode; the rest is decided by the RenderSystem (see MaterialType). */
+   *  write, alpha blending. An Opaque or Cutout material only contributes its
+   *  culling mode; the rest is decided by the RenderSystem (see MaterialType). */
   void setRenderState(const api::RenderState &state) {
     m_renderState = state;
   }
 
   const api::RenderState &getRenderState() const {
     return m_renderState;
+  }
+
+  /** True for MaterialType::Cutout: opaque, but its fragment shader discards,
+   *  so its depth pre-pass draw needs the alpha-tested variant. */
+  bool isAlphaTested() const {
+    return m_type == MaterialType::Cutout;
   }
 
   /** True for MaterialType::Transparent. RenderSystem draws such batches

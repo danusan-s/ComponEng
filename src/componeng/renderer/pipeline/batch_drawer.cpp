@@ -20,7 +20,7 @@ BatchDrawer::BatchDrawer(const PassContext &ctx,
       m_depthPrepassed(depthPrepassed) {}
 
 void BatchDrawer::forgetBoundState() {
-  m_boundShader = core::INVALID_HANDLE;
+  m_boundProgram = nullptr;
   m_boundAlbedo = core::INVALID_HANDLE;
   m_materialOverrodeUniforms = false;
 }
@@ -33,20 +33,27 @@ void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
   IMaterial &material = assets.getMaterial(batch.materialID);
   const Mesh &mesh = assets.getMesh(batch.meshID);
   const Shader &colorShader = assets.getShader(material.getShaderID());
-  // The pre-pass runs the shader's vertex stage only: nothing the fragment
-  // stage reads (albedo, PBR textures) needs setting up.
-  const Shader &shader = depthOnly ? colorShader.depthVariant() : colorShader;
+  // The pre-pass runs the shader's vertex stage with an empty fragment stage,
+  // so nothing the fragment stage reads (albedo, PBR textures) needs setting
+  // up. A cutout material's pre-pass keeps the fragment stage's alpha test, so
+  // it does read the albedo (and the material's own textures).
+  const bool alphaTestedDepth = depthOnly && material.isAlphaTested();
+  const bool readsAlbedo = !depthOnly || alphaTestedDepth;
+  const Shader &shader =
+      !depthOnly         ? colorShader
+      : alphaTestedDepth ? colorShader.alphaTestedDepthVariant()
+                         : colorShader.depthVariant();
 
   resources::PassStats &ps = m_ctx.stats.of(pass);
 
-  const bool shaderChanged = material.getShaderID() != m_boundShader;
+  const bool shaderChanged = &shader != m_boundProgram;
   if (shaderChanged) {
     ++ps.shaderBinds;
     // Time is attributed to the shader the batch belongs to, not its depth
     // variant, so a shader's timing covers all of its draws.
     m_ctx.profiler.timeShader(&colorShader);
     shader.use();
-    m_boundShader = material.getShaderID();
+    m_boundProgram = &shader;
   }
 
   device.setRenderState(
@@ -56,12 +63,12 @@ void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
     if (!shader.usesFrameData()) {
       m_ctx.frame.applyLoose(shader);
     }
-    if (!depthOnly) {
+    if (readsAlbedo) {
       shader.setInteger("albedoMap", 0);
     }
   }
 
-  if (!depthOnly) {
+  if (readsAlbedo) {
     const auto *pbr = dynamic_cast<const PbrMaterial *>(&material);
     MaterialBinder::setTextureToggles(shader, pbr != nullptr);
 
@@ -71,7 +78,7 @@ void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
       albedo.bind();
       m_boundAlbedo = material.getTextureID();
     }
-    if (pbr) {
+    if (pbr && !depthOnly) {
       MaterialBinder::bindPbrTextures(device, assets, shader, *pbr, albedo);
     }
   }

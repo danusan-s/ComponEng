@@ -440,6 +440,10 @@ Each material has a `MaterialType` that decides which pass draws it:
   the fragment shader once. The renderer sets blending and depth for these
   itself; the material's `RenderState` only contributes its culling mode. The
   fragment shader must not `discard`, because the pre-pass cannot see it.
+- `Cutout`: opaque, but the fragment shader may `discard` (alpha-tested leaves,
+  fences, billboards). Drawn with the opaque batches in the same state. In the
+  pre-pass it runs its own fragment shader, so the holes are cut into depth too
+  (see below).
 - `Transparent`: drawn after the opaque geometry and the sky, with the
   material's `RenderState` applied as given. Use it for anything blended, and
   for overlays that ignore depth (`depthTest = false`).
@@ -454,6 +458,23 @@ fragment shader, so a vertex shader used by an opaque material must declare
 `invariant gl_Position;` (the bundled shaders do) to get bit-identical depth in
 both passes; without it you may see speckled gaps. Turn the pre-pass off with
 `world.getResource<resources::RenderSettings>().depthPrepass = false`.
+
+A `Cutout` material's fragment shader is compiled a second time with
+`COMPONENG_DEPTH_PREPASS` defined, for the pre-pass, so there is one copy of the
+alpha test. Return right after the `discard` when the macro is set, so the
+pre-pass skips the lighting; without that it is still correct, only slower:
+
+```glsl
+if (tex.a < cutoff) discard;
+#ifdef COMPONENG_DEPTH_PREPASS
+return;
+#endif
+```
+
+The pre-pass binds the material's albedo texture (and what it added with
+`setTexture`), not the PBR set, so the alpha test must read only those. Whether
+the pre-pass pays off depends on the scene: it repeats the vertex stage of every
+opaque and cutout draw, so a vertex-heavy scene can lose more than it saves.
 
 Each material also carries a `RenderState` (culling, depth test/write/function
 and blending) that the renderer applies before drawing it. The default is

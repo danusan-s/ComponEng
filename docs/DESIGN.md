@@ -457,11 +457,14 @@ const auto& events = world.get_events<CollisionEvent>();
    instance attributes
 5. **Sorting**: Order batches opaque first, then by (shaderID, textureID,
    materialID, meshID) so draws sharing GPU state are adjacent. "Opaque" is the
-   material's `MaterialType`
+   material's `MaterialType` (`Opaque` and `Cutout`)
 6. **Upload**: Write each batch's instance data to its GPU buffer, once
-7. **Depth pre-pass** (`RenderSettings::depthPrepass`): Draw the opaque batches
-   with each shader's depth variant (its vertex stage plus an empty fragment
-   shader, `Shader::depthVariant`), colour writes off
+7. **Depth pre-pass** (`RenderSettings::depthPrepass`): Draw the opaque and
+   `Cutout` batches with each shader's depth variant (its vertex stage plus an
+   empty fragment shader, `Shader::depthVariant`), colour writes off. A `Cutout`
+   material gets `Shader::alphaTestedDepthVariant` instead: the shader's own
+   fragment stage compiled with `COMPONENG_DEPTH_PREPASS` defined, with the
+   albedo bound, so its `discard` cuts the same holes in depth as in colour
 8. **Opaque colour pass**: Draw the opaque batches again, shaded, with depth
    test `Equal` and depth writes off, so only the nearest surface at each pixel
    runs the fragment shader. Then the sky

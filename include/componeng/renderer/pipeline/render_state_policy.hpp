@@ -15,7 +15,8 @@ namespace componeng::renderer {
  *  - DepthPrepass: only its culling; the rest is fixed (depth in, no colour).
  *  - Opaque:       only its culling. Depth is writable, or after a pre-pass
  *                  read-only and tested for equality, so that only the nearest
- *                  surface of each pixel is shaded.
+ *                  surface of each pixel is shaded. Cutout materials (alpha
+ *                  tested) draw in these two passes with exactly this state.
  *  - Sky:          none of it; ignored.
  *  - Transparent:  all of it (blending, depth write, culling).
  *

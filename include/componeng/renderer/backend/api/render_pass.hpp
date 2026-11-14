@@ -10,8 +10,8 @@ namespace componeng::renderer::api {
  * (resources::RenderStats).
  */
 enum class RenderPass : int {
-  DepthPrepass, // opaque batches, depth only
-  Opaque,       // opaque batches, shaded
+  DepthPrepass, // opaque and cutout batches, depth only
+  Opaque,       // opaque and cutout batches, shaded
   Sky,          // the full-screen sky triangle
   Transparent,  // blended / depth-less batches
 };

@@ -9,6 +9,14 @@
 
 namespace componeng::renderer {
 
+/** Name of the macro defined in the fragment stage of an alpha-tested
+ *  material's depth pre-pass program (Shader::alphaTestedDepthVariant). */
+inline constexpr const char *kDepthPrepassDefine = "COMPONENG_DEPTH_PREPASS";
+
+/** `source` with `#define <name> 1` on the line after its `#version`
+ *  directive (GLSL needs `#version` first), or at the very top if it has none. */
+std::string defineAfterVersion(const std::string &source, const char *name);
+
 class Shader {
 public:
   /** Creates the backend shader through `device`. */
@@ -56,6 +64,22 @@ public:
    *  `invariant gl_Position;` so that is bit-exact). Compiled on first use. */
   const Shader &depthVariant() const;
 
+  /** The depth pre-pass program for a material whose fragment shader
+   *  `discard`s (MaterialType::Cutout). The same vertex stage, linked to this
+   *  shader's own fragment stage compiled with `COMPONENG_DEPTH_PREPASS`
+   *  defined, so the discard decision is the very code the colour pass runs
+   *  and the two cannot disagree. A fragment shader should return right after
+   *  its discard when the macro is defined, so the pre-pass skips the lighting:
+   *
+   *      if (alpha < cutoff) discard;
+   *      #ifdef COMPONENG_DEPTH_PREPASS
+   *      return;
+   *      #endif
+   *
+   *  Without that early-out it is still correct, only as costly as the colour
+   *  pass (colour writes are masked off). Compiled on first use. */
+  const Shader &alphaTestedDepthVariant() const;
+
   api::VertexLayout reflectInstanceLayout() const;
   std::vector<core::Name> reflectActiveUniformNames() const;
 
@@ -64,11 +88,13 @@ private:
   std::unique_ptr<api::IShader> m_impl;
   bool m_usesFrameData = false;
 
-  // Kept so depthVariant() can recompile the vertex stage later.
+  // Kept so the depth variants can recompile these stages later.
   std::string m_vertexSource;
   std::string m_geometrySource;
+  std::string m_fragmentSource;
   bool m_hasGeometry = false;
   mutable std::unique_ptr<Shader> m_depthVariant;
+  mutable std::unique_ptr<Shader> m_alphaTestedDepthVariant;
 };
 
 } // namespace componeng::renderer

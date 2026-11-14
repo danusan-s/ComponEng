@@ -407,6 +407,236 @@ TEST(DepthPrepass, FrameDataIsStillBoundForTheDepthVariantOfAShaderUsingIt) {
   EXPECT_FALSE(hasUniformIn(*s, 3, "viewProj"));
 }
 
+// --- Alpha-tested (Cutout) materials ------------------------------------------
+
+namespace {
+void makeCutout(Scene &s, const char *material) {
+  s.assets().getMaterial(s.assets().getMaterialID(material))
+      .setType(MaterialType::Cutout);
+}
+
+bool hasMacro(const std::string &source) {
+  return source.find("#define COMPONENG_DEPTH_PREPASS 1") !=
+         std::string::npos;
+}
+} // namespace
+
+TEST(MaterialType, CutoutIsAlphaTestedButNotTransparent) {
+  auto s = makeScene();
+  auto &m = s->assets().getMaterial(s->assets().getMaterialID("matA"));
+  EXPECT_FALSE(m.isAlphaTested());
+
+  m.setType(MaterialType::Cutout);
+  EXPECT_TRUE(m.isAlphaTested());
+  EXPECT_FALSE(m.isTransparent()) << "drawn with the opaque batches";
+
+  m.setType(MaterialType::Transparent);
+  EXPECT_FALSE(m.isAlphaTested());
+}
+
+TEST(Cutout, DrawsInTheOpaqueStateAndBeforeTransparentBatches) {
+  auto s = makeScene(); // pre-pass off
+  makeCutout(*s, "matB");
+  makeTransparent(*s, "matA", api::RenderState{});
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matB", 1);
+  s->frame();
+
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 2u);
+  EXPECT_EQ(draws[0].shaderId, 2) << "the cutout (matB) goes first";
+  EXPECT_EQ(draws[0].state, opaqueState()) << "depth writing, no blending";
+  EXPECT_EQ(draws[1].state, api::RenderState{});
+}
+
+TEST(Cutout, WithoutAPrepassItIsAnOrdinaryDrawOfItsOwnShader) {
+  auto s = makeScene();
+  makeCutout(*s, "matA");
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  EXPECT_EQ(s->rec().draws[0].shaderId, 1);
+  EXPECT_EQ(s->rec().draws[0].state, opaqueState());
+  EXPECT_EQ(s->rec().shadersCreated, 2) << "no depth variant needed";
+}
+
+TEST(Cutout, PrepassCutsItsHolesAndTheColourPassThenTestsEqual) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  makeCutout(*s, "matA");
+  s->spawn("tri", "matA");
+  s->frame();
+
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 2u);
+  EXPECT_FALSE(draws[0].state.colorWrite);
+  EXPECT_TRUE(draws[0].state.depthWrite);
+  EXPECT_EQ(draws[0].state.depthFunc, api::DepthFunc::Less);
+  EXPECT_TRUE(draws[1].state.colorWrite);
+  EXPECT_FALSE(draws[1].state.depthWrite);
+  EXPECT_EQ(draws[1].state.depthFunc, api::DepthFunc::Equal);
+}
+
+TEST(Cutout, PrepassUsesTheAlphaTestedVariantAndOpaqueKeepsTheEmptyOne) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  makeCutout(*s, "matA"); // shader 1
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matB", 1); // opaque, shader 2
+  s->frame();
+
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 4u);
+  const int cutoutVariant = draws[0].shaderId;
+  const int opaqueVariant = draws[1].shaderId;
+  EXPECT_GT(cutoutVariant, 2);
+  EXPECT_GT(opaqueVariant, 2);
+  EXPECT_NE(cutoutVariant, opaqueVariant);
+
+  const auto &sources = s->rec().fragmentSources;
+  EXPECT_TRUE(hasMacro(sources.at(cutoutVariant)))
+      << "the shader's own fragment stage, compiled with the macro";
+  EXPECT_FALSE(hasMacro(sources.at(opaqueVariant)))
+      << "the empty fragment stage";
+  EXPECT_FALSE(hasMacro(sources.at(1))) << "the colour shader is untouched";
+
+  EXPECT_EQ(draws[2].shaderId, 1);
+  EXPECT_EQ(draws[3].shaderId, 2);
+}
+
+TEST(Cutout, OpaqueAndCutoutMaterialsOfOneShaderGetDifferentPrepassPrograms) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  makeCutout(*s, "matC");     // shader a + t2
+  s->spawn("tri", "matA", 0); // shader a + t1, opaque
+  s->spawn("tri", "matC", 1);
+  s->frame();
+
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 4u);
+  // Same shader id, but two programs: tracking the bound shader by id would
+  // draw the second one with the first's program.
+  EXPECT_NE(draws[0].shaderId, draws[1].shaderId);
+  EXPECT_EQ(draws[2].shaderId, 1);
+  EXPECT_EQ(draws[3].shaderId, 1);
+  EXPECT_EQ(s->rec().shaderUses.size(), 3u)
+      << "two pre-pass programs and the colour shader, bound once";
+}
+
+TEST(Cutout, PrepassBindsTheAlbedoThatTheAlphaTestReads) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  makeCutout(*s, "matC"); // texture t2
+  s->spawn("tri", "matC");
+  s->frame();
+
+  const int variant = s->rec().draws[0].shaderId;
+  EXPECT_TRUE(hasUniformIn(*s, variant, "albedoMap"));
+  // Once for the pre-pass, again for the colour pass: the drawer forgets what
+  // is bound between passes.
+  EXPECT_EQ(s->rec().unit0TextureBinds, (std::vector<int>{2, 2}));
+}
+
+TEST(Cutout, OpaquePrepassStillBindsNoTexturesAtAll) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  s->spawn("tri", "matA"); // texture t1
+  s->frame();
+
+  const int variant = s->rec().draws[0].shaderId;
+  EXPECT_FALSE(hasUniformIn(*s, variant, "albedoMap"));
+  EXPECT_EQ(s->rec().unit0TextureBinds, (std::vector<int>{1}))
+      << "only the colour pass binds the albedo";
+}
+
+TEST(Cutout, DepthVariantsAreBuiltOnceNotEveryFrame) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  makeCutout(*s, "matA");
+  s->spawn("tri", "matA", 0);
+  s->frame();
+  const int created = s->rec().shadersCreated;
+  EXPECT_EQ(created, 3);
+  s->frame();
+  s->frame();
+  EXPECT_EQ(s->rec().shadersCreated, created);
+}
+
+TEST(Cutout, TransparentBatchesStillSkipThePrepass) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  makeCutout(*s, "matA");
+  makeTransparent(*s, "matB", api::RenderState{});
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matB", 1);
+  s->frame();
+
+  EXPECT_EQ(s->rec().draws.size(), 3u) << "matA twice, matB once";
+}
+
+TEST(ShaderVariants, AlphaTestedVariantIsTheOwnFragmentSourceWithTheMacro) {
+  auto s = makeScene();
+  Shader shader(s->world->getRenderDevice());
+  shader.compile("void vs() {}", "#version 330 core\nvoid main() {}\n",
+                 nullptr);
+  const int shaderId = s->rec().shadersCreated; // created last
+
+  const Shader &variant = shader.alphaTestedDepthVariant();
+  EXPECT_EQ(&variant, &shader.alphaTestedDepthVariant()) << "built once";
+  EXPECT_NE(&variant, &shader.depthVariant());
+
+  EXPECT_EQ(s->rec().fragmentSources.at(shaderId),
+            "#version 330 core\nvoid main() {}\n");
+  EXPECT_EQ(s->rec().fragmentSources.at(shaderId + 1),
+            "#version 330 core\n#define COMPONENG_DEPTH_PREPASS 1\n"
+            "void main() {}\n");
+}
+
+TEST(ShaderVariants, RecompilingDropsTheCachedVariants) {
+  auto s = makeScene();
+  Shader shader(s->world->getRenderDevice());
+  shader.compile("v", "#version 330 core\nvoid main() {}\n", nullptr);
+  const int before = s->rec().shadersCreated;
+  shader.alphaTestedDepthVariant();
+  EXPECT_EQ(s->rec().shadersCreated, before + 1);
+
+  shader.compile("v", "#version 330 core\nvoid main() { }\n", nullptr);
+  shader.alphaTestedDepthVariant();
+  EXPECT_EQ(s->rec().shadersCreated, before + 2)
+      << "rebuilt from the new source";
+}
+
+TEST(DefineAfterVersion, GoesOnTheLineAfterTheVersionDirective) {
+  EXPECT_EQ(defineAfterVersion("#version 330 core\nvoid main() {}\n", "X"),
+            "#version 330 core\n#define X 1\nvoid main() {}\n");
+}
+
+TEST(DefineAfterVersion, KeepsCommentsThatPrecedeTheVersion) {
+  EXPECT_EQ(defineAfterVersion("// note\n#version 330 core\nint a;\n", "X"),
+            "// note\n#version 330 core\n#define X 1\nint a;\n");
+}
+
+TEST(DefineAfterVersion, HandlesWindowsLineEndings) {
+  EXPECT_EQ(defineAfterVersion("#version 330 core\r\nint a;\r\n", "X"),
+            "#version 330 core\r\n#define X 1\nint a;\r\n");
+}
+
+TEST(DefineAfterVersion, VersionWithNoTrailingNewline) {
+  EXPECT_EQ(defineAfterVersion("#version 330 core", "X"),
+            "#version 330 core\n#define X 1\n");
+}
+
+TEST(DefineAfterVersion, SourceWithoutAVersionGetsItAtTheTop) {
+  EXPECT_EQ(defineAfterVersion("int a;\n", "X"), "#define X 1\nint a;\n");
+  EXPECT_EQ(defineAfterVersion("", "X"), "#define X 1\n");
+}
+
+TEST(DefineAfterVersion, IgnoresAVersionMentionedMidLine) {
+  EXPECT_EQ(defineAfterVersion("int a; // #version 1\n", "X"),
+            "#define X 1\nint a; // #version 1\n");
+}
+
 // --- Sky ---------------------------------------------------------------------
 
 namespace {

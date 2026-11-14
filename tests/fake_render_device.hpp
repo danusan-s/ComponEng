@@ -87,6 +87,9 @@ struct Recorder {
   // draw ("indexed" / "fullscreen") between them, in order.
   std::vector<std::string> gpuPassEvents;
 
+  // The fragment source each shader id was compiled from (IShader::loadGLSL).
+  std::map<int, std::string> fragmentSources;
+
   // Names passed to loose uniform setters, per shader id.
   std::map<int, std::vector<std::string>> looseUniforms;
 
@@ -144,7 +147,9 @@ class FakeShader final : public api::IShader {
 public:
   FakeShader(Recorder &rec, int id) : m_rec(rec), m_id(id) {
   }
-  void loadGLSL(const char *, const char *, const char *) override {
+  void loadGLSL(const char *, const char *fragmentSource,
+                const char *) override {
+    m_rec.fragmentSources[m_id] = fragmentSource ? fragmentSource : "";
   }
   void loadSPIRV(const char *, const char *, const char *) override {
   }

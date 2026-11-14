@@ -9,6 +9,7 @@ namespace componeng::renderer {
 
 class InstanceBufferCache;
 class MaterialBinder;
+class Shader;
 
 /**
  * @brief Issues the instanced draw for one RenderBatch in a given pass:
@@ -28,8 +29,9 @@ public:
   BatchDrawer(const PassContext &ctx, const InstanceBufferCache &instances,
               MaterialBinder &binder, bool depthPrepassed);
 
-  /** `pass` is DepthPrepass (the shader's depth-only variant), Opaque or
-   *  Transparent. */
+  /** `pass` is DepthPrepass, Opaque or Transparent. The pre-pass runs the
+   *  shader's depth-only variant, or for a Cutout material its alpha-tested
+   *  one (Shader::alphaTestedDepthVariant). */
   void draw(const RenderBatch &batch, api::RenderPass pass);
 
   void forgetBoundState();
@@ -40,7 +42,9 @@ private:
   MaterialBinder &m_binder;
   const bool m_depthPrepassed;
 
-  core::HandleID m_boundShader = core::INVALID_HANDLE;
+  // The program itself, not its shader id: in the pre-pass an opaque and a
+  // cutout material of one shader use different programs.
+  const Shader *m_boundProgram = nullptr;
   core::HandleID m_boundAlbedo = core::INVALID_HANDLE;
   // A material's own uniforms can overwrite a frame-wide one (e.g. its own
   // fogColor). The shader keeps that value, so after such a material the
