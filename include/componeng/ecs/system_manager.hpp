@@ -150,8 +150,9 @@ public:
     if (!m_executionOrderBuilt) {
       buildExecutionOrder();
     }
-#ifdef COMPONENG_DISABLE_DEBUG_UI
-    // The timings only feed the debug UI; skip the clock reads without it.
+#ifdef COMPONENG_DISABLE_PROFILING
+    // The timings only feed the profiling panes; skip the clock reads without
+    // them.
     for (auto &sysRec : m_systems)
       sysRec.system->onUpdate(state);
 #else

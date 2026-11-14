@@ -25,6 +25,54 @@ void GLRenderDevice::beginGpuTimer() {
   m_gpuSpanOpen = true;
 }
 
+void GLRenderDevice::beginGpuPass(api::RenderPass pass) {
+  GpuPassTimer &t = m_gpuPasses[static_cast<std::size_t>(pass)];
+  if (!t.created) {
+    glGenQueries(kGpuQueryCount * 2, &t.queries[0][0]);
+    t.created = true;
+  }
+  // Every slot still waiting on the GPU: skip this frame's measurement rather
+  // than overwrite queries that are in flight.
+  if (t.pending[t.next]) {
+    t.open = false;
+    return;
+  }
+  glQueryCounter(t.queries[t.next][0], GL_TIMESTAMP);
+  t.open = true;
+}
+
+void GLRenderDevice::endGpuPass(api::RenderPass pass) {
+  GpuPassTimer &t = m_gpuPasses[static_cast<std::size_t>(pass)];
+  if (!t.open)
+    return;
+  glQueryCounter(t.queries[t.next][1], GL_TIMESTAMP);
+  t.pending[t.next] = true;
+  t.next = (t.next + 1) % kGpuQueryCount;
+  t.open = false;
+}
+
+void GLRenderDevice::collectGpuPasses() {
+  for (GpuPassTimer &t : m_gpuPasses) {
+    // Oldest first, so the newest finished frame is the one left in `ms`.
+    for (int i = 0; i < kGpuQueryCount; ++i) {
+      const int slot = (t.next + i) % kGpuQueryCount;
+      if (!t.pending[slot])
+        continue;
+      GLint available = 0;
+      glGetQueryObjectiv(t.queries[slot][1], GL_QUERY_RESULT_AVAILABLE,
+                         &available);
+      if (!available)
+        break; // timestamps finish in order: nothing newer is ready either
+      GLuint64 start = 0;
+      GLuint64 end = 0;
+      glGetQueryObjectui64v(t.queries[slot][0], GL_QUERY_RESULT, &start);
+      glGetQueryObjectui64v(t.queries[slot][1], GL_QUERY_RESULT, &end);
+      t.ms = static_cast<double>(end - start) * 1e-6;
+      t.pending[slot] = false;
+    }
+  }
+}
+
 void GLRenderDevice::endGpuTimer() {
   if (m_gpuSpanOpen) {
     glEndQuery(GL_TIME_ELAPSED);
@@ -48,6 +96,8 @@ void GLRenderDevice::endGpuTimer() {
     m_gpuTimeMs = static_cast<double>(nanoseconds) * 1e-6;
     m_gpuPending[slot] = false;
   }
+
+  collectGpuPasses();
 }
 
 void GLRenderDevice::init(void * /*windowHandle*/) {

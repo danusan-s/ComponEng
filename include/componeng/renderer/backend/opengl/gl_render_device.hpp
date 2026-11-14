@@ -42,6 +42,11 @@ public:
   double lastGpuTimeMs() const override {
     return m_gpuTimeMs;
   }
+  void beginGpuPass(api::RenderPass pass) override;
+  void endGpuPass(api::RenderPass pass) override;
+  double lastGpuPassTimeMs(api::RenderPass pass) const override {
+    return m_gpuPasses[static_cast<std::size_t>(pass)].ms;
+  }
 
   std::unique_ptr<api::IShader> createShader() override;
   std::unique_ptr<api::ITexture> createTexture() override;
@@ -78,6 +83,22 @@ private:
   bool m_gpuSpanOpen = false; // begin() issued a query that end() must close
   bool m_gpuCreated = false;
   double m_gpuTimeMs = -1.0;
+
+  // Per-pass timers: each pass has its own ring of timestamp pairs. They are
+  // timestamps (glQueryCounter), not GL_TIME_ELAPSED, because only one
+  // GL_TIME_ELAPSED query can be active at a time and the frame timer above
+  // holds it. Read in collectGpuPasses(), from endGpuTimer().
+  struct GpuPassTimer {
+    unsigned int queries[kGpuQueryCount][2] = {}; // begin, end
+    bool pending[kGpuQueryCount] = {};
+    int next = 0;
+    bool open = false;
+    bool created = false;
+    double ms = -1.0;
+  };
+  GpuPassTimer m_gpuPasses[api::kRenderPassCount];
+
+  void collectGpuPasses();
 };
 
 } // namespace componeng::renderer::opengl

@@ -119,7 +119,21 @@ void Window::init(int width, int height, const char *title) {
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 #endif
 
-  m_handle = glfwCreateWindow(width, height, title, nullptr, nullptr);
+  GLFWmonitor *primaryMonitor = glfwGetPrimaryMonitor();
+  if (!primaryMonitor) {
+    LOG_ERROR("Failed to get primary monitor");
+    glfwTerminate();
+    return;
+  }
+  const GLFWvidmode *videoMode = glfwGetVideoMode(primaryMonitor);
+  if (!videoMode) {
+    LOG_ERROR("Failed to get video mode for primary monitor");
+    glfwTerminate();
+    return;
+  }
+
+  m_handle = glfwCreateWindow(videoMode->width, videoMode->height, title,
+                              primaryMonitor, nullptr);
   if (!m_handle) {
     LOG_ERROR("Failed to create GLFW window");
     glfwTerminate();

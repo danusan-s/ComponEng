@@ -1,41 +1,39 @@
 #pragma once
 
 #include "componeng/ecs/system.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
-#include "componeng/renderer/batching/draw_key.hpp"
-
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
+#include "componeng/renderer/pipeline/frame_uniforms.hpp"
+#include "componeng/renderer/pipeline/instance_buffer_cache.hpp"
+#include "componeng/renderer/pipeline/material_binder.hpp"
 
 namespace componeng::renderer {
 
 /**
- * @brief Presentation-phase system that renders all entities with MeshComponent
- * and MaterialComponent.
+ * @brief Presentation-phase system that draws the frame from the RenderQueue
+ * BatchingSystem built: depth pre-pass, opaque, sky, transparent, in that
+ * order.
  *
- * Performs builds draw batches, and issues draw calls
- * using instanced rendering through the render device abstraction.
+ * It only sequences the passes. What each piece does lives under
+ * renderer/pipeline/: FrameUniforms (per-frame values), InstanceBufferCache
+ * (instance data upload), BatchDrawer (one batch's draw), MaterialBinder
+ * (material data), renderStateFor (pipeline state per pass), drawSkyPass, and
+ * PassProfiler (timing).
+ *
+ * Fills resources::RenderStats every frame: per-pass draw, instance, triangle
+ * and shader-bind counts, plus (with the debug UI) per-pass CPU submit time.
+ * With the debug UI it also times each pass on the GPU, see
+ * IRenderDevice::beginGpuPass.
  */
 class RenderSystem final : public ecs::ISystem {
 public:
+  void onCreate(const ecs::SystemState &state) override;
   void onUpdate(const ecs::SystemState &state) override;
 
 private:
-  // Per-frame values (camera, light, fog, time) shared by every shader that
-  // declares the FrameData block; uploaded once per frame and bound once.
-  std::unique_ptr<api::IBuffer> m_frameBuffer;
-
-  // One persistent instance-data buffer per (mesh,material) combo, reused
-  // across frames via setSubData instead of being recreated every draw call.
-  std::unordered_map<DrawKey, std::unique_ptr<api::IBuffer>, DrawKeyHash>
-      m_instanceBuffers;
-
-  // Problems with a material's extra bindings (no such block in the shader,
-  // out of texture units) already logged, so each is reported once rather than
-  // every frame.
-  std::unordered_set<std::string> m_reportedBindingProblems;
+  // These live across frames because they own GPU buffers, or remember what
+  // was already reported.
+  FrameUniforms m_frame;
+  InstanceBufferCache m_instances;
+  MaterialBinder m_binder;
 };
 
 } // namespace componeng::renderer

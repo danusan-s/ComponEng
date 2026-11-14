@@ -29,6 +29,7 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/renderer/batching/*.cpp"
     "src/componeng/renderer/culling/*.cpp"
     "src/componeng/renderer/lod/*.cpp"
+    "src/componeng/renderer/pipeline/*.cpp"
     "src/componeng/audio/*.cpp"
     "src/componeng/input/*.cpp"
     "src/componeng/camera/*.cpp"
@@ -36,19 +37,23 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/ecs/*.cpp"
     "src/componeng/utils/*.cpp"
 )
-# The ImGui debug overlay (frame timings, camera info, ...). Turn it off with
-# -DCOMPONENG_DEBUG_UI=OFF for builds that should carry none of it: ImGui is not
-# compiled, DebugUI becomes empty inlines, and the engine skips the per-frame
-# timing and GPU timer-query work.
-option(COMPONENG_DEBUG_UI "Build the ImGui debug UI" ON)
+# Two independent switches for what a build shows and measures. ImGui is always
+# built: with the debug panels off it still draws a small FPS window.
+#
+# COMPONENG_DEBUG_UI: the debug panels (camera info, anything a game adds
+#   through DebugUI). OFF turns those calls into empty inlines and leaves only
+#   the FPS window.
+# COMPONENG_PROFILING: measurement. GPU timer queries (frame, render pass,
+#   shader), per-pass and per-system CPU timings, and the timing panes that
+#   show them. OFF compiles all of that out, for a benchmark or a profile that
+#   should not pay for its own measurement.
+option(COMPONENG_DEBUG_UI "Show the ImGui debug panels (off: only the FPS window)" ON)
+option(COMPONENG_PROFILING "Measure GPU/CPU timings and show the timing panes" ON)
 
 file(GLOB ENGINE_THIRD_PARTY_SOURCES
     "src/third_party/glad/*.c"
+    "src/third_party/imgui/*.cpp"
 )
-if (COMPONENG_DEBUG_UI)
-  file(GLOB IMGUI_SOURCES "src/third_party/imgui/*.cpp")
-  list(APPEND ENGINE_THIRD_PARTY_SOURCES ${IMGUI_SOURCES})
-endif()
 
 # Remove main.cpp if it exists in src/
 list(FILTER ENGINE_FIRST_PARTY_SOURCES EXCLUDE REGEX ".*main\\.cpp$")
@@ -58,11 +63,15 @@ set(ENGINE_SOURCES ${ENGINE_FIRST_PARTY_SOURCES} ${ENGINE_THIRD_PARTY_SOURCES})
 # Create STATIC library instead of executable
 add_library(ComponEng STATIC ${ENGINE_SOURCES})
 
-# PUBLIC so games that include debug_ui.hpp see the same setting the library
-# was built with.
+# PUBLIC so games that include debug_ui.hpp / profiling.hpp see the same
+# settings the library was built with.
 if (NOT COMPONENG_DEBUG_UI)
-  message(STATUS "Debug UI disabled (COMPONENG_DEBUG_UI=OFF)")
+  message(STATUS "Debug panels disabled (COMPONENG_DEBUG_UI=OFF): FPS window only")
   target_compile_definitions(ComponEng PUBLIC COMPONENG_DISABLE_DEBUG_UI)
+endif()
+if (NOT COMPONENG_PROFILING)
+  message(STATUS "Profiling disabled (COMPONENG_PROFILING=OFF)")
+  target_compile_definitions(ComponEng PUBLIC COMPONENG_DISABLE_PROFILING)
 endif()
 
 # Include directories (PUBLIC so game can access them)
@@ -172,6 +181,7 @@ set(TEST_SOURCES
     tests/test_instance_data.cpp
     tests/test_transform_matrix_cache.cpp
     tests/test_render_pipeline.cpp
+    tests/test_render_state_policy.cpp
     tests/test_culling.cpp
     tests/test_mesh.cpp
     tests/test_lod.cpp

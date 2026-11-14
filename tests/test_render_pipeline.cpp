@@ -1,5 +1,7 @@
 #include "render_scene_fixture.hpp"
 
+#include "componeng/core/profiling.hpp"
+#include "componeng/resources/render_stats.hpp"
 #include "gtest/gtest.h"
 
 #include <algorithm>
@@ -253,9 +255,7 @@ TEST(MaterialType, OpaqueMaterialKeepsItsCullModeButNotItsBlending) {
   st.cull = api::CullMode::None;
   st.blend = api::BlendMode::Alpha;
   st.depthWrite = false;
-  s->assets()
-      .getMaterial(s->assets().getMaterialID("matA"))
-      .setRenderState(st);
+  s->assets().getMaterial(s->assets().getMaterialID("matA")).setRenderState(st);
   s->spawn("tri", "matA");
   s->frame();
 
@@ -396,9 +396,8 @@ TEST(DepthPrepass, DepthVariantGetsLooseFrameUniformsWhenTheShaderHasNoBlock) {
 }
 
 TEST(DepthPrepass, FrameDataIsStillBoundForTheDepthVariantOfAShaderUsingIt) {
-  auto s = makeScene([](fake::Recorder &r) {
-    r.defaultShaderDeclaresFrameBlock = true;
-  });
+  auto s = makeScene(
+      [](fake::Recorder &r) { r.defaultShaderDeclaresFrameBlock = true; });
   enablePrepass(*s);
   s->spawn("tri", "matA");
   s->frame();
@@ -646,4 +645,123 @@ TEST(RenderPipeline, EachInstanceCarriesItsOwnModelMatrixAndColor) {
       EXPECT_EQ(inst[18], 0.6f);
     }
   }
+}
+
+// --- Render stats and pass timers --------------------------------------------
+
+namespace {
+const resources::RenderStats &statsOf(Scene &s) {
+  return s.world->getResource<resources::RenderStats>();
+}
+} // namespace
+
+TEST(RenderStats, CountDrawsInstancesTrianglesAndShaderBindsPerPass) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  makeTransparent(*s, "matB", api::RenderState{});
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matA", 1);
+  s->spawn("quad", "matA", 2); // 6 indices: 2 triangles
+  s->spawn("tri", "matB", 3);
+  s->frame();
+
+  const auto &st = statsOf(*s);
+  for (auto pass : {api::RenderPass::DepthPrepass, api::RenderPass::Opaque}) {
+    EXPECT_EQ(st.of(pass).drawCalls, 2) << api::renderPassName(pass);
+    EXPECT_EQ(st.of(pass).instances, 3u) << api::renderPassName(pass);
+    EXPECT_EQ(st.of(pass).triangles, 4u) << "2 x tri + 1 x quad";
+    EXPECT_EQ(st.of(pass).shaderBinds, 1) << "both batches use shader a";
+  }
+  const auto &blended = st.of(api::RenderPass::Transparent);
+  EXPECT_EQ(blended.drawCalls, 1);
+  EXPECT_EQ(blended.instances, 1u);
+  EXPECT_EQ(blended.triangles, 1u);
+  EXPECT_EQ(blended.shaderBinds, 1);
+
+  const auto &sky = st.of(api::RenderPass::Sky);
+  EXPECT_EQ(sky.drawCalls, 0);
+
+  const auto total = st.total();
+  EXPECT_EQ(total.drawCalls, 5);
+  EXPECT_EQ(total.instances, 7u);
+}
+
+TEST(RenderStats, SkyIsOneFullscreenTriangle) {
+  auto s = makeScene();
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  s->spawn("tri", "matA");
+  s->frame();
+
+  const auto &sky = statsOf(*s).of(api::RenderPass::Sky);
+  EXPECT_EQ(sky.drawCalls, 1);
+  EXPECT_EQ(sky.instances, 1u);
+  EXPECT_EQ(sky.triangles, 1u);
+  EXPECT_EQ(sky.shaderBinds, 1);
+}
+
+TEST(RenderStats, ResetEveryFrameRatherThanAccumulating) {
+  auto s = makeScene();
+  s->spawn("tri", "matA");
+  s->frame();
+  s->frame();
+  s->frame();
+
+  EXPECT_EQ(statsOf(*s).of(api::RenderPass::Opaque).drawCalls, 1);
+  EXPECT_EQ(statsOf(*s).of(api::RenderPass::Opaque).instances, 1u);
+}
+
+TEST(RenderStats, PrepassCountersStayZeroWhenThePrepassIsOff) {
+  auto s = makeScene(); // fixture default: off
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_EQ(statsOf(*s).of(api::RenderPass::DepthPrepass).drawCalls, 0);
+  EXPECT_EQ(statsOf(*s).of(api::RenderPass::Opaque).drawCalls, 1);
+}
+
+TEST(RenderStats, UploadBytesCoverEveryBatchsInstanceData) {
+  auto s = makeScene();
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matA", 1);
+  s->frame();
+
+  // Two instances of the diffuse layout: 16 floats of matrix + 4 of colour.
+  EXPECT_EQ(statsOf(*s).uploadBytes, 2u * 20u * sizeof(float));
+}
+
+TEST(GpuPassTimers, EachPassIsBracketedAroundItsOwnDraws) {
+  if constexpr (!core::Profiling::kEnabled) {
+    GTEST_SKIP() << "pass timers are compiled out without profiling";
+  }
+  auto s = makeScene();
+  enablePrepass(*s);
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  makeTransparent(*s, "matB", api::RenderState{});
+  s->spawn("tri", "matA", 0);
+  s->spawn("tri", "matB", 1);
+  s->frame();
+
+  EXPECT_EQ(s->rec().gpuPassEvents,
+            (std::vector<std::string>{
+                "begin Depth pre-pass", "indexed", "end Depth pre-pass",
+                "begin Opaque", "indexed", "end Opaque", //
+                "begin Sky", "fullscreen", "end Sky",    //
+                "begin Transparent", "indexed", "end Transparent"}));
+}
+
+TEST(GpuPassTimers, EmptyPassesAreStillBracketed) {
+  if constexpr (!core::Profiling::kEnabled) {
+    GTEST_SKIP() << "pass timers are compiled out without profiling";
+  }
+  auto s = makeScene();
+  s->frame();
+
+  // So a pass that did nothing reads ~0 instead of keeping an old value.
+  EXPECT_EQ(s->rec().gpuPassEvents,
+            (std::vector<std::string>{"begin Depth pre-pass",
+                                      "end Depth pre-pass", "begin Opaque",
+                                      "end Opaque", "begin Sky", "end Sky",
+                                      "begin Transparent", "end Transparent"}));
 }

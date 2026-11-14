@@ -1,533 +1,92 @@
 #include "componeng/renderer/render_system.hpp"
 
-#include "componeng/camera/camera_component.hpp"
 #include "componeng/camera/main_camera.hpp"
-#include "componeng/core/debug_ui.hpp"
-#include "componeng/core/transform_component.hpp"
-#include "componeng/core/types.hpp"
-#include "componeng/ecs/entity.hpp"
 #include "componeng/ecs/world.hpp"
-#include "componeng/renderer/asset/material.hpp"
-#include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/backend/api/render_pass.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
-#include "componeng/renderer/component/light_component.hpp"
-#include "componeng/renderer/component/material_component.hpp"
-#include "componeng/renderer/component/mesh_component.hpp"
-#include "componeng/renderer/component/skybox_component.hpp"
-#include "componeng/renderer/frame_data.hpp"
-#include "componeng/resources/fog.hpp"
+#include "componeng/renderer/pipeline/batch_drawer.hpp"
+#include "componeng/renderer/pipeline/pass_context.hpp"
+#include "componeng/renderer/pipeline/pass_profiler.hpp"
+#include "componeng/renderer/pipeline/sky_pass.hpp"
 #include "componeng/resources/render_settings.hpp"
-
-#include <algorithm>
-#include <string>
-#include <unordered_set>
+#include "componeng/resources/render_stats.hpp"
 
 namespace componeng::renderer {
 
-static constexpr core::Vec3 DEFAULT_LIGHT_DIR = core::Vec3(-0.2f, 1.0f, -0.3f);
-static constexpr core::Vec3 DEFAULT_LIGHT_COLOR = core::Vec3(1.0f, 1.0f, 1.0f);
-static constexpr core::Vec3 AMBIENT_COLOR = core::Vec3(0.3f, 0.4f, 0.6f);
-static constexpr float AMBIENT_STRENGTH = 0.4f;
+namespace {
 
-static void setShaderUniforms(const Shader &shader, const IMaterial &material) {
-  // Set material uniforms
-  for (const auto &[name, value] : material.getUniforms()) {
-    const char *iname = name;
-    std::visit(
-        [&shader, iname](auto &&arg) {
-          using T = std::decay_t<decltype(arg)>;
-          if constexpr (std::is_same_v<T, float>) {
-            shader.setFloat(iname, arg);
-          } else if constexpr (std::is_same_v<T, core::Vec2>) {
-            shader.setVector2f(iname, arg);
-          } else if constexpr (std::is_same_v<T, core::Vec3>) {
-            shader.setVector3f(iname, arg);
-          } else if constexpr (std::is_same_v<T, core::Vec4>) {
-            shader.setVector4f(iname, arg);
-          } else if constexpr (std::is_same_v<T, core::Mat4>) {
-            shader.setMatrix4(iname, arg);
-          }
-        },
-        value);
-  }
+bool depthPrepassEnabled(ecs::World &world) {
+  return !world.hasResource<resources::RenderSettings>() ||
+         world.getResource<resources::RenderSettings>().depthPrepass;
 }
 
-// Binds the extra textures, texture buffers and uniform blocks a material
-// declared (IMaterial::setTexture and friends). Problems are reported once.
-// `depthOnly` is for a depth pre-pass program, which holds only the vertex
-// stage: a block or sampler that only the fragment shader reads is expected
-// to be missing there and is skipped without a report.
-static void bindMaterialResources(api::IRenderDevice &device,
-                                  const AssetManager &assets,
-                                  const Shader &shader,
-                                  const IMaterial &material,
-                                  std::unordered_set<std::string> &reported,
-                                  bool depthOnly) {
-  auto report = [&reported](const std::string &key, const char *message,
-                            const std::string &name) {
-    if (reported.insert(key).second) {
-      LOG_ERROR("%s: %s", message, name.c_str());
-    }
-  };
+} // namespace
 
-  uint32_t unit = api::kFirstMaterialTextureUnit;
-  for (const auto &b : material.getTextureBindings()) {
-    if (unit >= api::kTextureUnitLimit) {
-      report("units:" + b.sampler, "out of texture units for sampler",
-             b.sampler);
-      break;
-    }
-    device.setActiveTextureUnit(unit);
-    assets.getTexture(b.texture).bind();
-    shader.setInteger(b.sampler.c_str(), static_cast<int>(unit));
-    ++unit;
-  }
-  for (const auto &b : material.getBufferTextureBindings()) {
-    if (unit >= api::kTextureUnitLimit) {
-      report("units:" + b.sampler, "out of texture units for sampler",
-             b.sampler);
-      break;
-    }
-    device.bindBufferTexture(unit, assets.getBuffer(b.buffer), b.format);
-    shader.setInteger(b.sampler.c_str(), static_cast<int>(unit));
-    ++unit;
-  }
-  if (unit != api::kFirstMaterialTextureUnit) {
-    // Back to unit 0 so the albedo binding the loop tracks stays the one that
-    // later binds and draws see.
-    device.setActiveTextureUnit(0);
-  }
-
-  uint32_t binding = api::kFirstMaterialUniformBinding;
-  for (const auto &b : material.getUniformBlockBindings()) {
-    if (binding >= api::kUniformBindingLimit) {
-      report("bindings:" + b.block, "out of uniform buffer bindings for block",
-             b.block);
-      break;
-    }
-    if (shader.bindUniformBlock(b.block.c_str(), binding)) {
-      device.bindUniformBuffer(binding, assets.getBuffer(b.buffer));
-    } else if (!depthOnly) {
-      report("block:" + b.block, "the shader declares no uniform block",
-             b.block);
-    }
-    ++binding;
-  }
-}
-
-// Pipeline state for an opaque material's depth-only pre-pass draw: the
-// material keeps its culling, everything else is fixed.
-static api::RenderState depthPrepassState(const api::RenderState &material) {
-  api::RenderState s;
-  s.cull = material.cull;
-  s.depthTest = true;
-  s.depthWrite = true;
-  s.depthFunc = api::DepthFunc::Less;
-  s.blend = api::BlendMode::None;
-  s.colorWrite = false;
-  return s;
-}
-
-// Pipeline state for an opaque material's shaded draw. After a pre-pass the
-// depth buffer already holds the nearest surface, so only fragments at exactly
-// that depth are shaded and nothing more is written to it.
-static api::RenderState opaqueColorState(const api::RenderState &material,
-                                         bool afterPrepass) {
-  api::RenderState s;
-  s.cull = material.cull;
-  s.depthTest = true;
-  s.depthWrite = !afterPrepass;
-  s.depthFunc = afterPrepass ? api::DepthFunc::Equal : api::DepthFunc::Less;
-  s.blend = api::BlendMode::None;
-  return s;
-}
-
-// Sends FrameData's values as loose uniforms, for shaders that predate the
-// FrameData block. The values come from the same struct that is uploaded to
-// the uniform buffer, so both paths always agree.
-static void setLooseFrameUniforms(const Shader &shader, const FrameData &frame,
-                                  const core::Mat4 &viewProj) {
-  shader.setMatrix4("viewProj", viewProj);
-  shader.setVector3f("lightDir", frame.lightDir[0], frame.lightDir[1],
-                     frame.lightDir[2]);
-  shader.setVector3f("lightColor", frame.lightColor[0], frame.lightColor[1],
-                     frame.lightColor[2]);
-  shader.setVector3f("cameraPos", frame.cameraPos[0], frame.cameraPos[1],
-                     frame.cameraPos[2]);
-  shader.setFloat("time", frame.time);
-
-  shader.setVector4f("fogColor", frame.fogColor[0], frame.fogColor[1],
-                     frame.fogColor[2], frame.fogColor[3]);
-  shader.setFloat("fogDensity", frame.fogDensity);
-  shader.setFloat("fogStart", frame.fogStart);
-  shader.setFloat("fogEnd", frame.fogEnd);
-
-  shader.setVector3f("ambientColor", frame.ambientColor[0],
-                     frame.ambientColor[1], frame.ambientColor[2]);
-  shader.setFloat("ambientStrength", frame.ambientStrength);
+void RenderSystem::onCreate(const ecs::SystemState &state) {
+  state.world->setResource(resources::RenderStats());
 }
 
 void RenderSystem::onUpdate(const ecs::SystemState &state) {
-  api::IRenderDevice &renderDevice = state.world->getRenderDevice();
-  renderDevice.setRenderState(api::RenderState{});
-  renderDevice.clear(0.0f, 0.0f, 0.0f, 1.0f);
+  ecs::World &world = *state.world;
+  api::IRenderDevice &device = world.getRenderDevice();
+  device.setRenderState(api::RenderState{});
+  device.clear(0.0f, 0.0f, 0.0f, 1.0f);
 
-  ecs::EntityID mainCameraID =
-      state.world->getResource<camera::MainCamera>().entity;
+  const ecs::EntityID camera = world.getResource<camera::MainCamera>().entity;
 
-  const core::Vec3 &cameraPos =
-      state.world->readComponent<core::TransformComponent>(mainCameraID)
-          .position;
-  core::Mat4 &viewProj =
-      state.world->getComponent<camera::CameraComponent>(mainCameraID)
-          .viewProjectionMatrix;
+  // Counters and CPU timings for the debug panes; see resources::RenderStats.
+  auto &stats = world.getResource<resources::RenderStats>();
+  stats = resources::RenderStats();
 
-  // Read fog resource
-  auto &fog = state.world->getResource<resources::Fog>();
+  m_frame.update(world, camera);
 
-  int drawCalls = 0;
-  int prepassDrawCalls = 0;
-
-  core::Vec3 lightDir = DEFAULT_LIGHT_DIR;
-  core::Vec3 lightColor = DEFAULT_LIGHT_COLOR;
-
-  state.world->query().read<renderer::DirectionalLightComponent>().each(
-      [&](const renderer::DirectionalLightComponent &l) {
-        lightDir = l.direction;
-        lightColor = l.color;
-      });
-
-  // Per-frame values shared by every shader that declares the FrameData block.
-  FrameData frame{};
-  std::copy_n(core::value_ptr(viewProj), 16, frame.viewProj);
-  std::copy_n(core::value_ptr(cameraPos), 3, frame.cameraPos);
-  frame.time = static_cast<float>(state.world->time);
-  std::copy_n(core::value_ptr(lightDir), 3, frame.lightDir);
-  std::copy_n(core::value_ptr(lightColor), 3, frame.lightColor);
-  std::copy_n(core::value_ptr(AMBIENT_COLOR), 3, frame.ambientColor);
-  frame.ambientStrength = AMBIENT_STRENGTH;
-  std::copy_n(core::value_ptr(fog.color), 4, frame.fogColor);
-  frame.fogDensity = fog.density;
-  frame.fogStart = fog.start;
-  frame.fogEnd = fog.end;
-
-  if (!m_frameBuffer) {
-    m_frameBuffer = renderDevice.createBuffer();
-  }
-  if (m_frameBuffer->size() < sizeof(FrameData)) {
-    m_frameBuffer->setData(&frame, sizeof(FrameData),
-                           api::IBuffer::Usage::Dynamic);
-  } else {
-    m_frameBuffer->setSubData(0, &frame, sizeof(FrameData));
-  }
-  renderDevice.bindUniformBuffer(kFrameDataBinding, *m_frameBuffer);
-
-  // ------------------------------------------------------------------
-  // Sky pass: a full-screen triangle behind everything. The shader pins depth
-  // to exactly 1.0, so the depth test must accept equal depth, and there is
-  // nothing behind it to protect so it does not write depth. Only the first
-  // SkyboxComponent is drawn.
-  //
-  // It is drawn after the opaque batches and before the blended / depth-less
-  // ones (see the loops below), not first: the sky shader is expensive, and
-  // with the depth test on, the pixels the opaque geometry already covers
-  // are rejected before it runs.
-  // ------------------------------------------------------------------
-  // GPU time is attributed per shader: a span runs from binding a shader until
-  // the next shader is bound (or nullptr, at the end of a pass). A shader can
-  // get several spans per frame (opaque, sky, blended passes); they are summed.
-  // Compiled out with the debug UI so no timer queries are issued.
-  const Shader *timedShader = nullptr;
-  auto timeShader = [&](const Shader *next) {
-    if constexpr (core::DebugUI::kEnabled) {
-      if (timedShader)
-        timedShader->endGpuTimer();
-      if (next)
-        next->beginGpuTimer();
-      timedShader = next;
-    }
-  };
-
-  auto drawSky = [&]() {
-    bool skyDrawn = false;
-    state.world->query().read<renderer::SkyboxComponent>().each(
-        [&](const renderer::SkyboxComponent &sky) {
-          if (skyDrawn) {
-            return;
-          }
-          skyDrawn = true;
-
-          const auto &assets = state.world->getResource<AssetManager>();
-          const Shader &shader =
-              assets.getShader(assets.getShaderID(sky.shaderName));
-          auto &cam =
-              state.world->getComponent<camera::CameraComponent>(mainCameraID);
-
-          timeShader(&shader);
-          shader.use();
-          if (!shader.usesFrameData()) {
-            setLooseFrameUniforms(shader, frame, viewProj);
-          }
-
-          // Projection x rotation-only view, inverted: turns a pixel back into
-          // the direction the camera sees through it. No camera translation, so
-          // the sky stays fixed relative to the camera's orientation.
-          shader.setMatrix4(
-              "invSkyViewProj",
-              core::inverse(cam.projectionMatrix * cam.viewMatrix));
-          shader.setVector3f("skyColor", sky.color);
-          // The fog colour as horizon lets fogged ground fade into the sky.
-          shader.setVector3f(
-              "horizonColor",
-              sky.horizonFromFog
-                  ? core::Vec3(fog.color.x, fog.color.y, fog.color.z)
-                  : sky.horizonColor);
-
-          api::RenderState skyState;
-          skyState.cull = api::CullMode::None;
-          skyState.depthFunc = api::DepthFunc::LessEqual;
-          skyState.depthWrite = false;
-          renderDevice.setRenderState(skyState);
-
-          renderDevice.drawFullscreenTriangle();
-
-          renderDevice.setRenderState(api::RenderState{});
-          timeShader(nullptr);
-        });
-  };
-
-  int instancesRendered = 0;
-  auto &renderQueue = state.world->getResource<RenderQueue>();
-  const auto &assetManager = state.world->getResource<AssetManager>();
-
-  // The queue is sorted by shader, then texture, so consecutive batches often
-  // share GPU state. Track what is currently bound and skip redundant work.
-  // GL state is only trusted within this loop: ImGui or anything else may have
-  // changed it between frames.
-  core::HandleID boundShader = core::INVALID_HANDLE;
-  core::HandleID boundAlbedo = core::INVALID_HANDLE;
-  // A material's own uniforms can overwrite a frame-wide one (e.g. its own
-  // fogColor). The shader keeps that value, so after such a material the
-  // frame-wide uniforms must be sent again even on the same shader.
-  bool materialOverrodeUniforms = false;
-
-  // Uploads every batch's instance data. Done once, ahead of both the
-  // pre-pass and the colour pass, which then only bind the buffers.
-  // One GPU buffer is reused per (mesh,material) combo across frames instead
-  // of creating/destroying one every draw call; it is only reallocated
-  // (setData) when a batch needs more room than it did before, otherwise
-  // updated in place (setSubData).
-  for (std::size_t i = 0; i < renderQueue.size(); ++i) {
-    const RenderBatch &batch = renderQueue.sorted(i);
-    if (batch.procedural) {
-      continue; // no per-instance data: the shader reads gl_InstanceID
-    }
-    std::unique_ptr<api::IBuffer> &buf =
-        m_instanceBuffers[DrawKey{batch.meshID, batch.materialID}];
-    if (!buf) {
-      buf = renderDevice.createBuffer();
-    }
-    const size_t requiredBytes = batch.instanceData.size() * sizeof(float);
-    if (requiredBytes > buf->size()) {
-      buf->setData(batch.instanceData.data(), requiredBytes,
-                   api::IBuffer::Usage::Dynamic);
-    } else if (requiredBytes > 0) {
-      buf->setSubData(0, batch.instanceData.data(), requiredBytes);
-    }
-  }
-
-  // The queue is sorted opaque first, transparent last.
-  std::size_t opaqueEnd = 0;
-  while (opaqueEnd < renderQueue.size() &&
-         !renderQueue.sorted(opaqueEnd).transparent) {
-    ++opaqueEnd;
-  }
-
-  const bool prepassEnabled =
-      !state.world->hasResource<resources::RenderSettings>() ||
-      state.world->getResource<resources::RenderSettings>().depthPrepass;
-  const bool prepassed = prepassEnabled && opaqueEnd > 0;
-
-  // `depthOnly` draws the batch with the shader's depth variant (see
-  // Shader::depthVariant), for the pre-pass: only what the vertex stage needs
-  // is set up, and the albedo and PBR textures are skipped.
-  auto drawBatch = [&](std::size_t batchIndex, bool depthOnly) {
-    const RenderBatch &batch = renderQueue.sorted(batchIndex);
-    const core::HandleID meshID = batch.meshID;
-    const core::HandleID materialID = batch.materialID;
-
-    auto &material = assetManager.getMaterial(materialID);
-    const api::VertexLayout &layout = material.getVertexLayout();
-    const Mesh &model = assetManager.getMesh(meshID);
-    const Shader &colorShader = assetManager.getShader(material.getShaderID());
-    const Shader &shader = depthOnly ? colorShader.depthVariant() : colorShader;
-
-    const bool shaderChanged = material.getShaderID() != boundShader;
-    if (shaderChanged) {
-      // Pre-pass time is attributed to the shader the batch belongs to, not
-      // its depth variant, so a shader's timing covers all of its draws.
-      timeShader(&colorShader);
-      shader.use();
-      boundShader = material.getShaderID();
-    }
-
-    if (depthOnly) {
-      renderDevice.setRenderState(
-          depthPrepassState(material.getRenderState()));
-    } else if (batch.transparent) {
-      renderDevice.setRenderState(material.getRenderState());
-    } else {
-      renderDevice.setRenderState(
-          opaqueColorState(material.getRenderState(), prepassed));
-    }
-
-    if (shaderChanged || materialOverrodeUniforms) {
-      if (!shader.usesFrameData()) {
-        setLooseFrameUniforms(shader, frame, viewProj);
-      }
-      if (!depthOnly) {
-        shader.setInteger("albedoMap", 0);
-      }
-    }
-
-    if (!depthOnly) {
-      // Texture toggles (PBR materials use textures; diffuse may not)
-      const auto *pbr = dynamic_cast<const PbrMaterial *>(&material);
-      const bool isPbr = pbr != nullptr;
-      shader.setInteger("useTextures", isPbr ? 1 : 0);
-      shader.setInteger("useNormalMap", isPbr ? 1 : 0);
-
-      const Texture2D &albedoTex =
-          assetManager.getTexture(material.getTextureID());
-
-      // Bind albedo to texture unit 0
-      if (material.getTextureID() != boundAlbedo) {
-        renderDevice.setActiveTextureUnit(0);
-        albedoTex.bind();
-        boundAlbedo = material.getTextureID();
-      }
-
-      // Bind PBR textures to units 1-4 if available
-      if (isPbr) {
-        renderDevice.setActiveTextureUnit(1);
-        if (pbr->getNormalMapID() != 0) {
-          const Texture2D &normalTex =
-              assetManager.getTexture(pbr->getNormalMapID());
-          normalTex.bind();
-        } else {
-          albedoTex.bind(); // fallback
-        }
-        shader.setInteger("normalMap", 1);
-
-        renderDevice.setActiveTextureUnit(2);
-        if (pbr->getMetallicMapID() != 0) {
-          const Texture2D &metallicTex =
-              assetManager.getTexture(pbr->getMetallicMapID());
-          metallicTex.bind();
-        } else {
-          albedoTex.bind();
-        }
-        shader.setInteger("metallicMap", 2);
-
-        renderDevice.setActiveTextureUnit(3);
-        if (pbr->getRoughnessMapID() != 0) {
-          const Texture2D &roughTex =
-              assetManager.getTexture(pbr->getRoughnessMapID());
-          roughTex.bind();
-        } else {
-          albedoTex.bind();
-        }
-        shader.setInteger("roughnessMap", 3);
-
-        renderDevice.setActiveTextureUnit(4);
-        if (pbr->getAOMapID() != 0) {
-          const Texture2D &aoTex = assetManager.getTexture(pbr->getAOMapID());
-          aoTex.bind();
-        } else {
-          albedoTex.bind();
-        }
-        shader.setInteger("aoMap", 4);
-
-        // Back to unit 0 so the albedo binding tracked above stays the one
-        // that later binds and draws see.
-        renderDevice.setActiveTextureUnit(0);
-      }
-    }
-
-    bindMaterialResources(renderDevice, assetManager, shader, material,
-                          m_reportedBindingProblems, depthOnly);
-
-    // Set material uniforms (fogColor etc. from PbrMaterial constructor)
-    setShaderUniforms(shader, material);
-
-    materialOverrodeUniforms = !material.getUniforms().empty();
-
-    model.getImpl().bind();
-
-    // Procedural batches carry no per-instance data: no instance attributes
-    // to enable; the shader reads gl_InstanceID.
-    if (batch.procedural) {
-      renderDevice.drawIndexedInstanced(model.indexCount(),
-                                        batch.instanceCount);
-    } else {
-      api::IBuffer &buf = *m_instanceBuffers.at(DrawKey{meshID, materialID});
-      renderDevice.setupInstanceAttributes(buf, layout);
-      renderDevice.drawIndexedInstanced(model.indexCount(),
-                                        batch.instanceCount);
-      renderDevice.unbindInstanceAttributes(layout);
-    }
-
-    if (depthOnly) {
-      ++prepassDrawCalls;
-    } else {
-      ++drawCalls;
-      instancesRendered += batch.instanceCount;
-    }
-  };
-
-  // Any pass changes the bound shader and what the loop tracks about it.
-  auto forgetBoundState = [&]() {
-    boundShader = core::INVALID_HANDLE;
-    boundAlbedo = core::INVALID_HANDLE;
-    materialOverrodeUniforms = false;
-  };
-
-  // Depth pre-pass: the opaque batches again, depth only. The colour pass
-  // below then shades just the pixel's nearest surface.
-  if (prepassed) {
-    for (std::size_t i = 0; i < opaqueEnd; ++i) {
-      drawBatch(i, /*depthOnly=*/true);
-    }
-    timeShader(nullptr);
-    forgetBoundState();
-  }
-
-  // Opaque batches go before the sky. Anything blended or drawn without depth
-  // testing (a lens flare, a transparent surface) must land on top of the sky,
-  // so it goes after. Each group keeps the queue's sorted order.
-  for (std::size_t i = 0; i < opaqueEnd; ++i) {
-    drawBatch(i, /*depthOnly=*/false);
-  }
-
-  // Closes the last opaque shader's span; the sky pass opens its own.
-  timeShader(nullptr);
-  drawSky();
-  // The sky pass changed the bound shader; what the loop tracked is stale.
-  forgetBoundState();
-
-  for (std::size_t i = opaqueEnd; i < renderQueue.size(); ++i) {
-    drawBatch(i, /*depthOnly=*/false);
-  }
-  timeShader(nullptr);
+  PassProfiler profiler(device, stats);
+  const PassContext ctx{device, world.getResource<AssetManager>(), m_frame,
+                        profiler, stats};
 
   // The queue is cleared by BatchingSystem at the start of next frame, which
   // lets its batch storage be reused instead of freed.
+  const auto &queue = world.getResource<RenderQueue>();
 
-  core::DebugUI::addValue("Instances Rendered", instancesRendered);
-  core::DebugUI::addValue("Draw Calls", drawCalls);
-  core::DebugUI::addValue("Prepass Draw Calls", prepassDrawCalls);
+  profiler.beginUpload();
+  stats.uploadBytes = m_instances.upload(device, queue);
+  profiler.endUpload();
+
+  // The queue is sorted opaque first, transparent last.
+  const std::size_t opaqueEnd = queue.opaqueCount();
+  const bool prepassed = depthPrepassEnabled(world) && opaqueEnd > 0;
+
+  BatchDrawer drawer(ctx, m_instances, m_binder, prepassed);
+
+  // Runs `drawer` over queue[first, last) in `pass`, with the pass bracketed
+  // for timing and the drawer's bound state forgotten afterwards.
+  auto runBatches = [&](api::RenderPass pass, std::size_t first,
+                        std::size_t last) {
+    profiler.beginPass(pass);
+    for (std::size_t i = first; i < last; ++i) {
+      drawer.draw(queue.sorted(i), pass);
+    }
+    profiler.timeShader(nullptr);
+    profiler.endPass(pass);
+    drawer.forgetBoundState();
+  };
+
+  // Depth pre-pass: the opaque batches again, depth only. The opaque pass then
+  // shades just the pixel's nearest surface.
+  runBatches(api::RenderPass::DepthPrepass, 0, prepassed ? opaqueEnd : 0);
+
+  runBatches(api::RenderPass::Opaque, 0, opaqueEnd);
+
+  // After the opaque batches and before the transparent ones: anything blended
+  // or drawn without depth testing must land on top of the sky.
+  profiler.beginPass(api::RenderPass::Sky);
+  drawSkyPass(ctx, world, camera);
+  profiler.endPass(api::RenderPass::Sky);
+  drawer.forgetBoundState();
+
+  runBatches(api::RenderPass::Transparent, opaqueEnd, queue.size());
 }
 
 } // namespace componeng::renderer

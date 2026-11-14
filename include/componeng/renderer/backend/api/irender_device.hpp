@@ -1,5 +1,7 @@
 #pragma once
 
+#include "componeng/renderer/backend/api/render_pass.hpp"
+
 #include "componeng/core/types.hpp"
 
 #include <cstdint>
@@ -428,6 +430,24 @@ public:
   /** Milliseconds of GPU work in the most recent completed timed span, or a
    *  negative value if none has completed (or timing is unsupported). */
   virtual double lastGpuTimeMs() const {
+    return -1.0;
+  }
+
+  /**
+   * Per-pass GPU timing. Work submitted between beginGpuPass(p) and
+   * endGpuPass(p) is timed as pass p, once per frame; passes may sit inside the
+   * beginGpuTimer()/endGpuTimer() span and inside each other's gaps, but a pass
+   * does not nest with itself. Like the frame timer, results arrive a few
+   * frames late, and are collected when endGpuTimer() runs.
+   * lastGpuPassTimeMs() is the newest finished frame's time for that pass, or
+   * negative if none has finished (or timing is unsupported). Optional, like
+   * the frame timer.
+   */
+  virtual void beginGpuPass(RenderPass) {
+  }
+  virtual void endGpuPass(RenderPass) {
+  }
+  virtual double lastGpuPassTimeMs(RenderPass) const {
     return -1.0;
   }
 

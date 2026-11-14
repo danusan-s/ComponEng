@@ -95,6 +95,18 @@ public:
     return m_order.size();
   }
 
+  /** How many of the first size() batches are opaque, i.e. the opaque draws
+   *  are sorted(0 .. opaqueCount()-1) and the transparent ones follow. Valid
+   *  after sort(). */
+  std::size_t opaqueCount() const {
+    return static_cast<std::size_t>(
+        std::partition_point(m_order.begin(), m_order.end(),
+                             [this](uint32_t i) {
+                               return !m_pool[i].transparent;
+                             }) -
+        m_order.begin());
+  }
+
   /** i-th batch in draw order; valid after sort(). */
   const RenderBatch &sorted(std::size_t i) const {
     return m_pool[m_order[i]];

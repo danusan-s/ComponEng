@@ -83,6 +83,9 @@ struct Recorder {
   std::vector<Draw> draws;
   std::vector<Draw> fullscreenDraws;     // drawFullscreenTriangle calls
   std::vector<std::string> drawSequence; // "fullscreen" / "indexed", in order
+  // beginGpuPass / endGpuPass calls as "begin <name>" / "end <name>", with each
+  // draw ("indexed" / "fullscreen") between them, in order.
+  std::vector<std::string> gpuPassEvents;
 
   // Names passed to loose uniform setters, per shader id.
   std::map<int, std::vector<std::string>> looseUniforms;
@@ -338,6 +341,14 @@ public:
     // data, unless it binds its own.
     rec.pendingInstanceFloats.clear();
   }
+  void beginGpuPass(api::RenderPass pass) override {
+    rec.gpuPassEvents.push_back(std::string("begin ") +
+                                api::renderPassName(pass));
+  }
+  void endGpuPass(api::RenderPass pass) override {
+    rec.gpuPassEvents.push_back(std::string("end ") +
+                                api::renderPassName(pass));
+  }
   void drawFullscreenTriangle() override {
     Draw d;
     d.state = rec.currentState;
@@ -345,6 +356,7 @@ public:
     d.instanceCount = 1;
     rec.fullscreenDraws.push_back(d);
     rec.drawSequence.push_back("fullscreen");
+    rec.gpuPassEvents.push_back("fullscreen");
   }
   void drawIndexedInstanced(size_t indexCount,
                             uint32_t instanceCount) override {
@@ -360,6 +372,7 @@ public:
     d.bufferTextureUnits = rec.boundBufferTextureByUnit;
     rec.draws.push_back(d);
     rec.drawSequence.push_back("indexed");
+    rec.gpuPassEvents.push_back("indexed");
   }
 };
 

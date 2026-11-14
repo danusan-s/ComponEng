@@ -16,6 +16,7 @@
 #include "componeng/renderer/asset/diffuse.hpp"
 #include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/asset_manager.hpp"
+#include "componeng/renderer/backend/api/render_pass.hpp"
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 #include "componeng/renderer/batching/batching_system.hpp"
 #include "componeng/renderer/component/light_component.hpp"
@@ -29,11 +30,13 @@
 #include "componeng/renderer/render_system.hpp"
 #include "componeng/resources/fog.hpp"
 #include "componeng/resources/render_settings.hpp"
+#include "componeng/resources/render_stats.hpp"
 #include "componeng/utils/logger.hpp"
 #include "componeng/utils/utils.hpp"
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -83,6 +86,12 @@ private:
  *  - GPU frame: GPU time for the frame's commands, measured with timer
  *    queries (a few frames behind, see IRenderDevice::beginGpuTimer).
  *  - Per system: each system's onUpdate wall time.
+ *  - Per render pass: GPU time (timestamp queries, like the frame's), the CPU
+ *    time spent submitting it, and what it drew (resources::RenderStats).
+ *
+ * The numbers are shown in separate panes: "Frame timing (ms)" for the frame
+ * and the systems, "Render passes" for the passes, "Shader GPU (ms)" for the
+ * shaders.
  *
  * Each frame's samples are accumulated and the displayed numbers refresh every
  * kWindowSeconds with the average over that window (and once right after the
@@ -93,10 +102,28 @@ public:
   static constexpr double kWindowSeconds = 0.5;
 
   void record(const ecs::World &world, const renderer::AssetManager &assets,
-              double deltaSeconds, double cpuMs, double swapMs, double gpuMs) {
+              const renderer::api::IRenderDevice &device,
+              const resources::RenderStats *stats, double deltaSeconds,
+              double cpuMs, double swapMs, double gpuMs) {
     m_cpu.add(cpuMs);
     m_swap.add(swapMs);
     m_gpu.add(gpuMs);
+
+    if (stats) {
+      for (std::size_t i = 0; i < renderer::api::kRenderPassCount; ++i) {
+        const auto pass = static_cast<renderer::api::RenderPass>(i);
+        const resources::PassStats &p = stats->of(pass);
+        PassTimes &t = m_passes[i];
+        t.gpu.add(device.lastGpuPassTimeMs(pass));
+        t.cpu.add(p.cpuMs);
+        t.draws.add(p.drawCalls);
+        t.instances.add(static_cast<double>(p.instances));
+        t.triangles.add(static_cast<double>(p.triangles));
+        t.shaderBinds.add(p.shaderBinds);
+      }
+      m_uploadMs.add(stats->uploadCpuMs);
+      m_uploadBytes.add(static_cast<double>(stats->uploadBytes));
+    }
 
     assets.forEachShader([&](Name name, const renderer::Shader &shader) {
       auto it = std::find_if(
@@ -121,6 +148,16 @@ public:
       m_cpu.publish();
       m_swap.publish();
       m_gpu.publish();
+      for (PassTimes &t : m_passes) {
+        t.gpu.publish();
+        t.cpu.publish();
+        t.draws.publish();
+        t.instances.publish();
+        t.triangles.publish();
+        t.shaderBinds.publish();
+      }
+      m_uploadMs.publish();
+      m_uploadBytes.publish();
       for (SystemTime &s : m_systems)
         s.ms.publish();
       for (SystemTime &s : m_shaders)
@@ -131,19 +168,26 @@ public:
   }
 
   void show() const {
-    if (!DebugUI::addSection("Frame timing (ms)"))
-      return;
-    DebugUI::addValue("CPU frame", static_cast<float>(m_cpu.value));
-    if (m_gpu.value >= 0.0)
-      DebugUI::addValue("GPU frame", static_cast<float>(m_gpu.value));
-    else
-      DebugUI::addText("GPU frame", "n/a");
-    DebugUI::addValue("Swap + events", static_cast<float>(m_swap.value));
+    if (ProfilerUI::beginPane("Frame timing (ms)")) {
+      ProfilerUI::addValue("CPU frame", static_cast<float>(m_cpu.value));
+      if (m_gpu.value >= 0.0)
+        ProfilerUI::addValue("GPU frame", static_cast<float>(m_gpu.value));
+      else
+        ProfilerUI::addText("GPU frame", "n/a");
+      ProfilerUI::addValue("Swap + events", static_cast<float>(m_swap.value));
 
-    if (DebugUI::addSection("System CPU (ms), slowest first"))
-      showSorted(m_systems);
-    if (DebugUI::addSection("Shader GPU (ms), slowest first"))
+      if (ProfilerUI::addSection("System CPU (ms), slowest first"))
+        showSorted(m_systems);
+    }
+    ProfilerUI::endPane();
+
+    if (ProfilerUI::beginPane("Render passes"))
+      showPasses();
+    ProfilerUI::endPane();
+
+    if (ProfilerUI::beginPane("Shader GPU (ms), slowest first"))
       showSorted(m_shaders);
+    ProfilerUI::endPane();
   }
 
 private:
@@ -151,6 +195,81 @@ private:
     std::string name;
     Smoothed ms;
   };
+
+  // One render pass's averaged timings and counters.
+  struct PassTimes {
+    Smoothed gpu;
+    Smoothed cpu;
+    Smoothed draws;
+    Smoothed instances;
+    Smoothed triangles;
+    Smoothed shaderBinds;
+  };
+
+  // 18200 -> "18.2k", 1234567 -> "1.23M"; small numbers as they are.
+  static std::string count(double v) {
+    char buf[32];
+    if (v >= 1e6)
+      std::snprintf(buf, sizeof buf, "%.2fM", v / 1e6);
+    else if (v >= 1e4)
+      std::snprintf(buf, sizeof buf, "%.1fk", v / 1e3);
+    else
+      std::snprintf(buf, sizeof buf, "%.0f", v);
+    return buf;
+  }
+
+  static std::string ms(double v) {
+    char buf[32];
+    if (v < 0.0)
+      return "n/a";
+    std::snprintf(buf, sizeof buf, "%.2f", v);
+    return buf;
+  }
+
+  // One line per pass, in the order the frame runs them:
+  //   GPU ms | CPU submit ms | draw calls | instances | triangles | shader
+  //   binds
+  // The GPU time is a few frames old, and the passes' GPU times do not have to
+  // add up to "GPU frame" (the UI itself is in that one, and so is any idle
+  // gap between passes).
+  void showPasses() const {
+    double gpuSum = 0.0, cpuSum = 0.0, draws = 0.0, instances = 0.0,
+           triangles = 0.0, binds = 0.0;
+    bool gpuKnown = true, any = false;
+    for (std::size_t i = 0; i < renderer::api::kRenderPassCount; ++i) {
+      const PassTimes &t = m_passes[i];
+      if (t.draws.value < 0.0) // no window has completed yet
+        continue;
+      any = true;
+      if (t.gpu.value >= 0.0)
+        gpuSum += t.gpu.value;
+      else
+        gpuKnown = false;
+      cpuSum += t.cpu.value;
+      draws += t.draws.value;
+      instances += t.instances.value;
+      triangles += t.triangles.value;
+      binds += t.shaderBinds.value;
+      ProfilerUI::addText(renderer::api::renderPassName(
+                           static_cast<renderer::api::RenderPass>(i)),
+                       "GPU " + ms(t.gpu.value) + " | CPU " + ms(t.cpu.value) +
+                           " | " + count(t.draws.value) + " draws | " +
+                           count(t.instances.value) + " inst | " +
+                           count(t.triangles.value) + " tris | " +
+                           count(t.shaderBinds.value) + " shaders");
+    }
+    if (!any)
+      return;
+    ProfilerUI::addText("All passes",
+                     "GPU " + ms(gpuKnown ? gpuSum : -1.0) + " | CPU " +
+                         ms(cpuSum) + " | " + count(draws) + " draws | " +
+                         count(instances) + " inst | " + count(triangles) +
+                         " tris | " + count(binds) + " shaders");
+    if (m_uploadMs.value >= 0.0)
+      ProfilerUI::addText("Instance upload",
+                       "CPU " + ms(m_uploadMs.value) + " | " +
+                           count(m_uploadBytes.value / 1024.0) + " KiB");
+  }
 
   static void showSorted(const std::vector<SystemTime> &times) {
     std::vector<const SystemTime *> order;
@@ -164,7 +283,7 @@ private:
                 return a->ms.value > b->ms.value;
               });
     for (const SystemTime *s : order)
-      DebugUI::addValue(s->name, static_cast<float>(s->ms.value));
+      ProfilerUI::addValue(s->name, static_cast<float>(s->ms.value));
   }
 
   double m_elapsed = 0.0;
@@ -173,6 +292,9 @@ private:
   Smoothed m_cpu;
   Smoothed m_swap;
   Smoothed m_gpu;
+  PassTimes m_passes[renderer::api::kRenderPassCount];
+  Smoothed m_uploadMs;
+  Smoothed m_uploadBytes;
   std::vector<SystemTime> m_systems;
   std::vector<SystemTime> m_shaders;
 };
@@ -220,12 +342,14 @@ void Engine::init() {
 
   // Same shader as default_diffuse, but blended and without depth writes so
   // things behind it show through. The entity's ColorComponent alpha sets the
-  // opacity. Culling is off so a thin plane is visible from both sides.
+  // opacity. Back faces are culled: a closed shape shows exactly one face to
+  // the camera, so each pixel is blended once instead of twice. A single
+  // two-sided plane would need CullMode::None instead.
   assetManager.registerMaterial<renderer::DiffuseMaterial>(
       "transparent_diffuse", "default", "white");
   {
     renderer::api::RenderState state;
-    state.cull = renderer::api::CullMode::None;
+    state.cull = renderer::api::CullMode::Back;
     state.depthWrite = false;
     state.blend = renderer::api::BlendMode::Alpha;
     auto &transparent = assetManager.getMaterial(
@@ -348,16 +472,17 @@ void Engine::run(IGame &game) {
     const auto cpuStart = Clock::now();
 
     DebugUI::beginFrame();
-    if constexpr (DebugUI::kEnabled)
+    if constexpr (Profiling::kEnabled)
       device.beginGpuTimer();
     m_world.updateSystems(deltaTime);
-    DebugUI::addValue("FPS", 1.0f / deltaTime);
-    DebugUI::addValue("Avg FPS", avgFPS);
-    timings.show();
+    DebugUI::showFps(static_cast<float>(1.0 / deltaTime),
+                     static_cast<float>(avgFPS));
+    if constexpr (Profiling::kEnabled)
+      timings.show();
     DebugUI::endFrame();
-    if constexpr (DebugUI::kEnabled)
+    if constexpr (Profiling::kEnabled)
       device.endGpuTimer();
-    if constexpr (DebugUI::kEnabled)
+    if constexpr (Profiling::kEnabled)
       m_world.getResource<renderer::AssetManager>().collectShaderTimings();
 
     const auto cpuEnd = Clock::now();
@@ -366,9 +491,14 @@ void Engine::run(IGame &game) {
     m_window.pollEvents();
 
     device.checkErrors();
-    if constexpr (DebugUI::kEnabled) {
+    if constexpr (Profiling::kEnabled) {
+      const resources::RenderStats *renderStats =
+          m_world.hasResource<resources::RenderStats>()
+              ? &m_world.getResource<resources::RenderStats>()
+              : nullptr;
       timings.record(m_world, m_world.getResource<renderer::AssetManager>(),
-                     deltaTime, msBetween(cpuStart, cpuEnd),
+                     device, renderStats, deltaTime,
+                     msBetween(cpuStart, cpuEnd),
                      msBetween(cpuEnd, Clock::now()), device.lastGpuTimeMs());
     }
   }
