@@ -2,6 +2,9 @@
 
 #include "componeng/core/window.hpp"
 #include "componeng/utils/logger.hpp"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
 
 #include <cstdint>
@@ -239,6 +242,25 @@ void GLRenderDevice::clear(float r, float g, float b, float a) {
 void GLRenderDevice::present(void *windowHandle) {
   GLFWwindow *window = static_cast<GLFWwindow *>(windowHandle);
   glfwSwapBuffers(window);
+}
+
+void GLRenderDevice::initImGui(void *windowHandle) {
+  ImGui_ImplGlfw_InitForOpenGL(static_cast<GLFWwindow *>(windowHandle), true);
+  ImGui_ImplOpenGL3_Init("#version 330");
+}
+
+void GLRenderDevice::imguiNewFrame() {
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+}
+
+void GLRenderDevice::imguiRender() {
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void GLRenderDevice::shutdownImGui() {
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
 }
 
 int GLRenderDevice::checkErrors() const {

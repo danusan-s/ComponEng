@@ -1,0 +1,169 @@
+#pragma once
+
+#include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/backend/vulkan/vk_core.hpp"
+#include "componeng/renderer/backend/vulkan/vk_resources.hpp"
+#include "componeng/renderer/backend/vulkan/vk_shader.hpp"
+
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+struct GLFWwindow;
+
+namespace componeng::renderer::vulkan {
+
+/**
+ * Vulkan 1.3 implementation of IRenderDevice, using dynamic rendering (no
+ * render passes). The GL-style state the engine sets (shader, uniforms by
+ * name, textures on units) is snapshotted into a descriptor set at every
+ * draw; pipelines are created on demand and cached. Window coordinates
+ * follow GL: the viewport is flipped with a negative height.
+ * See dev_docs/vulkan for the design.
+ */
+class VulkanRenderDevice final : public api::IRenderDevice {
+public:
+  VulkanRenderDevice() = default;
+  ~VulkanRenderDevice() override;
+
+  VulkanRenderDevice(const VulkanRenderDevice &) = delete;
+  VulkanRenderDevice &operator=(const VulkanRenderDevice &) = delete;
+
+  void init(void *windowHandle) override;
+  void shutdown() override;
+  void setViewport(int x, int y, int w, int h) override;
+  void setScissor(int x, int y, int w, int h) override;
+  void clear(float r, float g, float b, float a) override;
+  void present(void *windowHandle) override;
+  int checkErrors() const override {
+    return 0;
+  }
+
+  void initImGui(void *windowHandle) override;
+  void imguiNewFrame() override;
+  void imguiRender() override;
+  void shutdownImGui() override;
+
+  std::unique_ptr<api::IShader> createShader() override;
+  std::unique_ptr<api::ITexture> createTexture() override;
+  std::unique_ptr<api::IMesh> createMesh() override;
+  std::unique_ptr<api::IBuffer> createBuffer() override;
+
+  void setRenderState(const api::RenderState &state) override {
+    m_state = state;
+  }
+  void bindUniformBuffer(uint32_t binding, api::IBuffer &buffer) override;
+  void setActiveTextureUnit(uint32_t unit) override {
+    m_activeUnit = unit < api::kTextureUnitLimit ? unit : 0;
+  }
+  void bindBufferTexture(uint32_t unit, api::IBuffer &buffer,
+                         api::BufferTextureFormat format) override;
+  void setupInstanceAttributes(api::IBuffer &instanceBuffer,
+                               const api::VertexLayout &layout) override;
+  void unbindInstanceAttributes(const api::VertexLayout &layout) override;
+  void drawFullscreenTriangle() override;
+  void drawIndexedInstanced(size_t indexCount, uint32_t instanceCount) override;
+
+  // Called by the resources' bind()/use().
+  void bindTexture(const VulkanTexture *texture) {
+    m_unitTexture[m_activeUnit] = texture;
+  }
+  void bindMesh(const VulkanMesh *mesh) {
+    m_mesh = mesh;
+  }
+  void bindShader(const VulkanShader *shader) {
+    m_shader = shader;
+  }
+
+private:
+  // setup
+  bool createInstance();
+  bool pickPhysicalDevice();
+  bool createDevice();
+  bool createSwapchain();
+  void destroySwapchain(bool keepHandle);
+  bool createDepthImage();
+  void createFrameObjects();
+
+  // frame
+  bool ensureFrame();
+  bool ensureRendering();
+  void beginPass(bool colorOnly);
+  void endRendering();
+  void recordViewportAndScissor();
+
+  // drawing
+  bool draw(bool indexed, uint32_t count, uint32_t instanceCount);
+  VkPipeline pipelineFor(const VulkanShader &shader, const VulkanMesh *mesh,
+                         bool instanced);
+  VkDescriptorSet buildDescriptors(const VulkanShader &shader);
+  VkDescriptorSet allocateSet(VkDescriptorSetLayout layout);
+  bool allocUniform(uint32_t size, VkBuffer &buffer, VkDeviceSize &offset,
+                    void *&mapped);
+
+  std::shared_ptr<VulkanCore> m_core;
+  GLFWwindow *m_window = nullptr;
+  VkSurfaceKHR m_surface = VK_NULL_HANDLE;
+
+  // swapchain + depth
+  VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
+  VkFormat m_swapFormat = VK_FORMAT_UNDEFINED;
+  VkExtent2D m_extent{};
+  std::vector<VkImage> m_images;
+  std::vector<VkImageView> m_imageViews;
+  std::vector<VkSemaphore> m_renderDone;
+  VkFormat m_depthFormat = VK_FORMAT_D32_SFLOAT;
+  VkImage m_depthImage = VK_NULL_HANDLE;
+  VkDeviceMemory m_depthMemory = VK_NULL_HANDLE;
+  VkImageView m_depthView = VK_NULL_HANDLE;
+  bool m_swapDirty = false;
+
+  // frame
+  VkCommandBuffer m_cmd = VK_NULL_HANDLE;
+  VkSemaphore m_imageAvailable = VK_NULL_HANDLE;
+  VkFence m_fence = VK_NULL_HANDLE;
+  uint32_t m_imageIndex = 0;
+  bool m_frameActive = false;
+  bool m_rendering = false;
+  bool m_colorInitialised = false;
+  bool m_depthInitialised = false;
+  bool m_clearPending = false;
+  float m_clearColor[4] = {0, 0, 0, 1};
+
+  // per-frame descriptor pools and uniform upload ring
+  std::vector<VkDescriptorPool> m_pools;
+  size_t m_poolIndex = 0;
+  std::vector<VulkanCore::Allocation> m_uniformChunks;
+  size_t m_uniformChunk = 0;
+  VkDeviceSize m_uniformOffset = 0;
+
+  // GL-style state the engine sets between draws
+  api::RenderState m_state;
+  int m_viewport[4] = {0, 0, 0, 0};
+  int m_scissor[4] = {0, 0, 0, 0};
+  bool m_viewportSet = false;
+  bool m_scissorSet = false;
+  uint32_t m_activeUnit = 0;
+  const VulkanTexture *m_unitTexture[api::kTextureUnitLimit] = {};
+  struct UnitBuffer {
+    VulkanBuffer *buffer = nullptr;
+    api::BufferTextureFormat format = api::BufferTextureFormat::R32F;
+  };
+  UnitBuffer m_unitBuffer[api::kTextureUnitLimit];
+  VulkanBuffer *m_uniformBuffers[api::kUniformBindingLimit] = {};
+  const VulkanShader *m_shader = nullptr;
+  const VulkanMesh *m_mesh = nullptr;
+  VulkanBuffer *m_instanceBuffer = nullptr;
+  api::VertexLayout m_instanceLayout;
+
+  std::unordered_map<std::string, VkPipeline> m_pipelines;
+  uint64_t m_nextShaderId = 1;
+
+  std::unique_ptr<VulkanTexture> m_whiteTexture;
+  std::unique_ptr<VulkanBuffer> m_dummyBuffer;
+  bool m_imguiReady = false;
+  bool m_shutDown = false;
+};
+
+} // namespace componeng::renderer::vulkan
