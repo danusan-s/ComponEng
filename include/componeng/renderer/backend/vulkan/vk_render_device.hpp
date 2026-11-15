@@ -2,6 +2,7 @@
 
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/backend/vulkan/vk_core.hpp"
+#include "componeng/renderer/backend/vulkan/vk_gpu_timer.hpp"
 #include "componeng/renderer/backend/vulkan/vk_resources.hpp"
 #include "componeng/renderer/backend/vulkan/vk_shader.hpp"
 
@@ -38,6 +39,38 @@ public:
   void present(void *windowHandle) override;
   int checkErrors() const override {
     return 0;
+  }
+
+  // GPU timing (see VulkanGpuTimer).
+  void beginGpuTimer() override {
+    m_timer.beginFrameSpan();
+  }
+  void endGpuTimer() override {
+    m_timer.endFrameSpan();
+  }
+  double lastGpuTimeMs() const override {
+    return m_timer.frameMs();
+  }
+  void beginGpuPass(api::RenderPass pass) override {
+    if (m_timer.supported() && ensureFrame())
+      m_timer.beginPass(pass);
+  }
+  void endGpuPass(api::RenderPass pass) override {
+    m_timer.endPass(pass);
+  }
+  double lastGpuPassTimeMs(api::RenderPass pass) const override {
+    return m_timer.passMs(pass);
+  }
+  // Per-shader spans, forwarded from VulkanShader.
+  void beginShaderTimer(uint64_t shaderId) {
+    if (m_timer.supported() && ensureFrame())
+      m_timer.beginShader(shaderId);
+  }
+  void endShaderTimer(uint64_t shaderId) {
+    m_timer.endShader(shaderId);
+  }
+  double shaderTimeMs(uint64_t shaderId) const {
+    return m_timer.shaderMs(shaderId);
   }
 
   void initImGui(void *windowHandle) override;
@@ -162,6 +195,7 @@ private:
 
   std::unique_ptr<VulkanTexture> m_whiteTexture;
   std::unique_ptr<VulkanBuffer> m_dummyBuffer;
+  VulkanGpuTimer m_timer;
   bool m_imguiReady = false;
   bool m_shutDown = false;
 };

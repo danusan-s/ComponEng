@@ -1,0 +1,95 @@
+#pragma once
+
+#include "componeng/renderer/backend/api/render_pass.hpp"
+#include "componeng/renderer/backend/vulkan/vk_core.hpp"
+
+#include <array>
+#include <cstdint>
+#include <unordered_map>
+#include <vector>
+
+namespace componeng::renderer::vulkan {
+
+/**
+ * GPU timing for the Vulkan backend (whole frame, per render pass, per
+ * shader) with timestamp queries recorded into the frame's command buffer.
+ * Results are read after the GPU wait in present(). Everything is a no-op,
+ * and the accessors report "unavailable" (negative), when the queue family
+ * has no timestamp support.
+ */
+class VulkanGpuTimer {
+public:
+  void init(const VulkanCore &core);
+  void shutdown();
+  bool supported() const {
+    return m_pool != VK_NULL_HANDLE;
+  }
+
+  /** Frame's command buffer is open: reset the pool and start accepting spans. */
+  void startRecording(VkCommandBuffer cmd);
+  /** About to end the command buffer; spans still open are discarded. */
+  void stopRecording();
+
+  /** May be called before the command buffer exists (the engine requests it
+   *  ahead of the first system); the start is stamped once recording begins. */
+  void beginFrameSpan();
+  void endFrameSpan();
+  void beginPass(api::RenderPass pass);
+  void endPass(api::RenderPass pass);
+  void beginShader(uint64_t shaderId);
+  void endShader(uint64_t shaderId);
+
+  /** Read the finished frame's queries. Call after waiting on its fence. */
+  void collect();
+
+  double frameMs() const {
+    return m_frameMs;
+  }
+  double passMs(api::RenderPass pass) const {
+    return m_passMs[static_cast<std::size_t>(pass)];
+  }
+  /** 0 if the shader did not run in the last completed frame, negative if no
+   *  frame has completed yet. */
+  double shaderMs(uint64_t shaderId) const;
+
+private:
+  static constexpr uint32_t kMaxQueries = 4096;
+  static constexpr uint32_t kNone = UINT32_MAX;
+
+  enum class Kind : uint8_t { Frame, Pass, Shader };
+  struct Span {
+    Kind kind;
+    uint32_t pass; // Kind::Pass
+    uint64_t id;   // Kind::Shader
+    uint32_t begin;
+    uint32_t end;
+  };
+
+  uint32_t stamp();
+
+  const VulkanCore *m_core = nullptr;
+  VkQueryPool m_pool = VK_NULL_HANDLE;
+  VkCommandBuffer m_cmd = VK_NULL_HANDLE; // non-null while recording
+  uint64_t m_validMask = ~0ull;
+  double m_nsPerTick = 0.0;
+
+  uint32_t m_used = 0;
+  std::vector<Span> m_spans; // closed spans of the frame being recorded
+  bool m_framePending = false;
+  uint32_t m_openFrame = kNone;
+  std::array<uint32_t, api::kRenderPassCount> m_openPass;
+  std::unordered_map<uint64_t, uint32_t> m_openShader;
+
+  double m_frameMs = -1.0;
+  std::array<double, api::kRenderPassCount> m_passMs;
+  std::unordered_map<uint64_t, double> m_shaderMs;
+  bool m_haveResult = false;
+
+public:
+  VulkanGpuTimer() {
+    m_openPass.fill(kNone);
+    m_passMs.fill(-1.0);
+  }
+};
+
+} // namespace componeng::renderer::vulkan

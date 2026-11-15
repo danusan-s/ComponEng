@@ -686,6 +686,18 @@ void VulkanShader::use() const {
   m_device->bindShader(this);
 }
 
+void VulkanShader::beginGpuTimer() const {
+  m_device->beginShaderTimer(m_id);
+}
+
+void VulkanShader::endGpuTimer() const {
+  m_device->endShaderTimer(m_id);
+}
+
+double VulkanShader::lastGpuTimeMs() const {
+  return m_device->shaderTimeMs(m_id);
+}
+
 void VulkanShader::release() {
   if (m_vertex || m_fragment || m_setLayout || m_pipelineLayout) {
     VulkanCore *core = m_core.get();

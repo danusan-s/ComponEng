@@ -402,6 +402,7 @@ void VulkanRenderDevice::init(void *windowHandle) {
   if (!pickPhysicalDevice() || !createDevice())
     return;
   createFrameObjects();
+  m_timer.init(*m_core);
   if (!createSwapchain())
     return;
 
@@ -427,6 +428,8 @@ void VulkanRenderDevice::shutdown() {
     m_frameActive = false;
     m_rendering = false;
   }
+  m_timer.stopRecording();
+  m_timer.shutdown();
   m_shader = nullptr;
   m_mesh = nullptr;
   m_whiteTexture.reset();
@@ -494,6 +497,7 @@ bool VulkanRenderDevice::ensureFrame() {
   VkCommandBufferBeginInfo bi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   vkBeginCommandBuffer(m_cmd, &bi);
+  m_timer.startRecording(m_cmd);
 
   transitionImage(m_cmd, m_images[m_imageIndex], VK_IMAGE_LAYOUT_UNDEFINED,
                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, 1,
@@ -639,6 +643,7 @@ void VulkanRenderDevice::present(void * /*windowHandle*/) {
                   VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                   VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                   VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0);
+  m_timer.stopRecording();
   vkEndCommandBuffer(m_cmd);
 
   const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -665,6 +670,7 @@ void VulkanRenderDevice::present(void * /*windowHandle*/) {
   // One frame in flight: this is what makes plain memcpy into buffers safe.
   vkWaitForFences(m_core->device, 1, &m_fence, VK_TRUE, UINT64_MAX);
   vkResetFences(m_core->device, 1, &m_fence);
+  m_timer.collect();
   m_frameActive = false;
   m_core->flushDeferred();
 }

@@ -32,6 +32,11 @@ public:
   void use() const override;
   void release() override;
 
+  // Per-shader GPU timing; the device resolves every span at present().
+  void beginGpuTimer() const override;
+  void endGpuTimer() const override;
+  double lastGpuTimeMs() const override;
+
   void setFloat(const char *name, float value) const override;
   void setInteger(const char *name, int value) const override;
   void setVector2f(const char *name, float x, float y) const override;

@@ -38,7 +38,7 @@ public:
     constexpr float massMin = 0.5f;
     constexpr float massMax = 5.0f;
     constexpr float velocityRange = 50.0f;
-    constexpr int count = 20000; // count each for cube and sphere
+    constexpr int count = 10000; // count each for cube and sphere
 
     auto &audioManager = world.getResource<AudioManager>();
     audioManager.registerSound(
