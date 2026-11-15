@@ -12,10 +12,10 @@ namespace componeng::renderer::vulkan {
 
 /**
  * GPU timing for the Vulkan backend (whole frame, per render pass, per
- * shader) with timestamp queries recorded into the frame's command buffer.
- * Results are read after the GPU wait in present(). Everything is a no-op,
- * and the accessors report "unavailable" (negative), when the queue family
- * has no timestamp support.
+ * shader) with timestamp queries. Each frame slot has its own query range;
+ * the device calls collect(slot) once that slot's frame has finished, so
+ * results trail the CPU by about a frame. Everything is a no-op, and the
+ * accessors report "unavailable" (negative), without timestamp support.
  */
 class VulkanGpuTimer {
 public:
@@ -25,8 +25,8 @@ public:
     return m_pool != VK_NULL_HANDLE;
   }
 
-  /** Frame's command buffer is open: reset the pool and start accepting spans. */
-  void startRecording(VkCommandBuffer cmd);
+  /** `slot`'s command buffer is open: reset its queries and accept spans. */
+  void startRecording(VkCommandBuffer cmd, uint32_t slot);
   /** About to end the command buffer; spans still open are discarded. */
   void stopRecording();
 
@@ -39,8 +39,12 @@ public:
   void beginShader(uint64_t shaderId);
   void endShader(uint64_t shaderId);
 
-  /** Read the finished frame's queries. Call after waiting on its fence. */
-  void collect();
+  /** True if `slot` holds a submitted frame whose results are not read yet. */
+  bool hasPending(uint32_t slot) const {
+    return supported() && m_slots[slot].pending;
+  }
+  /** Read slot `slot`'s queries. Only call once its frame has finished. */
+  void collect(uint32_t slot);
 
   double frameMs() const {
     return m_frameMs;
@@ -73,8 +77,14 @@ private:
   uint64_t m_validMask = ~0ull;
   double m_nsPerTick = 0.0;
 
-  uint32_t m_used = 0;
-  std::vector<Span> m_spans; // closed spans of the frame being recorded
+  struct SlotData {
+    uint32_t used = 0;
+    std::vector<Span> spans; // closed spans of this slot's frame
+    bool pending = false;    // submitted, results not collected yet
+  };
+  std::array<SlotData, kFramesInFlight> m_slots;
+  uint32_t m_slot = 0; // slot being recorded
+
   bool m_framePending = false;
   uint32_t m_openFrame = kNone;
   std::array<uint32_t, api::kRenderPassCount> m_openPass;

@@ -24,34 +24,104 @@ VulkanBuffer::~VulkanBuffer() {
   release();
 }
 
-void VulkanBuffer::setData(const void *data, size_t sizeBytes, Usage /*usage*/) {
-  if (m_alloc.buffer == VK_NULL_HANDLE || m_alloc.size < sizeBytes) {
+void VulkanBuffer::destroyBacking(Backing &backing) {
+  if (backing.alloc.buffer == VK_NULL_HANDLE && backing.alloc.memory == VK_NULL_HANDLE)
+    return;
+  // Frames still in flight may name it: free it once they are done.
+  VulkanCore *core = m_core.get();
+  Backing doomed = backing;
+  core->defer([core, doomed]() mutable {
+    for (VkBufferView v : doomed.views)
+      if (v != VK_NULL_HANDLE)
+        vkDestroyBufferView(core->device, v, nullptr);
+    core->destroyAllocation(doomed.alloc);
+  });
+  backing = Backing{};
+}
+
+bool VulkanBuffer::prepareWrite() {
+  Backing &cur = m_current;
+  if (cur.alloc.buffer == VK_NULL_HANDLE)
+    return false;
+  const bool inFlight = cur.lastUse != 0 && cur.lastUse < m_core->recordingSerial &&
+                        cur.lastUse > m_core->completedSerial;
+  if (!inFlight)
+    return false;
+  if (!m_shadowed) {
+    m_core->waitSerial(cur.lastUse); // no shadow to refill a swap from
+    return false;
+  }
+
+  // A backing the GPU has finished with, or a new one.
+  Backing next;
+  for (size_t i = 0; i < m_retired.size(); ++i) {
+    if (m_retired[i].lastUse <= m_core->completedSerial &&
+        m_retired[i].alloc.size == cur.alloc.size) {
+      next = m_retired[i];
+      m_retired.erase(m_retired.begin() + static_cast<std::ptrdiff_t>(i));
+      break;
+    }
+  }
+  if (next.alloc.buffer == VK_NULL_HANDLE &&
+      !m_core->createMappedBuffer(cur.alloc.size, kBufferUsage, next.alloc)) {
+    m_core->waitSerial(cur.lastUse);
+    return false;
+  }
+  next.lastUse = 0;
+  m_retired.push_back(cur);
+  m_current = next;
+  return true;
+}
+
+void VulkanBuffer::setData(const void *data, size_t sizeBytes, Usage usage) {
+  const bool grow = m_current.alloc.buffer == VK_NULL_HANDLE ||
+                    m_current.alloc.size < sizeBytes;
+  if (grow) {
     release();
-    if (!m_core->createMappedBuffer(sizeBytes, kBufferUsage, m_alloc)) {
+    if (!m_core->createMappedBuffer(sizeBytes, kBufferUsage, m_current.alloc)) {
       m_size = 0;
       return;
     }
   }
   m_size = sizeBytes;
-  if (data && sizeBytes > 0)
-    std::memcpy(m_alloc.mapped, data, sizeBytes);
+
+  m_shadowed = usage == Usage::Dynamic;
+  if (m_shadowed) {
+    m_shadow.resize(static_cast<size_t>(m_current.alloc.size));
+    if (data && sizeBytes > 0)
+      std::memcpy(m_shadow.data(), data, sizeBytes);
+  } else {
+    m_shadow.clear();
+    m_shadow.shrink_to_fit();
+  }
+
+  const bool renamed = grow ? false : prepareWrite();
+  if (renamed)
+    std::memcpy(m_current.alloc.mapped, m_shadow.data(), m_shadow.size());
+  else if (data && sizeBytes > 0)
+    std::memcpy(m_current.alloc.mapped, data, sizeBytes);
 }
 
-void VulkanBuffer::setSubData(size_t offset, const void *data,
-                              size_t sizeBytes) {
-  if (!m_alloc.mapped || offset + sizeBytes > m_alloc.size) {
+void VulkanBuffer::setSubData(size_t offset, const void *data, size_t sizeBytes) {
+  if (!m_current.alloc.mapped || offset + sizeBytes > m_current.alloc.size) {
     LOG_ERROR("Vulkan: setSubData out of range (%zu + %zu > %llu)", offset,
-              sizeBytes, static_cast<unsigned long long>(m_alloc.size));
+              sizeBytes, static_cast<unsigned long long>(m_current.alloc.size));
     return;
   }
-  std::memcpy(static_cast<char *>(m_alloc.mapped) + offset, data, sizeBytes);
+  if (m_shadowed)
+    std::memcpy(m_shadow.data() + offset, data, sizeBytes);
+  if (prepareWrite())
+    std::memcpy(m_current.alloc.mapped, m_shadow.data(), m_shadow.size());
+  else
+    std::memcpy(static_cast<char *>(m_current.alloc.mapped) + offset, data, sizeBytes);
 }
 
 VkBufferView VulkanBuffer::view(api::BufferTextureFormat format) {
   const int index = static_cast<int>(format);
-  if (m_views[index] == VK_NULL_HANDLE) {
+  VkBufferView &view = m_current.views[index];
+  if (view == VK_NULL_HANDLE) {
     VkBufferViewCreateInfo vi{VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO};
-    vi.buffer = m_alloc.buffer;
+    vi.buffer = m_current.alloc.buffer;
     vi.range = VK_WHOLE_SIZE;
     switch (format) {
       case api::BufferTextureFormat::R32F:
@@ -64,26 +134,19 @@ VkBufferView VulkanBuffer::view(api::BufferTextureFormat format) {
         vi.format = VK_FORMAT_R32G32B32A32_SFLOAT;
         break;
     }
-    vkCreateBufferView(m_core->device, &vi, nullptr, &m_views[index]);
+    vkCreateBufferView(m_core->device, &vi, nullptr, &view);
   }
-  return m_views[index];
+  return view;
 }
 
 void VulkanBuffer::release() {
-  if (m_alloc.buffer == VK_NULL_HANDLE && m_alloc.memory == VK_NULL_HANDLE)
-    return;
-  // The current frame's commands may still name this buffer.
-  VulkanCore *core = m_core.get();
-  VulkanCore::Allocation alloc = m_alloc;
-  VkBufferView views[3] = {m_views[0], m_views[1], m_views[2]};
-  core->defer([core, alloc, views]() mutable {
-    for (VkBufferView v : views)
-      if (v != VK_NULL_HANDLE)
-        vkDestroyBufferView(core->device, v, nullptr);
-    core->destroyAllocation(alloc);
-  });
-  m_alloc = VulkanCore::Allocation{};
-  std::fill(std::begin(m_views), std::end(m_views), VkBufferView{});
+  destroyBacking(m_current);
+  for (Backing &b : m_retired)
+    destroyBacking(b);
+  m_retired.clear();
+  m_shadow.clear();
+  m_shadow.shrink_to_fit();
+  m_shadowed = false;
   m_size = 0;
 }
 

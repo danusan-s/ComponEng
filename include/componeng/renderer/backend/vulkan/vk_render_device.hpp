@@ -17,11 +17,13 @@ namespace componeng::renderer::vulkan {
 
 /**
  * Vulkan 1.3 implementation of IRenderDevice, using dynamic rendering (no
- * render passes). The GL-style state the engine sets (shader, uniforms by
- * name, textures on units) is snapshotted into a descriptor set at every
- * draw; pipelines are created on demand and cached. Window coordinates
- * follow GL: the viewport is flipped with a negative height.
- * See dev_docs/vulkan for the design.
+ * render passes). Up to kFramesInFlight frames are recorded ahead of the GPU
+ * on one thread; each frame slot owns its command buffer, descriptor pools
+ * and uniform ring, and buffers the CPU rewrites track the last frame that
+ * read them (VulkanBuffer::markUsed). The GL-style state the engine sets is
+ * snapshotted into a descriptor set at every draw; pipelines are created on
+ * demand and cached. The viewport is flipped with a negative height to match
+ * GL's coordinates. See dev_docs/vulkan for the design.
  */
 class VulkanRenderDevice final : public api::IRenderDevice {
 public:
@@ -118,6 +120,8 @@ private:
   void destroySwapchain(bool keepHandle);
   bool createDepthImage();
   void createFrameObjects();
+  /** Pick up frames the GPU has finished: free what they held, read timings. */
+  void pollCompletedFrames();
 
   // frame
   bool ensureFrame();
@@ -152,10 +156,26 @@ private:
   VkImageView m_depthView = VK_NULL_HANDLE;
   bool m_swapDirty = false;
 
-  // frame
+  // Everything that is per frame in flight.
+  struct FrameSlot {
+    VkCommandBuffer cmd = VK_NULL_HANDLE;
+    VkSemaphore imageAvailable = VK_NULL_HANDLE;
+    uint64_t serial = 0; // the frame last submitted from this slot (0: none)
+    // descriptor pools and the loose-uniform upload ring
+    std::vector<VkDescriptorPool> pools;
+    size_t poolIndex = 0;
+    std::vector<VulkanCore::Allocation> uniformChunks;
+    size_t uniformChunk = 0;
+    VkDeviceSize uniformOffset = 0;
+  };
+  FrameSlot m_slots[kFramesInFlight];
+  uint32_t m_slot = 0; // slot of the frame being recorded / recorded next
+  FrameSlot &slot() {
+    return m_slots[m_slot];
+  }
+
+  // frame being recorded
   VkCommandBuffer m_cmd = VK_NULL_HANDLE;
-  VkSemaphore m_imageAvailable = VK_NULL_HANDLE;
-  VkFence m_fence = VK_NULL_HANDLE;
   uint32_t m_imageIndex = 0;
   bool m_frameActive = false;
   bool m_rendering = false;
@@ -163,13 +183,6 @@ private:
   bool m_depthInitialised = false;
   bool m_clearPending = false;
   float m_clearColor[4] = {0, 0, 0, 1};
-
-  // per-frame descriptor pools and uniform upload ring
-  std::vector<VkDescriptorPool> m_pools;
-  size_t m_poolIndex = 0;
-  std::vector<VulkanCore::Allocation> m_uniformChunks;
-  size_t m_uniformChunk = 0;
-  VkDeviceSize m_uniformOffset = 0;
 
   // GL-style state the engine sets between draws
   api::RenderState m_state;

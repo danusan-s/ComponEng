@@ -20,7 +20,7 @@ void VulkanGpuTimer::init(const VulkanCore &core) {
 
   VkQueryPoolCreateInfo ci{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
   ci.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  ci.queryCount = kMaxQueries;
+  ci.queryCount = kMaxQueries * kFramesInFlight;
   if (vkCreateQueryPool(core.device, &ci, nullptr, &m_pool) != VK_SUCCESS)
     m_pool = VK_NULL_HANDLE;
 }
@@ -33,23 +33,25 @@ void VulkanGpuTimer::shutdown() {
 }
 
 uint32_t VulkanGpuTimer::stamp() {
-  if (!m_cmd || m_used >= kMaxQueries)
+  SlotData &slot = m_slots[m_slot];
+  if (!m_cmd || slot.used >= kMaxQueries)
     return kNone;
-  const uint32_t q = m_used++;
-  vkCmdWriteTimestamp2(m_cmd, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, m_pool, q);
+  const uint32_t q = slot.used++; // index within the slot's range
+  vkCmdWriteTimestamp2(m_cmd, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, m_pool,
+                       m_slot * kMaxQueries + q);
   return q;
 }
 
-void VulkanGpuTimer::startRecording(VkCommandBuffer cmd) {
+void VulkanGpuTimer::startRecording(VkCommandBuffer cmd, uint32_t slot) {
   if (!supported())
     return;
   m_cmd = cmd;
-  m_used = 0;
-  m_spans.clear();
+  m_slot = slot;
+  m_slots[slot] = SlotData{};
   m_openFrame = kNone;
   m_openPass.fill(kNone);
   m_openShader.clear();
-  vkCmdResetQueryPool(cmd, m_pool, 0, kMaxQueries);
+  vkCmdResetQueryPool(cmd, m_pool, slot * kMaxQueries, kMaxQueries);
   if (m_framePending) {
     m_openFrame = stamp();
     m_framePending = false;
@@ -57,6 +59,8 @@ void VulkanGpuTimer::startRecording(VkCommandBuffer cmd) {
 }
 
 void VulkanGpuTimer::stopRecording() {
+  if (m_cmd)
+    m_slots[m_slot].pending = m_slots[m_slot].used > 0;
   m_cmd = VK_NULL_HANDLE;
   m_framePending = false;
   m_openFrame = kNone;
@@ -79,7 +83,7 @@ void VulkanGpuTimer::endFrameSpan() {
     return;
   const uint32_t end = stamp();
   if (end != kNone)
-    m_spans.push_back({Kind::Frame, 0, 0, m_openFrame, end});
+    m_slots[m_slot].spans.push_back({Kind::Frame, 0, 0, m_openFrame, end});
   m_openFrame = kNone;
 }
 
@@ -95,7 +99,7 @@ void VulkanGpuTimer::endPass(api::RenderPass pass) {
     return;
   const uint32_t end = stamp();
   if (end != kNone)
-    m_spans.push_back({Kind::Pass, static_cast<uint32_t>(pass), 0, open, end});
+    m_slots[m_slot].spans.push_back({Kind::Pass, static_cast<uint32_t>(pass), 0, open, end});
   open = kNone;
 }
 
@@ -113,21 +117,22 @@ void VulkanGpuTimer::endShader(uint64_t shaderId) {
     return;
   const uint32_t end = stamp();
   if (end != kNone)
-    m_spans.push_back({Kind::Shader, 0, shaderId, it->second, end});
+    m_slots[m_slot].spans.push_back({Kind::Shader, 0, shaderId, it->second, end});
   m_openShader.erase(it);
 }
 
-void VulkanGpuTimer::collect() {
-  if (!supported() || m_used == 0)
+void VulkanGpuTimer::collect(uint32_t slotIndex) {
+  SlotData &slot = m_slots[slotIndex];
+  if (!supported() || !slot.pending)
     return;
+  slot.pending = false;
 
-  std::vector<uint64_t> ticks(m_used);
-  // A query never written (a span left open) is in no closed span, so a
-  // NOT_READY result for it is harmless.
-  vkGetQueryPoolResults(m_core->device, m_pool, 0, m_used,
-                        ticks.size() * sizeof(uint64_t), ticks.data(),
-                        sizeof(uint64_t),
-                        VK_QUERY_RESULT_64_BIT);
+  std::vector<uint64_t> ticks(slot.used);
+  // The frame has finished, so written queries are available; one never
+  // written (an unclosed span) is in no closed span, so NOT_READY is harmless.
+  vkGetQueryPoolResults(m_core->device, m_pool, slotIndex * kMaxQueries,
+                        slot.used, ticks.size() * sizeof(uint64_t), ticks.data(),
+                        sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
 
   auto ms = [&](const Span &s) {
     const uint64_t delta = (ticks[s.end] - ticks[s.begin]) & m_validMask;
@@ -140,7 +145,7 @@ void VulkanGpuTimer::collect() {
   std::array<bool, api::kRenderPassCount> passSeen{};
   double frame = 0.0;
   bool frameSeen = false;
-  for (const Span &s : m_spans) {
+  for (const Span &s : slot.spans) {
     switch (s.kind) {
       case Kind::Frame:
         frame += ms(s);
@@ -162,8 +167,8 @@ void VulkanGpuTimer::collect() {
     m_frameMs = frame;
   m_haveResult = true;
 
-  m_used = 0;
-  m_spans.clear();
+  slot.used = 0;
+  slot.spans.clear();
 }
 
 double VulkanGpuTimer::shaderMs(uint64_t shaderId) const {

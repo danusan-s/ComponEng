@@ -2,12 +2,16 @@
 
 #include "componeng/utils/logger.hpp"
 
+#include <algorithm>
+
 namespace componeng::renderer::vulkan {
 
 VulkanCore::~VulkanCore() {
   if (device != VK_NULL_HANDLE) {
     vkDeviceWaitIdle(device);
-    flushDeferred();
+    flushAllDeferred();
+    if (timeline != VK_NULL_HANDLE)
+      vkDestroySemaphore(device, timeline, nullptr);
     if (cmdPool != VK_NULL_HANDLE)
       vkDestroyCommandPool(device, cmdPool, nullptr);
     vkDestroyDevice(device, nullptr);
@@ -96,15 +100,43 @@ void VulkanCore::destroyAllocation(Allocation &a) const {
   a = Allocation{};
 }
 
+void VulkanCore::waitSerial(uint64_t serial) {
+  if (serial == 0 || serial >= recordingSerial || serial <= completedSerial)
+    return;
+  VkSemaphoreWaitInfo wi{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
+  wi.semaphoreCount = 1;
+  wi.pSemaphores = &timeline;
+  wi.pValues = &serial;
+  vkWaitSemaphores(device, &wi, UINT64_MAX);
+  completedSerial = std::max(completedSerial, serial);
+}
+
+void VulkanCore::pollCompleted() {
+  uint64_t value = 0;
+  if (timeline != VK_NULL_HANDLE &&
+      vkGetSemaphoreCounterValue(device, timeline, &value) == VK_SUCCESS)
+    completedSerial = std::max(completedSerial, value);
+}
+
 void VulkanCore::defer(std::function<void()> fn) {
-  m_deferred.push_back(std::move(fn));
+  m_deferred.push_back({recordingSerial, std::move(fn)});
 }
 
 void VulkanCore::flushDeferred() {
-  std::vector<std::function<void()>> work;
+  std::vector<Deferred> keep;
+  std::vector<Deferred> run;
+  for (auto &d : m_deferred)
+    (d.serial <= completedSerial ? run : keep).push_back(std::move(d));
+  m_deferred.swap(keep);
+  for (auto &d : run)
+    d.fn();
+}
+
+void VulkanCore::flushAllDeferred() {
+  std::vector<Deferred> work;
   work.swap(m_deferred);
-  for (auto &fn : work)
-    fn();
+  for (auto &d : work)
+    d.fn();
 }
 
 VkCommandBuffer VulkanCore::beginOneShot() const {

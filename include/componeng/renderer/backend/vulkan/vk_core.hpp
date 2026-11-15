@@ -8,6 +8,9 @@
 
 namespace componeng::renderer::vulkan {
 
+/** How many frames the CPU may record ahead of the GPU. */
+constexpr uint32_t kFramesInFlight = 2;
+
 /**
  * The Vulkan objects every resource needs, shared (shared_ptr) by the device
  * and all its resources so the VkDevice outlives them in any teardown order.
@@ -25,6 +28,21 @@ struct VulkanCore {
   uint32_t queueFamily = 0;
   VkQueue queue = VK_NULL_HANDLE;
   VkCommandPool cmdPool = VK_NULL_HANDLE;
+
+  // frame progress
+  // Each submitted frame gets a serial (1, 2, 3, ...) that the GPU signals on
+  // `timeline` when it finishes. `recordingSerial` is the serial the frame
+  // being recorded will get.
+  VkSemaphore timeline = VK_NULL_HANDLE;
+  uint64_t recordingSerial = 1;
+  uint64_t completedSerial = 0;
+
+  /** Block until frame `serial` has finished. Returns at once for 0, the frame
+   *  being recorded, and finished frames. */
+  void waitSerial(uint64_t serial);
+  /** Refresh completedSerial from the GPU without blocking. */
+  void pollCompleted();
+
   VkPhysicalDeviceProperties props{};
   VkPhysicalDeviceMemoryProperties memProps{};
   bool anisotropy = false;
@@ -44,16 +62,23 @@ struct VulkanCore {
                           Allocation &out) const;
   void destroyAllocation(Allocation &a) const;
 
-  /** Runs `fn` once the GPU is known to be done with the current frame. */
+  /** Runs `fn` once every frame that may still use what it destroys is done. */
   void defer(std::function<void()> fn);
+  /** Runs the deferred work whose frames have completed. */
   void flushDeferred();
+  /** Runs all of it; only valid once the device is idle. */
+  void flushAllDeferred();
 
   /** Record and submit commands now, blocking until they finish. */
   VkCommandBuffer beginOneShot() const;
   void endOneShot(VkCommandBuffer cmd) const;
 
 private:
-  std::vector<std::function<void()>> m_deferred;
+  struct Deferred {
+    uint64_t serial;
+    std::function<void()> fn;
+  };
+  std::vector<Deferred> m_deferred;
 };
 
 /** sync2 barrier over `levelCount` mips of a colour image. */

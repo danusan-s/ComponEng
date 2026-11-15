@@ -135,10 +135,13 @@ bool VulkanRenderDevice::pickPhysicalDevice() {
 
     VkPhysicalDeviceVulkan13Features f13{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+    VkPhysicalDeviceVulkan12Features f12{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+    f13.pNext = &f12;
     VkPhysicalDeviceFeatures2 f2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
     f2.pNext = &f13;
     vkGetPhysicalDeviceFeatures2(pd, &f2);
-    if (!f13.dynamicRendering || !f13.synchronization2)
+    if (!f13.dynamicRendering || !f13.synchronization2 || !f12.timelineSemaphore)
       continue;
 
     uint32_t qCount = 0;
@@ -190,6 +193,10 @@ bool VulkanRenderDevice::createDevice() {
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
   f13.dynamicRendering = VK_TRUE;
   f13.synchronization2 = VK_TRUE;
+  VkPhysicalDeviceVulkan12Features f12{
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+  f12.timelineSemaphore = VK_TRUE;
+  f13.pNext = &f12;
   VkPhysicalDeviceFeatures2 f2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
   f2.pNext = &f13;
   f2.features.samplerAnisotropy = supported.samplerAnisotropy;
@@ -208,6 +215,17 @@ bool VulkanRenderDevice::createDevice() {
   }
   vkGetDeviceQueue(m_core->device, m_core->queueFamily, 0, &m_core->queue);
 
+  // One timeline semaphore carries frame progress: each submit signals its
+  // serial, and anything that needs a frame finished waits for that value.
+  VkSemaphoreTypeCreateInfo ti{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
+  ti.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+  ti.initialValue = 0;
+  VkSemaphoreCreateInfo tsi{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+  tsi.pNext = &ti;
+  if (vkCreateSemaphore(m_core->device, &tsi, nullptr, &m_core->timeline) !=
+      VK_SUCCESS)
+    return false;
+
   VkCommandPoolCreateInfo pi{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
   pi.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   pi.queueFamilyIndex = m_core->queueFamily;
@@ -216,16 +234,16 @@ bool VulkanRenderDevice::createDevice() {
 }
 
 void VulkanRenderDevice::createFrameObjects() {
-  VkCommandBufferAllocateInfo ai{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-  ai.commandPool = m_core->cmdPool;
-  ai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  ai.commandBufferCount = 1;
-  vkAllocateCommandBuffers(m_core->device, &ai, &m_cmd);
+  for (FrameSlot &fs : m_slots) {
+    VkCommandBufferAllocateInfo ai{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    ai.commandPool = m_core->cmdPool;
+    ai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    ai.commandBufferCount = 1;
+    vkAllocateCommandBuffers(m_core->device, &ai, &fs.cmd);
 
-  VkSemaphoreCreateInfo si{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-  vkCreateSemaphore(m_core->device, &si, nullptr, &m_imageAvailable);
-  VkFenceCreateInfo fi{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-  vkCreateFence(m_core->device, &fi, nullptr, &m_fence);
+    VkSemaphoreCreateInfo si{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    vkCreateSemaphore(m_core->device, &si, nullptr, &fs.imageAvailable);
+  }
 }
 
 bool VulkanRenderDevice::createDepthImage() {
@@ -428,6 +446,7 @@ void VulkanRenderDevice::shutdown() {
     m_frameActive = false;
     m_rendering = false;
   }
+  m_core->pollCompleted();
   m_timer.stopRecording();
   m_timer.shutdown();
   m_shader = nullptr;
@@ -437,24 +456,23 @@ void VulkanRenderDevice::shutdown() {
   for (auto &entry : m_pipelines)
     vkDestroyPipeline(dev, entry.second, nullptr);
   m_pipelines.clear();
-  for (VkDescriptorPool pool : m_pools)
-    vkDestroyDescriptorPool(dev, pool, nullptr);
-  m_pools.clear();
-  for (auto &chunk : m_uniformChunks)
-    m_core->destroyAllocation(chunk);
-  m_uniformChunks.clear();
-  if (m_fence)
-    vkDestroyFence(dev, m_fence, nullptr);
-  if (m_imageAvailable)
-    vkDestroySemaphore(dev, m_imageAvailable, nullptr);
-  m_fence = VK_NULL_HANDLE;
-  m_imageAvailable = VK_NULL_HANDLE;
+  for (FrameSlot &fs : m_slots) {
+    for (VkDescriptorPool pool : fs.pools)
+      vkDestroyDescriptorPool(dev, pool, nullptr);
+    fs.pools.clear();
+    for (auto &chunk : fs.uniformChunks)
+      m_core->destroyAllocation(chunk);
+    fs.uniformChunks.clear();
+    if (fs.imageAvailable)
+      vkDestroySemaphore(dev, fs.imageAvailable, nullptr);
+    fs.imageAvailable = VK_NULL_HANDLE;
+  }
   destroySwapchain(/*keepHandle=*/false);
   if (m_surface) {
     vkDestroySurfaceKHR(m_core->instance, m_surface, nullptr);
     m_surface = VK_NULL_HANDLE;
   }
-  m_core->flushDeferred();
+  m_core->flushAllDeferred(); // the device is idle
   m_shutDown = true;
 }
 
@@ -476,28 +494,35 @@ bool VulkanRenderDevice::ensureFrame() {
       return false;
   }
 
+  // Reusing this slot needs its previous frame (kFramesInFlight ago) finished;
+  // the frame in between may still run, which is the overlap.
+  FrameSlot &fs = slot();
+  m_core->waitSerial(fs.serial);
+  pollCompletedFrames();
+
   VkResult r = VK_ERROR_OUT_OF_DATE_KHR;
   for (int attempt = 0; attempt < 2 && r != VK_SUCCESS && r != VK_SUBOPTIMAL_KHR;
        ++attempt) {
     r = vkAcquireNextImageKHR(m_core->device, m_swapchain, UINT64_MAX,
-                              m_imageAvailable, VK_NULL_HANDLE, &m_imageIndex);
+                              fs.imageAvailable, VK_NULL_HANDLE, &m_imageIndex);
     if (r == VK_ERROR_OUT_OF_DATE_KHR && !createSwapchain())
       return false;
   }
   if (r != VK_SUCCESS && r != VK_SUBOPTIMAL_KHR)
     return false;
 
-  for (VkDescriptorPool pool : m_pools)
+  for (VkDescriptorPool pool : fs.pools)
     vkResetDescriptorPool(m_core->device, pool, 0);
-  m_poolIndex = 0;
-  m_uniformChunk = 0;
-  m_uniformOffset = 0;
+  fs.poolIndex = 0;
+  fs.uniformChunk = 0;
+  fs.uniformOffset = 0;
 
+  m_cmd = fs.cmd;
   vkResetCommandBuffer(m_cmd, 0);
   VkCommandBufferBeginInfo bi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   vkBeginCommandBuffer(m_cmd, &bi);
-  m_timer.startRecording(m_cmd);
+  m_timer.startRecording(m_cmd, m_slot);
 
   transitionImage(m_cmd, m_images[m_imageIndex], VK_IMAGE_LAYOUT_UNDEFINED,
                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, 1,
@@ -508,7 +533,9 @@ bool VulkanRenderDevice::ensureFrame() {
                   VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, 0, 1,
                   VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
                       VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                  0,
+                  // The depth image is shared by all frames in flight: this
+                  // orders our first use after the previous frame's last one.
+                  VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
                   VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
                       VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
                   VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
@@ -646,16 +673,31 @@ void VulkanRenderDevice::present(void * /*windowHandle*/) {
   m_timer.stopRecording();
   vkEndCommandBuffer(m_cmd);
 
+  FrameSlot &fs = slot();
+  const uint64_t serial = m_core->recordingSerial;
   const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  // Binary semaphores (acquire, render-done) take a dummy value 0 in the
+  // timeline-submit arrays; the timeline gets the frame's serial.
+  const uint64_t waitValue = 0;
+  const uint64_t signalValues[2] = {0, serial};
+  VkTimelineSemaphoreSubmitInfo ts{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
+  ts.waitSemaphoreValueCount = 1;
+  ts.pWaitSemaphoreValues = &waitValue;
+  ts.signalSemaphoreValueCount = 2;
+  ts.pSignalSemaphoreValues = signalValues;
+  const VkSemaphore signals[2] = {m_renderDone[m_imageIndex], m_core->timeline};
   VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+  si.pNext = &ts;
   si.waitSemaphoreCount = 1;
-  si.pWaitSemaphores = &m_imageAvailable;
+  si.pWaitSemaphores = &fs.imageAvailable;
   si.pWaitDstStageMask = &waitStage;
   si.commandBufferCount = 1;
   si.pCommandBuffers = &m_cmd;
-  si.signalSemaphoreCount = 1;
-  si.pSignalSemaphores = &m_renderDone[m_imageIndex];
-  vkQueueSubmit(m_core->queue, 1, &si, m_fence);
+  si.signalSemaphoreCount = 2;
+  si.pSignalSemaphores = signals;
+  vkQueueSubmit(m_core->queue, 1, &si, VK_NULL_HANDLE);
+  fs.serial = serial;
+  ++m_core->recordingSerial;
 
   VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
   pi.waitSemaphoreCount = 1;
@@ -667,12 +709,20 @@ void VulkanRenderDevice::present(void * /*windowHandle*/) {
   if (pr == VK_ERROR_OUT_OF_DATE_KHR || pr == VK_SUBOPTIMAL_KHR)
     m_swapDirty = true;
 
-  // One frame in flight: this is what makes plain memcpy into buffers safe.
-  vkWaitForFences(m_core->device, 1, &m_fence, VK_TRUE, UINT64_MAX);
-  vkResetFences(m_core->device, 1, &m_fence);
-  m_timer.collect();
+  // No wait here: the GPU runs this frame while the CPU records the next.
   m_frameActive = false;
+  m_slot = (m_slot + 1) % kFramesInFlight;
+  pollCompletedFrames();
+}
+
+void VulkanRenderDevice::pollCompletedFrames() {
+  m_core->pollCompleted();
   m_core->flushDeferred();
+  for (uint32_t i = 0; i < kFramesInFlight; ++i) {
+    if (m_slots[i].serial != 0 && m_slots[i].serial <= m_core->completedSerial &&
+        m_timer.hasPending(i))
+      m_timer.collect(i);
+  }
 }
 
 // State the engine sets between draws
@@ -854,7 +904,8 @@ VkPipeline VulkanRenderDevice::pipelineFor(const VulkanShader &shader,
 
 VkDescriptorSet VulkanRenderDevice::allocateSet(VkDescriptorSetLayout layout) {
   for (;;) {
-    if (m_poolIndex == m_pools.size()) {
+    FrameSlot &fs = slot();
+    if (fs.poolIndex == fs.pools.size()) {
       const VkDescriptorPoolSize sizes[] = {
           {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16384},
           {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16384},
@@ -866,10 +917,10 @@ VkDescriptorSet VulkanRenderDevice::allocateSet(VkDescriptorSetLayout layout) {
       VkDescriptorPool pool = VK_NULL_HANDLE;
       if (vkCreateDescriptorPool(m_core->device, &ci, nullptr, &pool) != VK_SUCCESS)
         return VK_NULL_HANDLE;
-      m_pools.push_back(pool);
+      fs.pools.push_back(pool);
     }
     VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-    ai.descriptorPool = m_pools[m_poolIndex];
+    ai.descriptorPool = fs.pools[fs.poolIndex];
     ai.descriptorSetCount = 1;
     ai.pSetLayouts = &layout;
     VkDescriptorSet set = VK_NULL_HANDLE;
@@ -878,7 +929,7 @@ VkDescriptorSet VulkanRenderDevice::allocateSet(VkDescriptorSetLayout layout) {
       return set;
     if (r != VK_ERROR_OUT_OF_POOL_MEMORY && r != VK_ERROR_FRAGMENTED_POOL)
       return VK_NULL_HANDLE;
-    ++m_poolIndex; // this pool is full: move to (or make) the next one
+    ++fs.poolIndex; // this pool is full: move to (or make) the next one
   }
 }
 
@@ -886,25 +937,26 @@ bool VulkanRenderDevice::allocUniform(uint32_t size, VkBuffer &buffer,
                                       VkDeviceSize &offset, void *&mapped) {
   const VkDeviceSize align =
       std::max<VkDeviceSize>(m_core->props.limits.minUniformBufferOffsetAlignment, 16);
+  FrameSlot &fs = slot();
   for (;;) {
-    if (m_uniformChunk == m_uniformChunks.size()) {
+    if (fs.uniformChunk == fs.uniformChunks.size()) {
       VulkanCore::Allocation chunk;
       if (!m_core->createMappedBuffer(std::max<VkDeviceSize>(kUniformChunkBytes, size),
                                       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, chunk))
         return false;
-      m_uniformChunks.push_back(chunk);
+      fs.uniformChunks.push_back(chunk);
     }
-    const VkDeviceSize aligned = (m_uniformOffset + align - 1) / align * align;
-    VulkanCore::Allocation &chunk = m_uniformChunks[m_uniformChunk];
+    const VkDeviceSize aligned = (fs.uniformOffset + align - 1) / align * align;
+    VulkanCore::Allocation &chunk = fs.uniformChunks[fs.uniformChunk];
     if (aligned + size <= chunk.size) {
       buffer = chunk.buffer;
       offset = aligned;
       mapped = static_cast<char *>(chunk.mapped) + aligned;
-      m_uniformOffset = aligned + size;
+      fs.uniformOffset = aligned + size;
       return true;
     }
-    ++m_uniformChunk;
-    m_uniformOffset = 0;
+    ++fs.uniformChunk;
+    fs.uniformOffset = 0;
   }
 }
 
@@ -943,6 +995,7 @@ VkDescriptorSet VulkanRenderDevice::buildDescriptors(const VulkanShader &shader)
                             : nullptr;
     if (!buf || buf->handle() == VK_NULL_HANDLE || buf->size() == 0)
       buf = m_dummyBuffer.get();
+    buf->markUsed(m_core->recordingSerial);
     writeBuffer(b.binding, buf->handle(), 0,
                 std::min<VkDeviceSize>(buf->size(), maxRange));
   }
@@ -975,6 +1028,7 @@ VkDescriptorSet VulkanRenderDevice::buildDescriptors(const VulkanShader &shader)
         buf = m_dummyBuffer.get();
         format = api::BufferTextureFormat::RGBA32F;
       }
+      buf->markUsed(m_core->recordingSerial);
       texelViews.push_back(buf->view(format));
       w.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
       w.pTexelBufferView = &texelViews.back();
@@ -1040,6 +1094,11 @@ bool VulkanRenderDevice::draw(bool indexed, uint32_t count, uint32_t instanceCou
     vkCmdDraw(m_cmd, count, instanceCount, 0, 0);
     return true;
   }
+  const uint64_t serial = m_core->recordingSerial;
+  mesh->vertexBuffer()->markUsed(serial);
+  mesh->indexBuffer()->markUsed(serial);
+  if (instanced)
+    m_instanceBuffer->markUsed(serial);
   VkBuffer buffers[2] = {mesh->vertexBuffer()->handle(),
                          instanced ? m_instanceBuffer->handle() : VK_NULL_HANDLE};
   const VkDeviceSize offsets[2] = {0, 0};

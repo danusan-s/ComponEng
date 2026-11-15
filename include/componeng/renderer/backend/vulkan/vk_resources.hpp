@@ -4,14 +4,20 @@
 #include "componeng/renderer/backend/vulkan/vk_core.hpp"
 
 #include <memory>
+#include <vector>
 
 namespace componeng::renderer::vulkan {
 
 class VulkanRenderDevice;
 
 /**
- * Host-visible buffer written by plain memcpy. Safe because only one frame is
- * in flight at a time.
+ * Host-visible buffer written by plain memcpy. The GPU may still be reading
+ * the previous frame, so a buffer remembers the last frame that bound it
+ * (markUsed). A write arriving while that frame is in flight either
+ *  - renames (Dynamic buffers): swaps to another backing allocation, refilled
+ *    from a CPU shadow copy, and retires the old one until its frame ends; or
+ *  - waits (Static buffers: no shadow, written rarely).
+ * So buffers rewritten every frame never stall the CPU.
  */
 class VulkanBuffer final : public api::IBuffer {
 public:
@@ -25,21 +31,40 @@ public:
   }
   void release() override;
 
+  /** The backing the frame being recorded should bind. Changes when a write
+   *  renames the buffer, so fetch it at draw time. */
   VkBuffer handle() const {
-    return m_alloc.buffer;
+    return m_current.alloc.buffer;
   }
   /** Allocated bytes (>= size()). */
   VkDeviceSize capacity() const {
-    return m_alloc.size;
+    return m_current.alloc.size;
   }
-  /** A texel-buffer view of the whole buffer in `format`. */
+  /** Record that the frame being recorded (`serial`) reads this buffer. */
+  void markUsed(uint64_t serial) const {
+    m_current.lastUse = serial;
+  }
+  /** A texel-buffer view of the whole current backing in `format`. */
   VkBufferView view(api::BufferTextureFormat format);
 
 private:
+  struct Backing {
+    VulkanCore::Allocation alloc;
+    VkBufferView views[3] = {};
+    uint64_t lastUse = 0; // last frame serial that bound it
+  };
+
+  void destroyBacking(Backing &backing);
+  /** Make the backing writable. Returns true if it was swapped (refill it from
+   *  the shadow), false if it can be written in place, possibly after a wait. */
+  bool prepareWrite();
+
   std::shared_ptr<VulkanCore> m_core;
-  VulkanCore::Allocation m_alloc;
+  mutable Backing m_current;
+  std::vector<Backing> m_retired;
+  std::vector<unsigned char> m_shadow; // contents, when the buffer is Dynamic
+  bool m_shadowed = false;
   size_t m_size = 0;
-  VkBufferView m_views[3] = {};
 };
 
 class VulkanTexture final : public api::ITexture {
