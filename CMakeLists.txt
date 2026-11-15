@@ -35,6 +35,7 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/camera/*.cpp"
     "src/componeng/physics/*.cpp"
     "src/componeng/ecs/*.cpp"
+    "src/componeng/net/*.cpp"
     "src/componeng/utils/*.cpp"
 )
 # Two independent switches for what a build shows and measures. ImGui is always
@@ -120,6 +121,11 @@ target_link_libraries(ComponEng
         OpenGL::GL
 )
 
+# Winsock is a separate library on Windows; POSIX sockets are part of libc.
+if(WIN32)
+    target_link_libraries(ComponEng PUBLIC ws2_32)
+endif()
+
 # GLFW must not pull in the system GL header: glad provides the GL API, and only
 # the OpenGL backend includes it. Public so games that include GLFW agree.
 target_compile_definitions(ComponEng PUBLIC GLFW_INCLUDE_NONE)
@@ -195,6 +201,7 @@ set(TEST_SOURCES
     tests/test_utils.cpp
     tests/test_world.cpp
     tests/test_audio.cpp
+    tests/test_net.cpp
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})
