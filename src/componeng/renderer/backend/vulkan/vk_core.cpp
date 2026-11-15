@@ -10,6 +10,8 @@ VulkanCore::~VulkanCore() {
   if (device != VK_NULL_HANDLE) {
     vkDeviceWaitIdle(device);
     flushAllDeferred();
+    destroyGpuAllocator(allocator);
+    allocator = nullptr;
     if (timeline != VK_NULL_HANDLE)
       vkDestroySemaphore(device, timeline, nullptr);
     if (cmdPool != VK_NULL_HANDLE)
@@ -27,77 +29,27 @@ VulkanCore::~VulkanCore() {
   }
 }
 
-uint32_t VulkanCore::findMemoryType(uint32_t typeBits,
-                                    VkMemoryPropertyFlags flags) const {
-  for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
-    if ((typeBits & (1u << i)) &&
-        (memProps.memoryTypes[i].propertyFlags & flags) == flags)
-      return i;
-  }
-  return UINT32_MAX;
-}
-
 bool VulkanCore::createMappedBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                                    Allocation &out) const {
-  if (size == 0)
-    size = 16;
-  VkBufferCreateInfo bi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  bi.size = size;
-  bi.usage = usage;
-  bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  VkBuffer buffer = VK_NULL_HANDLE;
-  if (vkCreateBuffer(device, &bi, nullptr, &buffer) != VK_SUCCESS)
-    return false;
-
-  VkMemoryRequirements req;
-  vkGetBufferMemoryRequirements(device, buffer, &req);
-
-  const VkMemoryPropertyFlags host =
-      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-  const VkMemoryPropertyFlags attempts[] = {
-      host | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, host};
-
-  VkDeviceMemory memory = VK_NULL_HANDLE;
-  for (VkMemoryPropertyFlags flags : attempts) {
-    const uint32_t type = findMemoryType(req.memoryTypeBits, flags);
-    if (type == UINT32_MAX)
-      continue;
-    VkMemoryAllocateInfo ai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    ai.allocationSize = req.size;
-    ai.memoryTypeIndex = type;
-    if (vkAllocateMemory(device, &ai, nullptr, &memory) == VK_SUCCESS)
-      break;
-    memory = VK_NULL_HANDLE;
-  }
-  if (memory == VK_NULL_HANDLE) {
-    vkDestroyBuffer(device, buffer, nullptr);
+                                    Allocation &out, HostMemory memory) const {
+  if (!createGpuBuffer(allocator, size, usage, memory, out)) {
     LOG_ERROR("Vulkan: out of memory allocating a %llu byte buffer",
               static_cast<unsigned long long>(size));
     return false;
   }
-  vkBindBufferMemory(device, buffer, memory, 0);
-
-  void *mapped = nullptr;
-  if (vkMapMemory(device, memory, 0, VK_WHOLE_SIZE, 0, &mapped) != VK_SUCCESS) {
-    vkDestroyBuffer(device, buffer, nullptr);
-    vkFreeMemory(device, memory, nullptr);
-    return false;
-  }
-  out.buffer = buffer;
-  out.memory = memory;
-  out.mapped = mapped;
-  out.size = size;
   return true;
 }
 
 void VulkanCore::destroyAllocation(Allocation &a) const {
-  if (a.buffer != VK_NULL_HANDLE)
-    vkDestroyBuffer(device, a.buffer, nullptr);
-  if (a.memory != VK_NULL_HANDLE) {
-    vkUnmapMemory(device, a.memory);
-    vkFreeMemory(device, a.memory, nullptr);
-  }
-  a = Allocation{};
+  destroyGpuBuffer(allocator, a);
+}
+
+bool VulkanCore::createImage(const VkImageCreateInfo &info, bool dedicated,
+                             ImageAlloc &out) const {
+  return createGpuImage(allocator, info, dedicated, out);
+}
+
+void VulkanCore::destroyImage(ImageAlloc &image) const {
+  destroyGpuImage(allocator, image);
 }
 
 void VulkanCore::waitSerial(uint64_t serial) {

@@ -141,8 +141,13 @@ if(RENDERER_BACKEND STREQUAL "vulkan")
     )
     target_compile_definitions(ComponEng PUBLIC COMPONENG_VULKAN)
     # `VkFooInfo info{sType};` is the Vulkan idiom; -Wextra flags the rest.
-    set_source_files_properties(${VULKAN_BACKEND_SOURCES} PROPERTIES
+    set(VULKAN_VMA_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/componeng/renderer/backend/vulkan/vma_impl.cpp")
+    set(VULKAN_FIRST_PARTY_SOURCES ${VULKAN_BACKEND_SOURCES})
+    list(REMOVE_ITEM VULKAN_FIRST_PARTY_SOURCES ${VULKAN_VMA_SOURCE})
+    set_source_files_properties(${VULKAN_FIRST_PARTY_SOURCES} PROPERTIES
         COMPILE_OPTIONS "-Wno-missing-field-initializers")
+    # Vulkan Memory Allocator is vendored: it is only ever included here.
+    set_source_files_properties(${VULKAN_VMA_SOURCE} PROPERTIES COMPILE_OPTIONS "-w")
     message(STATUS "Renderer backend: Vulkan")
 else()
     message(STATUS "Renderer backend: OpenGL")

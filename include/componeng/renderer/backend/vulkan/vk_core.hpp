@@ -1,5 +1,7 @@
 #pragma once
 
+#include "componeng/renderer/backend/vulkan/vk_memory.hpp"
+
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
@@ -47,20 +49,19 @@ struct VulkanCore {
   VkPhysicalDeviceMemoryProperties memProps{};
   bool anisotropy = false;
 
-  /** Index of a memory type in `typeBits` with all of `flags`, or UINT32_MAX. */
-  uint32_t findMemoryType(uint32_t typeBits, VkMemoryPropertyFlags flags) const;
+  /** Sub-allocator for every buffer and image; created and destroyed with the device. */
+  GpuAllocator *allocator = nullptr;
 
-  /** A mapped, host-visible buffer. Prefers device-local host-visible memory
-   *  (resizable BAR) and falls back to plain host-visible. */
-  struct Allocation {
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    void *mapped = nullptr;
-    VkDeviceSize size = 0;
-  };
+  /** A persistently mapped, coherent, host-visible buffer. */
+  using Allocation = BufferAlloc;
   bool createMappedBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                          Allocation &out) const;
+                          Allocation &out,
+                          HostMemory memory = HostMemory::PreferDevice) const;
   void destroyAllocation(Allocation &a) const;
+
+  bool createImage(const VkImageCreateInfo &info, bool dedicated,
+                   ImageAlloc &out) const;
+  void destroyImage(ImageAlloc &image) const;
 
   /** Runs `fn` once every frame that may still use what it destroys is done. */
   void defer(std::function<void()> fn);

@@ -90,14 +90,16 @@ public:
 
 private:
   /** Copies `pixels` (m_format layout, w x h at x, y) into the image and
-   *  rebuilds the mip chain; `fromUndefined` for the very first fill. */
+   *  rebuilds the mip chain; `fromUndefined` for the very first fill. Recorded
+   *  into the frame's command buffer (no CPU wait), or run as a blocking
+   *  one-shot if no frame can be opened. */
   void upload(uint32_t x, uint32_t y, uint32_t w, uint32_t h,
               const void *pixels, bool fromUndefined);
 
   VulkanRenderDevice *m_device;
   std::shared_ptr<VulkanCore> m_core;
   VkImage m_image = VK_NULL_HANDLE;
-  VkDeviceMemory m_memory = VK_NULL_HANDLE;
+  void *m_allocation = nullptr; // opaque, owned through VulkanCore::createImage
   VkImageView m_view = VK_NULL_HANDLE;
   VkSampler m_sampler = VK_NULL_HANDLE;
   VkFormat m_format = VK_FORMAT_UNDEFINED;

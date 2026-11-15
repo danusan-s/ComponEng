@@ -25,7 +25,7 @@ VulkanBuffer::~VulkanBuffer() {
 }
 
 void VulkanBuffer::destroyBacking(Backing &backing) {
-  if (backing.alloc.buffer == VK_NULL_HANDLE && backing.alloc.memory == VK_NULL_HANDLE)
+  if (backing.alloc.buffer == VK_NULL_HANDLE && backing.alloc.allocation == nullptr)
     return;
   // Frames still in flight may name it: free it once they are done.
   VulkanCore *core = m_core.get();
@@ -197,6 +197,52 @@ VkFilter toVk(api::TextureFilter f) {
 
 } // namespace
 
+namespace {
+
+/**
+ * Where a texture's transfer commands go: normally the frame's command buffer
+ * (no CPU wait; staging is freed once that frame finishes), or a blocking
+ * one-shot submit if no frame can be opened or too much staging is queued.
+ */
+class UploadScope {
+public:
+  UploadScope(VulkanRenderDevice *device, VulkanCore &core, size_t stagingBytes)
+      : m_core(core) {
+    m_cmd = device->beginTransfer(stagingBytes);
+    if (m_cmd == VK_NULL_HANDLE) {
+      m_cmd = core.beginOneShot();
+      m_oneShot = true;
+    }
+  }
+  VkCommandBuffer cmd() const {
+    return m_cmd;
+  }
+  /** Done recording; `staging` (if any) is released at the right time. */
+  void finish(VulkanCore::Allocation *staging) {
+    if (m_oneShot) {
+      m_core.endOneShot(m_cmd);
+      if (staging)
+        m_core.destroyAllocation(*staging);
+    } else if (staging && staging->buffer != VK_NULL_HANDLE) {
+      VulkanCore *core = &m_core;
+      VulkanCore::Allocation doomed = *staging;
+      core->defer([core, doomed]() mutable { core->destroyAllocation(doomed); });
+    }
+    if (staging)
+      *staging = VulkanCore::Allocation{};
+  }
+
+private:
+  VulkanCore &m_core;
+  VkCommandBuffer m_cmd = VK_NULL_HANDLE;
+  bool m_oneShot = false;
+};
+
+constexpr VkPipelineStageFlags2 kShaderStages =
+    VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+
+} // namespace
+
 VulkanTexture::VulkanTexture(VulkanRenderDevice *device,
                              std::shared_ptr<VulkanCore> core)
     : m_device(device), m_core(std::move(core)) {
@@ -252,27 +298,13 @@ void VulkanTexture::create(uint32_t width, uint32_t height,
              VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
   ii.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  if (vkCreateImage(m_core->device, &ii, nullptr, &m_image) != VK_SUCCESS) {
+  ImageAlloc image;
+  if (!m_core->createImage(ii, /*dedicated=*/false, image)) {
     LOG_ERROR("Vulkan: failed to create a %ux%u texture", width, height);
-    m_image = VK_NULL_HANDLE;
     return;
   }
-
-  VkMemoryRequirements req;
-  vkGetImageMemoryRequirements(m_core->device, m_image, &req);
-  VkMemoryAllocateInfo ai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  ai.allocationSize = req.size;
-  ai.memoryTypeIndex = m_core->findMemoryType(
-      req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  if (ai.memoryTypeIndex == UINT32_MAX ||
-      vkAllocateMemory(m_core->device, &ai, nullptr, &m_memory) != VK_SUCCESS) {
-    LOG_ERROR("Vulkan: out of memory for a %ux%u texture", width, height);
-    vkDestroyImage(m_core->device, m_image, nullptr);
-    m_image = VK_NULL_HANDLE;
-    m_memory = VK_NULL_HANDLE;
-    return;
-  }
-  vkBindImageMemory(m_core->device, m_image, m_memory, 0);
+  m_image = image.image;
+  m_allocation = image.allocation;
 
   VkImageViewCreateInfo vi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
   vi.image = m_image;
@@ -300,13 +332,12 @@ void VulkanTexture::create(uint32_t width, uint32_t height,
   if (pixels) {
     upload(0, 0, width, height, pixels, /*fromUndefined=*/true);
   } else {
-    VkCommandBuffer cmd = m_core->beginOneShot();
-    transitionImage(cmd, m_image, VK_IMAGE_LAYOUT_UNDEFINED,
+    UploadScope scope(m_device, *m_core, 0);
+    transitionImage(scope.cmd(), m_image, VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, m_mipLevels,
-                    VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0,
-                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0, kShaderStages,
                     VK_ACCESS_2_SHADER_READ_BIT);
-    m_core->endOneShot(cmd);
+    scope.finish(nullptr);
   }
 }
 
@@ -343,13 +374,13 @@ void VulkanTexture::upload(uint32_t x, uint32_t y, uint32_t w, uint32_t h,
     std::memcpy(staging.mapped, pixels, bytes);
   }
 
-  VkCommandBuffer cmd = m_core->beginOneShot();
+  UploadScope scope(m_device, *m_core, bytes);
+  VkCommandBuffer cmd = scope.cmd();
   transitionImage(cmd, m_image,
                   fromUndefined ? VK_IMAGE_LAYOUT_UNDEFINED
                                 : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, m_mipLevels,
-                  fromUndefined ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
-                                : VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                  fromUndefined ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT : kShaderStages,
                   fromUndefined ? 0 : VK_ACCESS_2_SHADER_READ_BIT,
                   VK_PIPELINE_STAGE_2_TRANSFER_BIT,
                   VK_ACCESS_2_TRANSFER_WRITE_BIT);
@@ -364,7 +395,7 @@ void VulkanTexture::upload(uint32_t x, uint32_t y, uint32_t w, uint32_t h,
   const auto T = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
   const auto W = VK_ACCESS_2_TRANSFER_WRITE_BIT;
   const auto R = VK_ACCESS_2_TRANSFER_READ_BIT;
-  const auto F = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+  const auto F = kShaderStages;
   const auto S = VK_ACCESS_2_SHADER_READ_BIT;
 
   int32_t mw = static_cast<int32_t>(m_width);
@@ -391,8 +422,7 @@ void VulkanTexture::upload(uint32_t x, uint32_t y, uint32_t w, uint32_t h,
   transitionImage(cmd, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_mipLevels - 1, 1,
                   T, W, F, S);
-  m_core->endOneShot(cmd);
-  m_core->destroyAllocation(staging);
+  scope.finish(&staging);
 }
 
 void VulkanTexture::bind() const {
@@ -403,18 +433,16 @@ void VulkanTexture::release() {
   if (m_image == VK_NULL_HANDLE)
     return;
   VulkanCore *core = m_core.get();
-  VkImage image = m_image;
-  VkDeviceMemory memory = m_memory;
+  ImageAlloc image{m_image, m_allocation};
   VkImageView view = m_view;
   VkSampler sampler = m_sampler;
-  core->defer([core, image, memory, view, sampler]() {
+  core->defer([core, image, view, sampler]() mutable {
     vkDestroySampler(core->device, sampler, nullptr);
     vkDestroyImageView(core->device, view, nullptr);
-    vkDestroyImage(core->device, image, nullptr);
-    vkFreeMemory(core->device, memory, nullptr);
+    core->destroyImage(image);
   });
   m_image = VK_NULL_HANDLE;
-  m_memory = VK_NULL_HANDLE;
+  m_allocation = nullptr;
   m_view = VK_NULL_HANDLE;
   m_sampler = VK_NULL_HANDLE;
 }

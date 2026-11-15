@@ -215,6 +215,13 @@ bool VulkanRenderDevice::createDevice() {
   }
   vkGetDeviceQueue(m_core->device, m_core->queueFamily, 0, &m_core->queue);
 
+  m_core->allocator =
+      createGpuAllocator(m_core->instance, m_core->physical, m_core->device);
+  if (!m_core->allocator) {
+    LOG_ERROR("Vulkan: could not create the memory allocator");
+    return false;
+  }
+
   // One timeline semaphore carries frame progress: each submit signals its
   // serial, and anything that needs a frame finished waits for that value.
   VkSemaphoreTypeCreateInfo ti{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
@@ -247,35 +254,28 @@ void VulkanRenderDevice::createFrameObjects() {
 }
 
 bool VulkanRenderDevice::createDepthImage() {
-  VkImageCreateInfo ii{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-  ii.imageType = VK_IMAGE_TYPE_2D;
-  ii.format = m_depthFormat;
-  ii.extent = {m_extent.width, m_extent.height, 1};
-  ii.mipLevels = 1;
-  ii.arrayLayers = 1;
-  ii.samples = VK_SAMPLE_COUNT_1_BIT;
-  ii.tiling = VK_IMAGE_TILING_OPTIMAL;
-  ii.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-  ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  if (vkCreateImage(m_core->device, &ii, nullptr, &m_depthImage) != VK_SUCCESS)
-    return false;
-  VkMemoryRequirements req;
-  vkGetImageMemoryRequirements(m_core->device, m_depthImage, &req);
-  VkMemoryAllocateInfo ai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  ai.allocationSize = req.size;
-  ai.memoryTypeIndex = m_core->findMemoryType(
-      req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  if (vkAllocateMemory(m_core->device, &ai, nullptr, &m_depthMemory) !=
-      VK_SUCCESS)
-    return false;
-  vkBindImageMemory(m_core->device, m_depthImage, m_depthMemory, 0);
-  VkImageViewCreateInfo vi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-  vi.image = m_depthImage;
-  vi.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  vi.format = m_depthFormat;
-  vi.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
-  return vkCreateImageView(m_core->device, &vi, nullptr, &m_depthView) ==
-         VK_SUCCESS;
+  for (DepthTarget &depth : m_depth) {
+    VkImageCreateInfo ii{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    ii.imageType = VK_IMAGE_TYPE_2D;
+    ii.format = m_depthFormat;
+    ii.extent = {m_extent.width, m_extent.height, 1};
+    ii.mipLevels = 1;
+    ii.arrayLayers = 1;
+    ii.samples = VK_SAMPLE_COUNT_1_BIT;
+    ii.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ii.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (!m_core->createImage(ii, /*dedicated=*/true, depth.image))
+      return false;
+    VkImageViewCreateInfo vi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    vi.image = depth.image.image;
+    vi.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    vi.format = m_depthFormat;
+    vi.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    if (vkCreateImageView(m_core->device, &vi, nullptr, &depth.view) != VK_SUCCESS)
+      return false;
+  }
+  return true;
 }
 
 bool VulkanRenderDevice::createSwapchain() {
@@ -388,15 +388,12 @@ void VulkanRenderDevice::destroySwapchain(bool keepHandle) {
   m_renderDone.clear();
   m_imageViews.clear();
   m_images.clear();
-  if (m_depthView)
-    vkDestroyImageView(dev, m_depthView, nullptr);
-  if (m_depthImage)
-    vkDestroyImage(dev, m_depthImage, nullptr);
-  if (m_depthMemory)
-    vkFreeMemory(dev, m_depthMemory, nullptr);
-  m_depthView = VK_NULL_HANDLE;
-  m_depthImage = VK_NULL_HANDLE;
-  m_depthMemory = VK_NULL_HANDLE;
+  for (DepthTarget &depth : m_depth) {
+    if (depth.view)
+      vkDestroyImageView(dev, depth.view, nullptr);
+    depth.view = VK_NULL_HANDLE;
+    m_core->destroyImage(depth.image);
+  }
   if (!keepHandle && m_swapchain) {
     vkDestroySwapchainKHR(dev, m_swapchain, nullptr);
     m_swapchain = VK_NULL_HANDLE;
@@ -529,13 +526,13 @@ bool VulkanRenderDevice::ensureFrame() {
                   VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
                   VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                   VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
-  transitionImage(m_cmd, m_depthImage, VK_IMAGE_LAYOUT_UNDEFINED,
+  // This slot's depth image was last used kFramesInFlight frames ago and that
+  // frame has finished (waitSerial above), so no barrier dependency is needed.
+  transitionImage(m_cmd, m_depth[m_slot].image.image, VK_IMAGE_LAYOUT_UNDEFINED,
                   VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, 0, 1,
                   VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
                       VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                  // The depth image is shared by all frames in flight: this
-                  // orders our first use after the previous frame's last one.
-                  VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                  0,
                   VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
                       VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
                   VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
@@ -561,7 +558,7 @@ void VulkanRenderDevice::beginPass(bool colorOnly) {
     color.clearValue.color.float32[i] = useClearColor ? m_clearColor[i] : (i == 3 ? 1.0f : 0.0f);
 
   VkRenderingAttachmentInfo depth{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  depth.imageView = m_depthView;
+  depth.imageView = m_depth[m_slot].view;
   depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
   depth.loadOp = (m_clearPending || !m_depthInitialised)
                      ? VK_ATTACHMENT_LOAD_OP_CLEAR
@@ -598,6 +595,17 @@ void VulkanRenderDevice::endRendering() {
     vkCmdEndRendering(m_cmd);
     m_rendering = false;
   }
+}
+
+VkCommandBuffer VulkanRenderDevice::beginTransfer(size_t stagingBytes) {
+  // Staging stays alive until the frame it rode in has finished; past this much
+  // a blocking upload (which frees it at once) is the better trade.
+  constexpr size_t kMaxQueuedStaging = 256u << 20;
+  if (m_stagingBytes + stagingBytes > kMaxQueuedStaging || !ensureFrame())
+    return VK_NULL_HANDLE;
+  endRendering(); // transfers cannot be recorded inside a render pass
+  m_stagingBytes += stagingBytes;
+  return m_cmd;
 }
 
 void VulkanRenderDevice::setViewport(int x, int y, int w, int h) {
@@ -698,6 +706,7 @@ void VulkanRenderDevice::present(void * /*windowHandle*/) {
   vkQueueSubmit(m_core->queue, 1, &si, VK_NULL_HANDLE);
   fs.serial = serial;
   ++m_core->recordingSerial;
+  m_stagingBytes = 0;
 
   VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
   pi.waitSemaphoreCount = 1;

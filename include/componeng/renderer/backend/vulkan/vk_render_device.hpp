@@ -100,6 +100,15 @@ public:
   void drawFullscreenTriangle() override;
   void drawIndexedInstanced(size_t indexCount, uint32_t instanceCount) override;
 
+  /**
+   * For a resource about to record texture-upload commands that read
+   * `stagingBytes` of staging memory: returns the frame's command buffer
+   * (outside any render pass) so the upload rides along with the frame. Null
+   * if no frame can be opened or too much staging is queued; the caller then
+   * does a blocking submit.
+   */
+  VkCommandBuffer beginTransfer(size_t stagingBytes);
+
   // Called by the resources' bind()/use().
   void bindTexture(const VulkanTexture *texture) {
     m_unitTexture[m_activeUnit] = texture;
@@ -151,9 +160,13 @@ private:
   std::vector<VkImageView> m_imageViews;
   std::vector<VkSemaphore> m_renderDone;
   VkFormat m_depthFormat = VK_FORMAT_D32_SFLOAT;
-  VkImage m_depthImage = VK_NULL_HANDLE;
-  VkDeviceMemory m_depthMemory = VK_NULL_HANDLE;
-  VkImageView m_depthView = VK_NULL_HANDLE;
+  // One depth image per frame slot: with a single shared one, frame N+1's depth
+  // tests would have to wait for frame N's, serialising the two on the GPU.
+  struct DepthTarget {
+    ImageAlloc image;
+    VkImageView view = VK_NULL_HANDLE;
+  };
+  DepthTarget m_depth[kFramesInFlight];
   bool m_swapDirty = false;
 
   // Everything that is per frame in flight.
@@ -181,6 +194,7 @@ private:
   bool m_rendering = false;
   bool m_colorInitialised = false;
   bool m_depthInitialised = false;
+  size_t m_stagingBytes = 0; // staging queued into the current frame
   bool m_clearPending = false;
   float m_clearColor[4] = {0, 0, 0, 1};
 
