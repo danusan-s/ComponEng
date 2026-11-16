@@ -69,13 +69,15 @@ public:
   // Registers a message type on its channel (Reliable for what must arrive,
   // Unreliable for what goes stale). Every peer must register the same types;
   // unknown ones are counted in rejectedMessages(). Also emits
-  // MessageReceivedEvent<T>.
+  // MessageReceivedEvent<T> unless `emitEvents` is false (engine-internal
+  // messages).
   template <typename T>
-  bool registerMessage(Channel channel = Channel::Reliable) {
+  bool registerMessage(Channel channel = Channel::Reliable,
+                       bool emitEvents = true) {
     if (!m_registry.add<T>(channel)) {
       return false;
     }
-    if (m_registry.contains<T>() &&
+    if (emitEvents && m_registry.contains<T>() &&
         !m_forwarded.count(std::type_index(typeid(T)))) {
       m_forwarded.insert(std::type_index(typeid(T)));
       std::shared_ptr<WorldBinding> binding = m_binding;

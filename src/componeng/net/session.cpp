@@ -104,10 +104,12 @@ public:
       }
     });
 
-    bool ok = m_net.registerMessage<session_msg::JoinRequest>() &&
-              m_net.registerMessage<session_msg::JoinAccept>() &&
-              m_net.registerMessage<session_msg::JoinReject>() &&
-              m_net.registerMessage<session_msg::Hello>();
+    constexpr auto kReliable = Channel::Reliable;
+    bool ok =
+        m_net.registerMessage<session_msg::JoinRequest>(kReliable, false) &&
+        m_net.registerMessage<session_msg::JoinAccept>(kReliable, false) &&
+        m_net.registerMessage<session_msg::JoinReject>(kReliable, false) &&
+        m_net.registerMessage<session_msg::Hello>(kReliable, false);
     if (!ok) {
       LOG_ERROR("Could not register the session messages");
     }

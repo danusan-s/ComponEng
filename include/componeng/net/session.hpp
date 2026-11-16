@@ -101,15 +101,20 @@ public:
   // For diagnostics; messages are addressed by PeerId.
   Address addressOf(PeerId peer) const;
   PeerId peerOf(const Address &address) const;
+  size_t maxReliableMessageSize() const {
+    return m_network.config().maxMessageSize;
+  }
 
-  // Registers T on the Network and arranges SessionMessageEvent<T>. Do it on
-  // every peer before such messages can arrive.
+  // Registers T on the Network and arranges SessionMessageEvent<T> (unless
+  // `emitEvents` is false). Do it on every peer before such messages can
+  // arrive.
   template <typename T>
-  bool registerMessage(Channel channel = Channel::Reliable) {
-    if (!m_network.registerMessage<T>(channel)) {
+  bool registerMessage(Channel channel = Channel::Reliable,
+                       bool emitEvents = true) {
+    if (!m_network.registerMessage<T>(channel, emitEvents)) {
       return false;
     }
-    if (m_forwarded.insert(std::type_index(typeid(T))).second) {
+    if (emitEvents && m_forwarded.insert(std::type_index(typeid(T))).second) {
       std::shared_ptr<Shared> shared = m_shared;
       m_network.onMessage<T>([shared](const Address &from, const T &message) {
         auto it = shared->byAddress.find(from);

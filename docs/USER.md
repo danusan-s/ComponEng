@@ -838,6 +838,47 @@ moves) can use the leader as one. ECS events: `SessionJoinedEvent`,
 `SessionLeaderChangedEvent` and `SessionMessageEvent<T>`
 (`events/session_event.hpp`).
 
+### Shared objects: one owner at a time
+
+For state every peer sees and edits, such as the pieces of a shared jigsaw, use
+`SharedObjects<T>`. Each object is either free or owned by exactly one peer, and
+only its owner may change it, so two players cannot drag the same piece. The
+session's leader decides who gets an object when several ask at once.
+
+```cpp
+struct Piece {
+  float x = 0, y = 0;
+  bool placed = false;
+  template <typename Ar> void serialize(Ar &ar) { ar(x, y, placed); }
+};
+net::SharedObjects<Piece> pieces(session, "jigsaw.pieces"); // same name on every peer
+
+pieces.add(pieces.newId(), Piece{...});        // e.g. the host, once, at the start
+
+pieces.claim(id);                              // on mouse down: ask for it
+pieces.onOwnerChanged([&](net::ObjectId id, net::PeerId owner) { ... });
+pieces.onClaimDenied([&](net::ObjectId id, net::PeerId owner) { ... });
+
+if (pieces.ownedByMe(id)) pieces.update(id, Piece{x, y, false}); // each frame while dragging
+pieces.release(id, Piece{x, y, snapped});      // on mouse up: final state, object is free
+
+if (const Piece *p = pieces.get(id)) draw(*p); // every frame, on every peer
+```
+
+The claim is a request: the game starts dragging when `onOwnerChanged` says it
+owns the piece (or when `ownedByMe` turns true), and gives up if it is denied.
+`update` streams unreliably, so a lost update is replaced by the next one;
+`release` delivers the final state reliably, so a piece always ends where its
+owner dropped it. A peer that leaves frees what it owned. A peer that joins is
+sent the whole set (`onSynced` fires when it has arrived), and the set is
+empty and `synced()` is false until then. State sent with `update` must fit one
+packet (about 1.1 KB); `add` and `release` can be larger.
+
+Callbacks report what other peers did, and the leader's decisions about this
+peer's claims. Ownership operations need an active session; `add`, `remove` and
+`get` also work on a set used alone. Peers are trusted to play by the rules:
+this keeps friends in step, it does not stop a modified client from cheating.
+
 ### Finding games on the local network
 
 A hosting session answers LAN searches by default (`SessionConfig::advertiseOnLan`).

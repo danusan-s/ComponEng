@@ -207,6 +207,7 @@ set(TEST_SOURCES
     tests/test_network.cpp
     tests/test_lan_discovery.cpp
     tests/test_session.cpp
+    tests/test_object_sync.cpp
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})
