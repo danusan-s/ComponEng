@@ -12,6 +12,7 @@ This guide covers what you need to know to build a game or application using Com
 - [Working with Resources](#working-with-resources)
 - [Working with Assets](#working-with-assets)
 - [Emitting and Handling Events](#emitting-and-handling-events)
+- [Networking](#networking)
 
 ---
 
@@ -735,6 +736,80 @@ void DamageSystem::onUpdate(const ecs::SystemState& state) {
     }
 }
 ```
+
+---
+
+## Networking
+
+The engine has a peer-to-peer networking layer: no server is required, any
+instance can connect to any other, and a game works with typed messages rather
+than sockets or bytes. It is idle (no socket, no cost) until you open it.
+
+### Defining messages
+
+A message is a struct with a unique `kName` and one `serialize` function, which
+is used for both writing and reading so the two cannot disagree:
+
+```cpp
+#include "componeng/net/network.hpp"
+
+struct MoveMessage {
+  static constexpr const char *kName = "chess.move";
+  uint8_t from = 0, to = 0, promotion = 0;
+  template <typename Ar> void serialize(Ar &ar) { ar(from, to, promotion); }
+};
+```
+
+Supported field types: `bool`, integers, enums, `float`/`double`, `std::string`,
+`std::vector`, `std::array`, other serializable structs, and the engine's `Vec2`,
+`Vec3`, `Vec4` (include `componeng/net/archive_math.hpp`). Use fixed-width
+integers (`uint32_t`, not `unsigned long` or `size_t`) so peers on different
+platforms agree. Data from the network is untrusted: reads are bounds-checked
+and a malformed message is dropped, but checking that an enum or float holds a
+sensible value is up to the game.
+
+### Opening, connecting, sending
+
+```cpp
+auto &net = world.getResource<componeng::net::Network>();
+
+net.registerMessage<MoveMessage>();                 // reliable, in order
+net.registerMessage<CursorMessage>(net::Channel::Unreliable); // may be lost
+net.open(7777);                      // port 0 picks a free one
+net.setAcceptIncoming(true);         // on the peer that others join
+
+net.connect("192.168.1.20:7777");    // on the peer that joins (numeric IP)
+net.send(peer, MoveMessage{12, 28, 0});
+net.broadcast(MoveMessage{12, 28, 0});             // every connected peer
+```
+
+Every peer registers the same message types. Use `Channel::Reliable` for
+anything that must arrive exactly once and in order (a chess move), and
+`Channel::Unreliable` for what is stale a moment later (a cursor position).
+
+### Receiving
+
+As callbacks (run during the network update), as ECS events, or both:
+
+```cpp
+net.onMessage<MoveMessage>([](const net::Address &from, const MoveMessage &m) { ... });
+net.onPeerConnected([](const net::Address &peer) { ... });
+
+// ECS events, readable the frame after they arrive:
+for (const auto &e : world.getEvents<events::MessageReceivedEvent<MoveMessage>>())
+  use(e.from, e.message);
+// Also: PeerConnectedEvent, PeerDisconnectedEvent, ConnectFailedEvent
+// (events/network_event.hpp).
+```
+
+The engine's `NetworkSystem` runs the network every frame; outside the engine,
+call `net.update(now)` yourself with seconds from a steady clock.
+
+### Scope
+
+LAN and direct-IP play works. Reaching a peer across the internet needs the
+peers' public addresses and, for most home routers, NAT traversal, which is not
+part of the engine yet.
 
 ---
 
