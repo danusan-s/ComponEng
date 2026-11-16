@@ -141,7 +141,8 @@ bool VulkanRenderDevice::pickPhysicalDevice() {
     VkPhysicalDeviceFeatures2 f2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
     f2.pNext = &f13;
     vkGetPhysicalDeviceFeatures2(pd, &f2);
-    if (!f13.dynamicRendering || !f13.synchronization2 || !f12.timelineSemaphore)
+    if (!f13.dynamicRendering || !f13.synchronization2 ||
+        !f13.shaderDemoteToHelperInvocation || !f12.timelineSemaphore)
       continue;
 
     uint32_t qCount = 0;
@@ -193,6 +194,7 @@ bool VulkanRenderDevice::createDevice() {
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
   f13.dynamicRendering = VK_TRUE;
   f13.synchronization2 = VK_TRUE;
+  f13.shaderDemoteToHelperInvocation = VK_TRUE; // glslang compiles `discard` to it
   VkPhysicalDeviceVulkan12Features f12{
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
   f12.timelineSemaphore = VK_TRUE;
