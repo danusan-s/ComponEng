@@ -409,6 +409,21 @@ public:
   /** Present the rendered frame. */
   virtual void present(void *windowHandle) = 0;
 
+  /** Release objects that must go before the window (swapchain, surface). */
+  virtual void shutdown() {
+  }
+
+  /** Dear ImGui hooks; the defaults do nothing. imguiRender draws the UI on
+   *  top of the finished frame, just before present(). */
+  virtual void initImGui(void * /*windowHandle*/) {
+  }
+  virtual void imguiNewFrame() {
+  }
+  virtual void imguiRender() {
+  }
+  virtual void shutdownImGui() {
+  }
+
   /** Check for API errors and log them. Returns error count. */
   virtual int checkErrors() const = 0;
 

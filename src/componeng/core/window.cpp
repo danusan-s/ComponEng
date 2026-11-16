@@ -112,11 +112,16 @@ void Window::init(int width, int height, const char *title) {
     return;
   }
 
+#ifdef COMPONENG_VULKAN
+  // Vulkan owns the surface: GLFW must not create a GL context.
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+#else
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifdef __APPLE__
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+#endif
 #endif
 
   GLFWmonitor *primaryMonitor = glfwGetPrimaryMonitor();
@@ -140,9 +145,11 @@ void Window::init(int width, int height, const char *title) {
     return;
   }
 
+#ifndef COMPONENG_VULKAN
   glfwMakeContextCurrent(m_handle);
 
   glfwSwapInterval(0);
+#endif
 
   Engine &engine = Engine::get();
 
@@ -180,6 +187,9 @@ void Window::setViewport(int w, int h) {
 }
 
 void Window::shutdown() {
+  // Swapchain and surface have to go before the window they belong to.
+  if (m_renderDevice)
+    m_renderDevice->shutdown();
   if (m_handle) {
     glfwDestroyWindow(m_handle);
     m_handle = nullptr;
@@ -192,8 +202,8 @@ bool Window::shouldClose() const {
 }
 
 void Window::swapBuffers() {
-  if (m_handle)
-    glfwSwapBuffers(m_handle);
+  if (m_handle && m_renderDevice)
+    m_renderDevice->present(m_handle);
 }
 
 void Window::pollEvents() {

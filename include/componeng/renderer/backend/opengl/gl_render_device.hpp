@@ -37,6 +37,11 @@ public:
   void present(void *windowHandle) override;
   int checkErrors() const override;
 
+  void initImGui(void *windowHandle) override;
+  void imguiNewFrame() override;
+  void imguiRender() override;
+  void shutdownImGui() override;
+
   void beginGpuTimer() override;
   void endGpuTimer() override;
   double lastGpuTimeMs() const override {

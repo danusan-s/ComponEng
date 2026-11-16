@@ -5,6 +5,7 @@ in vec3 Normal;
 in vec2 TexCoords;
 in vec3 ObjectColor;
 in vec3 WorldNormal;
+flat in float LodFade;
 
 out vec4 FragColor;
 
@@ -36,6 +37,15 @@ uniform int useTextures;
 uniform int useNormalMap;
 
 const float PI = 3.141592653589793;
+
+// LOD cross-fade: LodFade is 0 normally. A fading entity's old mesh has it
+// rising 0 -> 1 and the new mesh -1 -> 0; each discards its share of a fixed
+// screen-space dither (interleaved gradient noise), and the two shares are
+// complementary. The pattern must match in the depth pre-pass and colour pass.
+float lodDither()
+{
+    return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+}
 
 vec3 parseNormal(vec3 normal, sampler2D normalMap, vec2 uv, int useNormalMap) {
     if (useNormalMap == 0) return normalize(normal);
@@ -73,6 +83,15 @@ float geometrySmith(float NdotV, float NdotL, float roughness) {
 
 void main()
 {
+    if (LodFade != 0.0) {
+        float n = lodDither();
+        if (LodFade > 0.0 ? n < LodFade : n >= 1.0 + LodFade) discard;
+    }
+#ifdef COMPONENG_DEPTH_PREPASS
+    // Depth pre-pass of a fading batch: the discard above is all it needed.
+    return;
+#endif
+
     vec3 N = normalize(WorldNormal);
 
     // Sample material properties

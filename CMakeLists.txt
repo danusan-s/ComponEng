@@ -55,6 +55,16 @@ file(GLOB ENGINE_THIRD_PARTY_SOURCES
     "src/third_party/imgui/*.cpp"
 )
 
+if(RENDERER_BACKEND STREQUAL "vulkan")
+    # Device, resources and the ImGui Vulkan backend (already in the third-party glob).
+    file(GLOB VULKAN_BACKEND_SOURCES "src/componeng/renderer/backend/vulkan/*.cpp")
+    list(APPEND ENGINE_FIRST_PARTY_SOURCES ${VULKAN_BACKEND_SOURCES})
+elseif(NOT RENDERER_BACKEND STREQUAL "opengl")
+    message(FATAL_ERROR "RENDERER_BACKEND must be 'opengl' or 'vulkan', got '${RENDERER_BACKEND}'")
+else()
+    list(FILTER ENGINE_THIRD_PARTY_SOURCES EXCLUDE REGEX "imgui_impl_vulkan\\.cpp$")
+endif()
+
 # Remove main.cpp if it exists in src/
 list(FILTER ENGINE_FIRST_PARTY_SOURCES EXCLUDE REGEX ".*main\\.cpp$")
 
@@ -114,39 +124,34 @@ target_link_libraries(ComponEng
 # the OpenGL backend includes it. Public so games that include GLFW agree.
 target_compile_definitions(ComponEng PUBLIC GLFW_INCLUDE_NONE)
 
-# Vulkan backend setup - TEMPORARILY DISABLED as GLSL to SPIR-V conversion is buggy
-# and Vulkan support is not yet implemented
-# if(RENDERER_BACKEND STREQUAL "vulkan")
-#     find_package(Vulkan REQUIRED)
-#
-#     find_program(GLSLC glslc)
-#     if(NOT GLSLC)
-#         message(FATAL_ERROR "glslc not found. Install shaderc or Vulkan SDK.")
-#     endif()
-#
-#     file(GLOB GLSL_SOURCES "assets/shaders/*.vert" "assets/shaders/*.frag")
-#     set(SPIRV_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/spirv")
-#     file(MAKE_DIRECTORY ${SPIRV_OUTPUT_DIR})
-#
-#     set(SPIRV_FILES "")
-#     foreach(glsl ${GLSL_SOURCES})
-#         get_filename_component(filename ${glsl} NAME)
-#         set(spirv "${SPIRV_OUTPUT_DIR}/${filename}.spv")
-#         add_custom_command(
-#             OUTPUT ${spirv}
-#             COMMAND ${GLSLC} -o ${spirv} ${glsl}
-#             DEPENDS ${glsl}
-#             COMMENT "Compiling ${filename} → ${filename}.spv"
-#         )
-#         list(APPEND SPIRV_FILES ${spirv})
-#     endforeach()
-#
-#     add_custom_target(CompileShaders DEPENDS ${SPIRV_FILES})
-#     add_dependencies(GameEngine CompileShaders)
-#
-#     target_link_libraries(GameEngine PUBLIC Vulkan::Vulkan)
-#     target_compile_definitions(GameEngine PUBLIC RENDERER_BACKEND_VULKAN)
-# endif()
+# Vulkan backend (-DRENDERER_BACKEND=vulkan). Needs the Vulkan loader and
+# glslang: GLSL is compiled to SPIR-V at load time, so there is no offline
+# shader step.
+if(RENDERER_BACKEND STREQUAL "vulkan")
+    find_package(Vulkan REQUIRED)
+    find_package(glslang CONFIG REQUIRED)
+
+    target_link_libraries(ComponEng
+        PUBLIC
+            Vulkan::Vulkan
+        PRIVATE
+            glslang::glslang
+            glslang::SPIRV
+            glslang::glslang-default-resource-limits
+    )
+    target_compile_definitions(ComponEng PUBLIC COMPONENG_VULKAN)
+    # `VkFooInfo info{sType};` is the Vulkan idiom; -Wextra flags the rest.
+    set(VULKAN_VMA_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/componeng/renderer/backend/vulkan/vma_impl.cpp")
+    set(VULKAN_FIRST_PARTY_SOURCES ${VULKAN_BACKEND_SOURCES})
+    list(REMOVE_ITEM VULKAN_FIRST_PARTY_SOURCES ${VULKAN_VMA_SOURCE})
+    set_source_files_properties(${VULKAN_FIRST_PARTY_SOURCES} PROPERTIES
+        COMPILE_OPTIONS "-Wno-missing-field-initializers")
+    # Vulkan Memory Allocator is vendored: it is only ever included here.
+    set_source_files_properties(${VULKAN_VMA_SOURCE} PROPERTIES COMPILE_OPTIONS "-w")
+    message(STATUS "Renderer backend: Vulkan")
+else()
+    message(STATUS "Renderer backend: OpenGL")
+endif()
 
 if (EXCLUDE_EXAMPLE)
   message(STATUS "Excluding example executables")

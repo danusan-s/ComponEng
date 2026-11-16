@@ -549,6 +549,43 @@ ones and follows the camera's field of view, and it does not depend on the
 window's resolution. `lodScreenHeight(worldSize, distance, fov)` gives the
 threshold for a switch at a distance you have in mind.
 
+#### Cross-fading between levels
+
+By default a level change dissolves instead of popping. During the transition
+the entity draws both meshes, each through a complementary screen-door (dither)
+pattern, so every pixel shows exactly one of them: no blending, no sorting, one
+extra instance for a fraction of a second. Two `RenderSettings` fields control
+it:
+
+```cpp
+auto &settings = world.getResource<resources::RenderSettings>();
+settings.lodDither = false;        // back to the hard switch
+settings.lodFadeSeconds = 0.5f;    // default 0.35; 0 also means instant
+```
+
+Turning `lodDither` off mid-transition finishes every transition at once. A
+level change back to the level being faded out reverses the fade where it
+stands; a change to a third level mid-fade drops the old mesh at once and fades
+from the level that was coming in.
+
+The bundled `diffuse` and `pbr` shaders can fade. A shader of your own can
+too, by declaring the attribute after its other per-instance ones, passing it
+to the fragment stage, and discarding on it (copy `lodDither()` and the first
+lines of `main` from `assets/shaders/diffuse.frag`, including the
+`COMPONENG_DEPTH_PREPASS` early return, since a batch with fading instances
+runs the fragment stage in the depth pre-pass so both passes discard the same
+pixels):
+
+```glsl
+layout(location = 8) in float instanceFade;   // vertex: 0 = no fade
+flat out float LodFade;                        // ... LodFade = instanceFade;
+```
+
+A material whose shader has no `instanceFade` attribute keeps the hard switch.
+Entities with a `ProceduralInstancesComponent` are not faded. Note that these
+shaders now contain a `discard`: with the depth pre-pass off, that can cost
+early-Z on some GPUs.
+
 ### Textures and buffers from memory
 
 Textures need not come from image files. `createTexture` takes pixels you

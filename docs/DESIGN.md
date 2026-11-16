@@ -446,7 +446,13 @@ const auto& events = world.get_events<CollisionEvent>();
 1. **Query**: Query all entities with TransformComponent, MeshComponent, MaterialComponent
 2. **LOD**: `LodSystem` picks each `LodComponent` entity's mesh from its distance
    to the camera, or from the fraction of the screen's height it covers when
-   the component has a `size` (or hides it beyond the last level)
+   the component has a `size` (or hides it beyond the last level). A level
+   change cross-fades over `RenderSettings::lodFadeSeconds` when `lodDither` is
+   on: `LodSystem` puts the old mesh in `MeshComponent::fadeMeshID` and a
+   signed `fade`, and `BatchingSystem` writes two instances, one per mesh,
+   whose `instanceFade` values are complementary. The fragment shader discards
+   on a screen-space dither pattern, so the two meshes tile the pixels between
+   them. Materials whose shader lacks `instanceFade` keep the hard switch
 3. **Culling**: Test each entity's AABB against view frustum planes
 4. **Batching**: Group visible entities by (meshID, materialID); each entity's
    instance data is written directly into its batch's flat buffer, with the model
@@ -465,6 +471,7 @@ const auto& events = world.get_events<CollisionEvent>();
    material gets `Shader::alphaTestedDepthVariant` instead: the shader's own
    fragment stage compiled with `COMPONENG_DEPTH_PREPASS` defined, with the
    albedo bound, so its `discard` cuts the same holes in depth as in colour
+   (a batch with LOD-fading instances gets this variant too, for the same reason)
 8. **Opaque colour pass**: Draw the opaque batches again, shaded, with depth
    test `Equal` and depth writes off, so only the nearest surface at each pixel
    runs the fragment shader. Then the sky

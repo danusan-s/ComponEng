@@ -1,10 +1,8 @@
 #include "componeng/core/debug_ui.hpp"
 
+#include "componeng/core/engine.hpp"
 #include "componeng/utils/logger.hpp"
 #include "imgui/imgui.h"
-#include "imgui/imgui_impl_glfw.h"
-#include "imgui/imgui_impl_opengl3.h"
-#include <GLFW/glfw3.h>
 
 #include <string>
 #include <vector>
@@ -19,7 +17,7 @@ static bool s_frameActive = false;
 void DebugUI::init() {
   LOG_INFO("Initializing UI System...");
 
-  auto window = glfwGetCurrentContext();
+  Engine &engine = Engine::get();
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -27,20 +25,17 @@ void DebugUI::init() {
   io.FontGlobalScale = 1.5f;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-  ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL3_Init("#version 330");
+  engine.m_world.getRenderDevice().initImGui(engine.m_window.getHandle());
 }
 
 void DebugUI::shutdown() {
   LOG_INFO("Shutting down UI System...");
-  ImGui_ImplOpenGL3_Shutdown();
-  ImGui_ImplGlfw_Shutdown();
+  Engine::get().m_world.getRenderDevice().shutdownImGui();
   ImGui::DestroyContext();
 }
 
 void DebugUI::beginFrame() {
-  ImGui_ImplOpenGL3_NewFrame();
-  ImGui_ImplGlfw_NewFrame();
+  Engine::get().m_world.getRenderDevice().imguiNewFrame();
   ImGui::NewFrame();
   // The default window only exists for the debug panels; without them nothing
   // is added outside a pane of its own.
@@ -54,7 +49,7 @@ void DebugUI::endFrame() {
   if constexpr (kEnabled)
     ImGui::End();
   ImGui::Render();
-  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  Engine::get().m_world.getRenderDevice().imguiRender();
 }
 
 void DebugUI::showFps(float fps, float avgFps) {

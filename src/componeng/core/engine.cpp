@@ -17,7 +17,11 @@
 #include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/render_pass.hpp"
+#ifdef COMPONENG_VULKAN
+#include "componeng/renderer/backend/vulkan/vk_render_device.hpp"
+#else
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
+#endif
 #include "componeng/renderer/batching/batching_system.hpp"
 #include "componeng/renderer/component/light_component.hpp"
 #include "componeng/renderer/component/material_component.hpp"
@@ -305,7 +309,11 @@ void Engine::init() {
   m_world.init();
 
   std::unique_ptr<renderer::api::IRenderDevice> renderDevice =
+#ifdef COMPONENG_VULKAN
+      std::make_unique<renderer::vulkan::VulkanRenderDevice>();
+#else
       std::make_unique<renderer::opengl::GLRenderDevice>();
+#endif
   m_world.setResource<std::unique_ptr<renderer::api::IRenderDevice>>(
       std::move(renderDevice));
 

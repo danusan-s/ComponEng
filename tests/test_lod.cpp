@@ -2,6 +2,7 @@
 
 #include "componeng/renderer/lod/lod_component.hpp"
 #include "componeng/renderer/lod/lod_system.hpp"
+#include "componeng/resources/render_settings.hpp"
 #include "gtest/gtest.h"
 
 using namespace rscene;
@@ -34,9 +35,13 @@ struct LodScene {
     return e;
   }
 
-  void run() {
+  void run(float dt = 0.016f) {
     LodSystem system;
-    system.onUpdate(SystemState{scene->world.get(), 0.016f});
+    system.onUpdate(SystemState{scene->world.get(), dt});
+  }
+
+  resources::RenderSettings &settings() {
+    return scene->world->getResource<resources::RenderSettings>();
   }
 
   MeshComponent &mesh(EntityID e) {
@@ -184,4 +189,170 @@ TEST(LodScreenHeight, ZeroSizeStaysInDistanceMode) {
   EntityID e = s.spawn(30.0f, lod);
   s.run();
   EXPECT_EQ(s.mesh(e).meshID, s.quad);
+}
+
+// Cross-fade
+
+namespace {
+
+// Fade length the tests run with; a step of kFadeStep takes a quarter of it.
+constexpr float kFadeSeconds = 0.4f;
+constexpr float kFadeStep = kFadeSeconds / 4.0f;
+
+struct FadeScene : LodScene {
+  FadeScene() {
+    settings().lodDither = true;
+    settings().lodFadeSeconds = kFadeSeconds;
+  }
+
+  // An entity settled on level 0 (tri) at 5 m, then moved to `d` metres.
+  EntityID settledNearThenMoveTo(float d) {
+    EntityID e = spawn(5.0f, twoLevels(tri, quad));
+    run();
+    scene->world->getComponent<TransformComponent>(e).position.x = kCamX + d;
+    return e;
+  }
+};
+
+} // namespace
+
+TEST(LodFade, TheFirstFrameSettlesWithoutFading) {
+  FadeScene s;
+  EntityID e = s.spawn(30.0f, twoLevels(s.tri, s.quad));
+  s.run();
+  EXPECT_EQ(s.mesh(e).meshID, s.quad);
+  EXPECT_EQ(s.mesh(e).fade, 0.0f);
+  EXPECT_EQ(s.mesh(e).fadeMeshID, 0u);
+}
+
+TEST(LodFade, ALevelChangeDithersTheNewMeshInBesideTheOld) {
+  FadeScene s;
+  EntityID e = s.settledNearThenMoveTo(30.0f);
+  s.run(kFadeStep);
+
+  const MeshComponent &m = s.mesh(e);
+  EXPECT_TRUE(m.visible);
+  EXPECT_EQ(m.meshID, s.quad) << "the incoming mesh is the primary one";
+  EXPECT_EQ(m.fadeMeshID, s.tri) << "the old mesh is drawn beside it";
+  EXPECT_NEAR(m.fade, -0.75f, 1e-5f) << "a quarter of the way in";
+}
+
+TEST(LodFade, TheFadeProgressesWithTimeAndThenSettles) {
+  FadeScene s;
+  EntityID e = s.settledNearThenMoveTo(30.0f);
+
+  s.run(kFadeStep);
+  EXPECT_NEAR(s.mesh(e).fade, -0.75f, 1e-5f);
+  s.run(kFadeStep);
+  EXPECT_NEAR(s.mesh(e).fade, -0.5f, 1e-5f);
+  s.run(kFadeStep);
+  s.run(kFadeStep);
+
+  EXPECT_EQ(s.mesh(e).fade, 0.0f);
+  EXPECT_EQ(s.mesh(e).fadeMeshID, 0u);
+  EXPECT_EQ(s.mesh(e).meshID, s.quad);
+  EXPECT_TRUE(s.mesh(e).visible);
+}
+
+TEST(LodFade, FadingToNothingDithersTheOldMeshOutThenHides) {
+  FadeScene s;
+  EntityID e = s.settledNearThenMoveTo(80.0f); // beyond every level
+  // Level 0 -> hidden: both levels are skipped, so the old mesh is tri.
+  s.run(kFadeStep);
+
+  EXPECT_TRUE(s.mesh(e).visible) << "still on screen while it dissolves";
+  EXPECT_EQ(s.mesh(e).meshID, s.tri);
+  EXPECT_EQ(s.mesh(e).fadeMeshID, 0u);
+  EXPECT_NEAR(s.mesh(e).fade, 0.25f, 1e-5f);
+
+  for (int i = 0; i < 3; ++i) {
+    s.run(kFadeStep);
+  }
+  EXPECT_FALSE(s.mesh(e).visible);
+  EXPECT_EQ(s.mesh(e).fade, 0.0f);
+}
+
+TEST(LodFade, FadingInFromNothingDithersTheNewMeshIn) {
+  FadeScene s;
+  EntityID e = s.spawn(80.0f, twoLevels(s.tri, s.quad));
+  s.run();
+  ASSERT_FALSE(s.mesh(e).visible);
+
+  s.moveCamera(kCamX + 75.0f); // now 5 m away
+  s.run(kFadeStep);
+  EXPECT_TRUE(s.mesh(e).visible);
+  EXPECT_EQ(s.mesh(e).meshID, s.tri);
+  EXPECT_EQ(s.mesh(e).fadeMeshID, 0u) << "nothing to dither out";
+  EXPECT_NEAR(s.mesh(e).fade, -0.75f, 1e-5f);
+}
+
+TEST(LodFade, GoingBackToTheLevelBeingFadedOutReversesTheFade) {
+  FadeScene s;
+  EntityID e = s.settledNearThenMoveTo(30.0f);
+  s.run(kFadeStep);
+  s.run(kFadeStep); // halfway to the far mesh
+  ASSERT_NEAR(s.mesh(e).fade, -0.5f, 1e-5f);
+
+  s.scene->world->getComponent<TransformComponent>(e).position.x = kCamX + 5.0f;
+  s.run(0.0f);
+
+  // Coverage carries over: the near mesh is back, half in.
+  EXPECT_EQ(s.mesh(e).meshID, s.tri);
+  EXPECT_EQ(s.mesh(e).fadeMeshID, s.quad);
+  EXPECT_NEAR(s.mesh(e).fade, -0.5f, 1e-5f);
+
+  s.run(kFadeStep * 2.0f);
+  EXPECT_EQ(s.mesh(e).fade, 0.0f);
+  EXPECT_EQ(s.mesh(e).meshID, s.tri);
+  EXPECT_EQ(s.mesh(e).fadeMeshID, 0u);
+}
+
+TEST(LodFade, ATransitionDoesNotRestartWhileTheLevelHolds) {
+  FadeScene s;
+  EntityID e = s.settledNearThenMoveTo(30.0f);
+  s.run(kFadeStep);
+  s.run(kFadeStep);
+  EXPECT_NEAR(s.mesh(e).fade, -0.5f, 1e-5f) << "kept advancing, not restarted";
+}
+
+TEST(LodFade, SwitchesAtOnceWhenDitheringIsOff) {
+  FadeScene s;
+  s.settings().lodDither = false;
+  EntityID e = s.settledNearThenMoveTo(30.0f);
+  s.run(kFadeStep);
+
+  EXPECT_EQ(s.mesh(e).meshID, s.quad);
+  EXPECT_EQ(s.mesh(e).fade, 0.0f);
+  EXPECT_EQ(s.mesh(e).fadeMeshID, 0u);
+}
+
+TEST(LodFade, SwitchesAtOnceWithAZeroFadeTime) {
+  FadeScene s;
+  s.settings().lodFadeSeconds = 0.0f;
+  EntityID e = s.settledNearThenMoveTo(80.0f);
+  s.run(kFadeStep);
+  EXPECT_FALSE(s.mesh(e).visible);
+  EXPECT_EQ(s.mesh(e).fade, 0.0f);
+}
+
+TEST(LodFade, TurningDitheringOffFinishesATransitionInProgress) {
+  FadeScene s;
+  EntityID e = s.settledNearThenMoveTo(30.0f);
+  s.run(kFadeStep);
+  ASSERT_NE(s.mesh(e).fade, 0.0f);
+
+  s.settings().lodDither = false;
+  s.run(kFadeStep);
+  EXPECT_EQ(s.mesh(e).fade, 0.0f);
+  EXPECT_EQ(s.mesh(e).fadeMeshID, 0u);
+  EXPECT_EQ(s.mesh(e).meshID, s.quad);
+}
+
+TEST(LodFade, TwoLevelsSharingAMeshHaveNothingToFade) {
+  FadeScene s;
+  EntityID e = s.settledNearThenMoveTo(30.0f);
+  s.scene->world->getComponent<LodComponent>(e).mesh[1] = s.tri;
+  s.run(kFadeStep);
+  EXPECT_EQ(s.mesh(e).fade, 0.0f);
+  EXPECT_EQ(s.mesh(e).meshID, s.tri);
 }

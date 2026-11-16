@@ -33,6 +33,9 @@ struct RenderBatch {
 
   uint32_t instanceCount = 0;
   bool procedural = false;
+  // True if any instance carries a LOD cross-fade value, so the depth pre-pass
+  // must run the fragment stage's discard too.
+  bool fading = false;
   std::vector<float> instanceData;
 };
 
@@ -64,6 +67,7 @@ public:
     batch.transparent = transparent;
     batch.instanceCount = 0;
     batch.procedural = false;
+    batch.fading = false;
     batch.instanceData.clear();
     return static_cast<uint32_t>(m_active++);
   }

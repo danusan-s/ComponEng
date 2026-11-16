@@ -4,6 +4,7 @@ in vec3 FragPos;
 in vec4 ObjectColor;
 in vec3 Normal;
 in vec2 TexCoords;
+flat in float LodFade;
 
 uniform sampler2D Tex;
 
@@ -21,8 +22,26 @@ layout(std140) uniform FrameData {
 
 out vec4 FragColor;
 
+// LOD cross-fade: LodFade is 0 normally. A fading entity's old mesh has it
+// rising 0 -> 1 and the new mesh -1 -> 0; each discards its share of a fixed
+// screen-space dither (interleaved gradient noise), and the two shares are
+// complementary. The pattern must match in the depth pre-pass and colour pass.
+float lodDither()
+{
+    return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+}
+
 void main()
 {
+    if (LodFade != 0.0) {
+        float n = lodDither();
+        if (LodFade > 0.0 ? n < LodFade : n >= 1.0 + LodFade) discard;
+    }
+#ifdef COMPONENG_DEPTH_PREPASS
+    // Depth pre-pass of a fading batch: the discard above is all it needed.
+    return;
+#endif
+
     // Normalize inputs
     vec3 normal   = normalize(Normal);
     // vec3 viewDir  = normalize(viewPos - FragPos);
