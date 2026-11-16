@@ -805,11 +805,65 @@ for (const auto &e : world.getEvents<events::MessageReceivedEvent<MoveMessage>>(
 The engine's `NetworkSystem` runs the network every frame; outside the engine,
 call `net.update(now)` yourself with seconds from a steady clock.
 
+### Sessions: more than two peers
+
+`Network` connects peers one pair at a time. For a game with several players,
+use a `Session`: one peer hosts, others join, and every peer ends up connected
+to every other (a mesh). Peers are named by `PeerId` (the host is 0, then 1, 2,
+...), and ids are not reused while the session lives.
+
+```cpp
+auto &session = world.getResource<net::Session>();
+session.registerMessage<PieceMoved>();      // instead of net.registerMessage
+net.open(7777);
+
+session.host({.name = "Jigsaw night"});     // peer 0
+// or, on another machine:
+session.join("192.168.1.20:7777");
+
+session.onJoined([] { /* in, and connected to everyone */ });
+session.onPeerJoined([](net::PeerId id) { ... });
+session.onPeerLeft([](net::PeerId id, net::DisconnectReason why) { ... });
+
+session.broadcast(PieceMoved{...});         // to every other peer
+session.send(2, PieceMoved{...});           // to peer 2
+session.onMessage<PieceMoved>([](net::PeerId from, const PieceMoved &m) { ... });
+```
+
+The **leader** is the one peer that admits joiners and answers LAN searches:
+the host, and if it leaves, the peer with the lowest id. Everything else is
+symmetric; a game that wants an authority (for example to settle conflicting
+moves) can use the leader as one. ECS events: `SessionJoinedEvent`,
+`SessionJoinFailedEvent`, `SessionPeerJoinedEvent`, `SessionPeerLeftEvent`,
+`SessionLeaderChangedEvent` and `SessionMessageEvent<T>`
+(`events/session_event.hpp`).
+
+### Finding games on the local network
+
+A hosting session answers LAN searches by default (`SessionConfig::advertiseOnLan`).
+To list them, use the world's `LanBrowser`:
+
+```cpp
+auto &browser = world.getResource<net::LanBrowser>();
+browser.start(net.config().protocolId);     // same value on every peer of a game
+// each frame, until the player picks one:
+for (const net::LanSessionInfo &s : browser.sessions())
+  show(s.name, s.peers, s.maxPeers);
+session.join(chosen);                       // a LanSessionInfo
+```
+
+Searching asks the broadcast address once a second; nothing is sent while idle.
+If two hosts on one machine use the same discovery port, only one of them hears
+a given search.
+
 ### Scope
 
-LAN and direct-IP play works. Reaching a peer across the internet needs the
-peers' public addresses and, for most home routers, NAT traversal, which is not
-part of the engine yet.
+LAN and direct-IP play works, for up to a handful of peers (every peer keeps a
+connection to every other, so keep `maxPeers` a few under
+`TransportConfig::maxConnections`). Two peers that stay connected to the rest
+but lose contact with each other are not reconnected. Reaching a peer across
+the internet needs the peers' public addresses and, for most home routers, NAT
+traversal, which is not part of the engine yet.
 
 ---
 

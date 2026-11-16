@@ -20,9 +20,10 @@ public:
   UdpSocket(UdpSocket &&other) noexcept;
   UdpSocket &operator=(UdpSocket &&other) noexcept;
 
-  // Binds to `local`, closing any open socket first. False (see lastError()) if
-  // it could not be bound, e.g. the port is taken.
-  bool open(const Address &local);
+  // Binds to `local`, closing any open socket first. `shareAddress` lets
+  // several sockets share a port (broadcasts reach all, unicast only one), as
+  // LAN discovery needs. Sending to the broadcast address is always allowed.
+  bool open(const Address &local, bool shareAddress = false);
   void close() override;
   bool isOpen() const override {
     return m_handle != kNoHandle;

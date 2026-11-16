@@ -150,7 +150,7 @@ UdpSocket &UdpSocket::operator=(UdpSocket &&other) noexcept {
   return *this;
 }
 
-bool UdpSocket::open(const Address &local) {
+bool UdpSocket::open(const Address &local, bool shareAddress) {
   close();
   m_lastError.clear();
   if (!local.isValid()) {
@@ -193,6 +193,24 @@ bool UdpSocket::open(const Address &local) {
                    reinterpret_cast<const char *>(&only), sizeof(only)) != 0) {
       return fail("setting IPV6_V6ONLY");
     }
+  }
+  // Needed to send to the broadcast address (discovery).
+  int enable = 1;
+  if (setsockopt(handle, SOL_SOCKET, SO_BROADCAST,
+                 reinterpret_cast<const char *>(&enable),
+                 sizeof(enable)) != 0) {
+    return fail("setting SO_BROADCAST");
+  }
+  if (shareAddress) {
+    if (setsockopt(handle, SOL_SOCKET, SO_REUSEADDR,
+                   reinterpret_cast<const char *>(&enable),
+                   sizeof(enable)) != 0) {
+      return fail("setting SO_REUSEADDR");
+    }
+#if !defined(_WIN32) && defined(SO_REUSEPORT)
+    // BSD/macOS need this too for broadcasts to reach every socket.
+    setsockopt(handle, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
+#endif
   }
 #ifdef _WIN32
   // Windows would otherwise turn an ICMP "port unreachable" into a recv error,

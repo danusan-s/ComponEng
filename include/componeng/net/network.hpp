@@ -48,6 +48,9 @@ public:
   bool isOpen() const {
     return m_transport != nullptr;
   }
+  const TransportConfig &config() const {
+    return m_config;
+  }
   // The IP is the wildcard: peers need your real one (see publicAddress()).
   Address localAddress() const;
 
@@ -163,6 +166,7 @@ private:
       m_onDisconnected;
   std::vector<std::function<void(const Address &, DisconnectReason)>>
       m_onConnectFailed;
+  TransportConfig m_config;
   uint64_t m_rejectedMessages = 0;
 };
 

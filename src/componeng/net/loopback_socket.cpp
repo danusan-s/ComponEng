@@ -114,9 +114,10 @@ std::unique_ptr<LoopbackSocket> LoopbackNetwork::open(uint16_t port) {
 
 void LoopbackNetwork::deliver(const Address &from, const Address &to,
                               const void *data, size_t size) {
-  // Only 127.0.0.1 exists; a port nobody holds swallows the datagram, as UDP
-  // would.
-  if (to != Address::loopback(to.port(), to.family())) {
+  // Only 127.0.0.1 exists. A broadcast reaches whoever holds the port (ports
+  // are not shared on this network).
+  const bool broadcast = to == Address::ipv4(255, 255, 255, 255, to.port());
+  if (!broadcast && to != Address::loopback(to.port(), to.family())) {
     return;
   }
   auto it = m_sockets.find(to.port());

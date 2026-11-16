@@ -29,6 +29,7 @@ bool Network::open(std::unique_ptr<IDatagramSocket> socket,
     return false;
   }
   m_socket = std::move(socket);
+  m_config = config;
   m_transport = std::make_unique<Transport>(*m_socket, config);
   return true;
 }

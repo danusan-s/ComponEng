@@ -4,9 +4,9 @@
 
 namespace componeng::net {
 
-// Binds the Network to the world for ECS events and updates it once a frame,
-// ahead of the systems that read the results. Does nothing while no Network is
-// open.
+// Binds Network/Session to the world for ECS events and updates them (and the
+// LanBrowser) once a frame, ahead of the systems that read the results. Skips
+// resources that are absent.
 class NetworkSystem final : public ecs::ISystem {
 public:
   void onCreate(const ecs::SystemState &state) override;
