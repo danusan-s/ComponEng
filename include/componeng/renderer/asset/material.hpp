@@ -21,7 +21,8 @@ namespace componeng::renderer {
  * a depth pre-pass (see resources::RenderSettings), so each pixel is shaded
  * once. The RenderSystem owns the blend and depth state of these draws: the
  * material's RenderState supplies only the culling mode. The fragment shader
- * must not `discard`, since the pre-pass would not know about it.
+ * must not `discard`, since the pre-pass would not know about it (the LOD
+ * cross-fade is the exception: see supportsLodFade()).
  *
  * Cutout: opaque, except that the fragment shader may `discard` (an
  * alpha-tested leaf card, a fence, a billboard). Drawn with the opaque batches
@@ -211,7 +212,21 @@ public:
 
   void setVertexLayout(const api::VertexLayout &layout) {
     m_vertexLayout = layout;
+    static const core::Name fadeName("instanceFade");
+    m_lodFadeSlot = findInstanceSlot(layout, fadeName);
     resolveInstanceSlots(layout);
+  }
+
+  /** True if the shader declares a per-instance `instanceFade` float, which
+   *  lets an entity cross-fade between LOD levels (RenderSettings::lodDither).
+   *  The engine writes it after writeInstanceData(); 0 means no fade. */
+  bool supportsLodFade() const {
+    return m_lodFadeSlot.valid();
+  }
+
+  /** Writes `fade` into the instance `out` addresses; see supportsLodFade(). */
+  void writeLodFade(InstanceWriter &out, float fade) const {
+    out.set(m_lodFadeSlot, fade);
   }
 
   /** Called whenever the material receives its vertex layout (registration,
@@ -263,6 +278,7 @@ private:
   core::HandleID m_shaderID = 0;
   core::HandleID m_textureID = 0;
   api::VertexLayout m_vertexLayout;
+  InstanceSlot m_lodFadeSlot;
   MaterialType m_type = MaterialType::Opaque;
   api::RenderState m_renderState;
   float m_boundsPadding = 0.0f;

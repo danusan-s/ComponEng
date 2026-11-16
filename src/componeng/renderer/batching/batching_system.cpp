@@ -84,33 +84,58 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
             continue;
           }
 
-          const DrawKey key{m.meshID, mat.materialID};
-          if (lastBatch == kNoBatch || !(key == lastKey)) {
-            auto [it, inserted] = m_batchIndex.try_emplace(key, kNoBatch);
-            if (inserted) {
-              it->second = renderQueue.openBatch(
-                  key.meshID, key.materialID, material.getShaderID(),
-                  material.getTextureID(), material.isTransparent());
+          // Writes one instance of `meshID` into its batch. `fade` is the
+          // value for the shader's `instanceFade` (0: none).
+          auto emit = [&](core::HandleID meshID, float fade) {
+            const DrawKey key{meshID, mat.materialID};
+            if (lastBatch == kNoBatch || !(key == lastKey)) {
+              auto [it, inserted] = m_batchIndex.try_emplace(key, kNoBatch);
+              if (inserted) {
+                it->second = renderQueue.openBatch(
+                    key.meshID, key.materialID, material.getShaderID(),
+                    material.getTextureID(), material.isTransparent());
+              }
+              lastKey = key;
+              lastBatch = it->second;
+              lastMaterial = &material;
             }
-            lastKey = key;
-            lastBatch = it->second;
-            lastMaterial = &material;
+
+            RenderBatch &batch = renderQueue.batch(lastBatch);
+            const api::VertexLayout &layout = lastMaterial->getVertexLayout();
+            const std::size_t strideFloats = layout.stride / sizeof(float);
+
+            // resize() zero-fills the new instance, so any attribute the
+            // material does not write reads as 0.
+            const std::size_t base = batch.instanceData.size();
+            batch.instanceData.resize(base + strideFloats);
+
+            InstanceWriter writer(layout, batch.instanceData.data() + base);
+            InstanceContext ctx(*state.world, chunk.entity(row),
+                                transforms[row], models[row]);
+            lastMaterial->writeInstanceData(ctx, writer);
+            if (fade != 0.0f) {
+              lastMaterial->writeLodFade(writer, fade);
+              batch.fading = true;
+            }
+            ++batch.instanceCount;
+          };
+
+          if (m.fade == 0.0f) {
+            emit(m.meshID, 0.0f);
+          } else if (!material.supportsLodFade()) {
+            // Its shader cannot dither: keep the hard switch, which shows the
+            // incoming mesh and nothing once the entity is fading to nothing.
+            if (m.fade < 0.0f) {
+              emit(m.meshID, 0.0f);
+            }
+          } else {
+            emit(m.meshID, m.fade);
+            if (m.fadeMeshID != 0) {
+              // The other mesh takes the complementary pattern: where this
+              // one is dithering in at progress t, that one dithers out at t.
+              emit(m.fadeMeshID, m.fade > 0.0f ? m.fade - 1.0f : m.fade + 1.0f);
+            }
           }
-
-          RenderBatch &batch = renderQueue.batch(lastBatch);
-          const api::VertexLayout &layout = lastMaterial->getVertexLayout();
-          const std::size_t strideFloats = layout.stride / sizeof(float);
-
-          // resize() zero-fills the new instance, so any attribute the
-          // material does not write reads as 0.
-          const std::size_t base = batch.instanceData.size();
-          batch.instanceData.resize(base + strideFloats);
-
-          InstanceWriter writer(layout, batch.instanceData.data() + base);
-          InstanceContext ctx(*state.world, chunk.entity(row), transforms[row],
-                              models[row]);
-          lastMaterial->writeInstanceData(ctx, writer);
-          ++batch.instanceCount;
         }
       });
 

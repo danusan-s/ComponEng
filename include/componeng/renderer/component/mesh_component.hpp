@@ -18,6 +18,14 @@ struct MeshComponent {
   // frustum. Kept apart from `visible` so culling cannot un-hide (or hide)
   // anything the application decided.
   bool culled = false;
+
+  // Set by LodSystem during a LOD cross-fade (RenderSettings::lodDither), else
+  // 0 / 0. `fade` is `meshID`'s instanceFade: negative while it dithers in
+  // (-1 invisible .. 0 shown), positive while it dithers out (0 shown .. 1
+  // gone). `fadeMeshID` is the other mesh, drawn with the complementary value
+  // (0: none). Not applied to ProceduralInstancesComponent entities.
+  float fade = 0.0f;
+  core::HandleID fadeMeshID = 0;
 };
 
 } // namespace componeng::renderer

@@ -40,6 +40,13 @@ namespace componeng::renderer {
  * Entities that make up one object (a tree's trunk and leaves) switch
  * together as long as they share a position and ranges (and, in screen-height
  * mode, a size and scale).
+ *
+ * Cross-fade: with RenderSettings::lodDither on (the default) a level change
+ * dissolves over `lodFadeSeconds` instead of popping, drawing both meshes
+ * through complementary dither patterns. The material's shader must declare
+ * `instanceFade` and discard on it (diffuse.frag and pbr.frag do); others keep
+ * the hard switch. Returning to the level being faded out reverses the fade; a
+ * change to a third level restarts it, dropping the old mesh at once.
  */
 struct LodComponent {
   static constexpr const char *component_name = "LodComponent";
@@ -55,6 +62,12 @@ struct LodComponent {
   // Runtime: the level chosen last time, so unchanged entities cost one
   // compare.
   int level = -1;
+
+  // Runtime: cross-fade state. `fromLevel` is the level being faded out
+  // (kMaxLevels for "nothing"), `transition` how far the fade to `level` has
+  // got: 0 just started, 1 settled.
+  int fromLevel = kMaxLevels;
+  float transition = 1.0f;
 };
 
 /**

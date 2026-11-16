@@ -995,3 +995,155 @@ TEST(GpuPassTimers, EmptyPassesAreStillBracketed) {
                                       "end Opaque", "begin Sky", "end Sky",
                                       "begin Transparent", "end Transparent"}));
 }
+
+// LOD cross-fade
+
+namespace {
+
+// diffuse.vert's layout plus the `instanceFade` float after instanceColor.
+api::VertexLayout fadeLayout() {
+  api::VertexLayout layout = diffuseLayout();
+  layout.attributes.push_back({Name("instanceFade"), 80, 1, false, -1});
+  layout.stride = 84;
+  return layout;
+}
+
+constexpr size_t kFadeFloat = 20; // index of instanceFade within an instance
+
+std::unique_ptr<Scene> makeFadeScene() {
+  return makeScene([](fake::Recorder &r) { r.instanceLayout = fadeLayout(); });
+}
+
+// An entity mid cross-fade from `from` to `to` (mesh names).
+EntityID spawnFading(Scene &s, const char *to, const char *from, float fade) {
+  EntityID e = s.spawn(to, "matA");
+  auto &m = s.world->getComponent<MeshComponent>(e);
+  m.meshID = s.assets().getMeshID(to);
+  m.fadeMeshID = from ? s.assets().getMeshID(from) : 0;
+  m.fade = fade;
+  return e;
+}
+
+const fake::Draw *drawWithIndexCount(const fake::Recorder &r, size_t count) {
+  for (const fake::Draw &d : r.draws) {
+    if (d.indexCount == count) {
+      return &d;
+    }
+  }
+  return nullptr;
+}
+
+} // namespace
+
+TEST(LodFadeBatching, MaterialsLearnWhetherTheirShaderCanFade) {
+  auto fade = makeFadeScene();
+  EXPECT_TRUE(fade->assets()
+                  .getMaterial(fade->assets().getMaterialID("matA"))
+                  .supportsLodFade());
+
+  auto plain = makeScene();
+  EXPECT_FALSE(plain->assets()
+                   .getMaterial(plain->assets().getMaterialID("matA"))
+                   .supportsLodFade());
+}
+
+TEST(LodFadeBatching, ACrossFadeDrawsBothMeshesWithComplementaryFades) {
+  auto s = makeFadeScene();
+  spawnFading(*s, "quad", "tri", -0.25f); // quad dithering in, a quarter shown
+  s->frame();
+
+  ASSERT_EQ(s->rec().draws.size(), 2u);
+  const fake::Draw *quad = drawWithIndexCount(s->rec(), 6);
+  const fake::Draw *tri = drawWithIndexCount(s->rec(), 3);
+  ASSERT_TRUE(quad && tri);
+  ASSERT_EQ(quad->instanceFloats.size(), 21u);
+  ASSERT_EQ(tri->instanceFloats.size(), 21u);
+
+  EXPECT_FLOAT_EQ(quad->instanceFloats[kFadeFloat], -0.25f);
+  // Where the new mesh keeps pixels with noise < 0.75, the old keeps the rest.
+  EXPECT_FLOAT_EQ(tri->instanceFloats[kFadeFloat], 0.75f);
+}
+
+TEST(LodFadeBatching, ADitheringOutPrimaryPairsWithAnIncomingSecondary) {
+  auto s = makeFadeScene();
+  spawnFading(*s, "quad", "tri", 0.25f);
+  s->frame();
+
+  const fake::Draw *quad = drawWithIndexCount(s->rec(), 6);
+  const fake::Draw *tri = drawWithIndexCount(s->rec(), 3);
+  ASSERT_TRUE(quad && tri);
+  EXPECT_FLOAT_EQ(quad->instanceFloats[kFadeFloat], 0.25f);
+  EXPECT_FLOAT_EQ(tri->instanceFloats[kFadeFloat], -0.75f);
+}
+
+TEST(LodFadeBatching, FadingToNothingDrawsTheOldMeshAlone) {
+  auto s = makeFadeScene();
+  spawnFading(*s, "tri", nullptr, 0.5f);
+  s->frame();
+
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  EXPECT_FLOAT_EQ(s->rec().draws[0].instanceFloats[kFadeFloat], 0.5f);
+}
+
+TEST(LodFadeBatching, EntitiesNotFadingAreWrittenWithNoFade) {
+  auto s = makeFadeScene();
+  s->spawn("tri", "matA", 0);
+  spawnFading(*s, "tri", "quad", -0.5f);
+  s->frame();
+
+  const fake::Draw *tri = drawWithIndexCount(s->rec(), 3);
+  ASSERT_TRUE(tri);
+  ASSERT_EQ(tri->instanceCount, 2u);
+  std::vector<float> fades = {tri->instanceFloats[kFadeFloat],
+                              tri->instanceFloats[21 + kFadeFloat]};
+  std::sort(fades.begin(), fades.end());
+  EXPECT_FLOAT_EQ(fades[0], -0.5f);
+  EXPECT_FLOAT_EQ(fades[1], 0.0f) << "an ordinary instance reads 0";
+}
+
+TEST(LodFadeBatching, ShadersWithoutAFadeAttributeKeepTheHardSwitch) {
+  auto s = makeScene(); // diffuseLayout: no instanceFade
+  spawnFading(*s, "quad", "tri", -0.25f);
+  s->frame();
+
+  // Only the incoming mesh, and as an ordinary instance.
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  EXPECT_EQ(s->rec().draws[0].indexCount, 6u);
+  EXPECT_EQ(s->rec().draws[0].instanceFloats.size(), 20u);
+}
+
+TEST(LodFadeBatching,
+     ShadersWithoutAFadeAttributeHideAtOnceWhenFadingToNothing) {
+  auto s = makeScene();
+  spawnFading(*s, "tri", nullptr, 0.5f);
+  s->frame();
+  EXPECT_TRUE(s->rec().draws.empty());
+}
+
+TEST(LodFadeBatching, AFadingBatchGetsTheAlphaTestedPrepassVariant) {
+  auto s = makeFadeScene();
+  enablePrepass(*s);
+  spawnFading(*s, "quad", "tri", -0.25f);
+  s->frame();
+
+  // quad and tri batches: depth pass then colour pass, each.
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 4u);
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_TRUE(hasMacro(s->rec().fragmentSources.at(draws[i].shaderId)))
+        << "pre-pass draw " << i << " must discard like the colour pass";
+  }
+  EXPECT_EQ(draws[2].shaderId, 1);
+  EXPECT_EQ(draws[3].shaderId, 1);
+}
+
+TEST(LodFadeBatching, ABatchWithNoFadingInstanceKeepsTheEmptyPrepassShader) {
+  auto s = makeFadeScene();
+  enablePrepass(*s);
+  s->spawn("tri", "matA");
+  s->frame();
+
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 2u);
+  EXPECT_FALSE(hasMacro(s->rec().fragmentSources.at(draws[0].shaderId)));
+}

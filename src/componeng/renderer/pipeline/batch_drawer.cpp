@@ -36,8 +36,11 @@ void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
   // The pre-pass runs the shader's vertex stage with an empty fragment stage,
   // so nothing the fragment stage reads (albedo, PBR textures) needs setting
   // up. A cutout material's pre-pass keeps the fragment stage's alpha test, so
-  // it does read the albedo (and the material's own textures).
-  const bool alphaTestedDepth = depthOnly && material.isAlphaTested();
+  // it does read the albedo (and the material's own textures). So does a batch
+  // with LOD-fading instances: it discards on the fade pattern, and the
+  // pre-pass must cut the same pixels.
+  const bool alphaTestedDepth =
+      depthOnly && (material.isAlphaTested() || batch.fading);
   const bool readsAlbedo = !depthOnly || alphaTestedDepth;
   const Shader &shader =
       !depthOnly         ? colorShader
