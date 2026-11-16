@@ -202,6 +202,7 @@ set(TEST_SOURCES
     tests/test_world.cpp
     tests/test_audio.cpp
     tests/test_net.cpp
+    tests/test_transport.cpp
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})
