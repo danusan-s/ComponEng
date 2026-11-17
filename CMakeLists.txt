@@ -43,12 +43,12 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
 # COMPONENG_DEBUG_UI: the debug panels (camera info, anything a game adds
 #   through DebugUI). OFF turns those calls into empty inlines and leaves only
 #   the FPS window.
-# COMPONENG_PROFILING: measurement. GPU timer queries (frame, render pass,
+# COMPONENG_PROFILING (default OFF): measurement. GPU timer queries (frame, render pass,
 #   shader), per-pass and per-system CPU timings, and the timing panes that
 #   show them. OFF compiles all of that out, for a benchmark or a profile that
 #   should not pay for its own measurement.
 option(COMPONENG_DEBUG_UI "Show the ImGui debug panels (off: only the FPS window)" ON)
-option(COMPONENG_PROFILING "Measure GPU/CPU timings and show the timing panes" ON)
+option(COMPONENG_PROFILING "Measure GPU/CPU timings and show the timing panes" OFF)
 # COMPONENG_NETWORKING: build the ComponEngNet library (peer-to-peer networking).
 #   The engine does not depend on it: a game links ComponEngNet and calls
 #   net::installNetworking(world). OFF skips building it and its tests.

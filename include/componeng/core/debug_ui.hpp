@@ -97,7 +97,7 @@ template <bool Active> struct PanelApi {
  *  - COMPONENG_DEBUG_UI (default ON): the debug panels, i.e. everything a game
  *    or system adds through DebugUI. OFF turns those calls into empty inlines
  *    and leaves only the small FPS window.
- *  - COMPONENG_PROFILING (default ON, see Profiling): the timing panes, drawn
+ *  - COMPONENG_PROFILING (default OFF, see Profiling): the timing panes, drawn
  *    through ProfilerUI.
  * ImGui itself is always built, for the FPS window.
  *

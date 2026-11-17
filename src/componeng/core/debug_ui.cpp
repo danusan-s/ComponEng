@@ -22,9 +22,15 @@ static bool s_tabBarOpen = false;  // and said yes: EndTabBar is owed
 static bool s_tabItemOpen = false; // inside a selected tab: EndTabItem is owed
 static bool s_profilingWindow = false; // we began "Profiling": End is owed
 
-static void firstUseWindowLayout() {
-  ImGui::SetNextWindowPos(ImVec2(40.0f, 40.0f), ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(ImVec2(560.0f, 380.0f), ImGuiCond_FirstUseEver);
+// The panel window sits in the top-left corner and sizes itself to its
+// contents, so no text is ever cut off. It can't be moved or resized by hand.
+static constexpr ImGuiWindowFlags kPanelFlags =
+    ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+    ImGuiWindowFlags_NoSavedSettings;
+
+static void beginPanelWindow(const char *title) {
+  ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
+  ImGui::Begin(title, nullptr, kPanelFlags);
 }
 
 void DebugUI::init(ecs::World &world, void *windowHandle) {
@@ -51,8 +57,7 @@ void DebugUI::beginFrame(ecs::World &world) {
   // The default window only exists for the debug panels; without them nothing
   // is added outside a pane of its own.
   if constexpr (kEnabled) {
-    firstUseWindowLayout();
-    ImGui::Begin("Debug Info");
+    beginPanelWindow("Debug Info");
   }
   s_tabBarTried = s_tabBarOpen = s_tabItemOpen = s_profilingWindow = false;
   s_frameActive = true;
@@ -120,8 +125,7 @@ bool beginTab(const std::string &label) {
   if (!s_tabBarTried) {
     s_tabBarTried = true;
     if constexpr (!kDebugPanelsEnabled) {
-      firstUseWindowLayout();
-      ImGui::Begin("Profiling");
+      beginPanelWindow("Profiling");
       s_profilingWindow = true;
     }
     s_tabBarOpen = ImGui::BeginTabBar("##debug_tabs");
