@@ -34,9 +34,9 @@ enum class DisconnectReason : uint8_t {
 };
 
 struct TransportConfig {
-  // Packets with another value are ignored. Set it per game and change it when
-  // your message formats change.
-  uint32_t protocolId = 0x43455001;
+  // Packets with another value are ignored. Required (Network::open refuses 0):
+  // set it per game and change it when your message formats change.
+  uint32_t protocolId = 0;
 
   // Counts handshaking connections too; more are rejected.
   size_t maxConnections = 16;

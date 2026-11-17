@@ -1,7 +1,5 @@
 #pragma once
 
-#include "componeng/ecs/world.hpp"
-#include "componeng/events/session_event.hpp"
 #include "componeng/net/address.hpp"
 #include "componeng/net/lan_discovery.hpp"
 #include "componeng/net/network.hpp"
@@ -11,9 +9,7 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <typeindex>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 namespace componeng::net {
@@ -112,26 +108,11 @@ public:
     return m_network.config().maxMessageSize;
   }
 
-  // Registers T on the Network and arranges SessionMessageEvent<T> (unless
-  // `emitEvents` is false). Do it on every peer before such messages can
+  // Registers T on the Network. Do it on every peer before such messages can
   // arrive.
   template <typename T>
-  bool registerMessage(Channel channel = Channel::Reliable,
-                       bool emitEvents = true) {
-    if (!m_network.registerMessage<T>(channel, emitEvents)) {
-      return false;
-    }
-    if (emitEvents && m_forwarded.insert(std::type_index(typeid(T))).second) {
-      std::shared_ptr<Shared> shared = m_shared;
-      m_network.onMessage<T>([shared](const Address &from, const T &message) {
-        auto it = shared->byAddress.find(from);
-        if (it != shared->byAddress.end() && shared->world) {
-          shared->world->emitEvent(
-              events::SessionMessageEvent<T>{it->second, message});
-        }
-      });
-    }
-    return true;
+  bool registerMessage(Channel channel = Channel::Reliable) {
+    return m_network.registerMessage<T>(channel);
   }
   // Called with the sender's id; messages from non-peers are dropped.
   template <typename T>
@@ -171,14 +152,9 @@ public:
   // Timeouts, the unidentified-connection sweep and LAN advertising.
   void update(double now);
 
-  void bindWorld(ecs::World *world) {
-    m_shared->world = world;
-  }
-
 private:
   // Shared state, on the heap behind a shared_ptr so handlers survive a move.
   struct Shared {
-    ecs::World *world = nullptr;
     PeerId self = kNoPeer;
     PeerId leader = kNoPeer;
     std::unordered_map<Address, PeerId> byAddress;
@@ -189,7 +165,6 @@ private:
   Network &m_network;
   std::shared_ptr<Shared> m_shared;
   std::shared_ptr<Impl> m_impl;
-  std::unordered_set<std::type_index> m_forwarded;
 };
 
 } // namespace componeng::net

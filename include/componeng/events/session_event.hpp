@@ -5,8 +5,8 @@
 
 namespace componeng::events {
 
-// Emitted when a Session is bound to a world. Readable for one frame: the one
-// after NetworkSystem produced them.
+// Emitted by net::EcsBridge. Readable for one frame: the one after
+// NetworkSystem produced them.
 
 // join() finished: this peer is in the session and connected to all the others.
 struct SessionJoinedEvent {};

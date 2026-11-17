@@ -9,15 +9,14 @@
 
 namespace componeng::net {
 
-Network::Network() : m_binding(std::make_shared<WorldBinding>()) {
-}
+Network::Network() = default;
 
 Network::~Network() = default;
 Network::Network(Network &&) noexcept = default;
 Network &Network::operator=(Network &&) noexcept = default;
 
-bool Network::open(uint16_t port, Address::Family family,
-                   const TransportConfig &config) {
+bool Network::open(uint16_t port, const TransportConfig &config,
+                   Address::Family family) {
   auto socket = std::make_unique<UdpSocket>();
   if (!socket->open(Address::any(port, family))) {
     return false;
@@ -28,6 +27,13 @@ bool Network::open(uint16_t port, Address::Family family,
 bool Network::open(std::unique_ptr<IDatagramSocket> socket,
                    const TransportConfig &config) {
   close();
+  // Zero is "not set": every game must pick its own, or two games on one
+  // network would answer each other's connection requests and LAN searches.
+  if (config.protocolId == 0) {
+    LOG_ERROR("TransportConfig::protocolId must be set to a number of your "
+              "game's own");
+    return false;
+  }
   if (!socket || !socket->isOpen()) {
     return false;
   }
@@ -118,28 +124,17 @@ void Network::dispatch(const Event &event) {
       for (size_t i = 0; i < m_onConnected.size(); ++i) {
         m_onConnected[i](event.peer);
       }
-      if (m_binding->world) {
-        m_binding->world->emitEvent(events::PeerConnectedEvent{event.peer});
-      }
       break;
 
     case Event::Type::Disconnected:
       for (size_t i = 0; i < m_onDisconnected.size(); ++i) {
         m_onDisconnected[i](event.peer, event.reason);
       }
-      if (m_binding->world) {
-        m_binding->world->emitEvent(
-            events::PeerDisconnectedEvent{event.peer, event.reason});
-      }
       break;
 
     case Event::Type::ConnectFailed:
       for (size_t i = 0; i < m_onConnectFailed.size(); ++i) {
         m_onConnectFailed[i](event.peer, event.reason);
-      }
-      if (m_binding->world) {
-        m_binding->world->emitEvent(
-            events::ConnectFailedEvent{event.peer, event.reason});
       }
       break;
 

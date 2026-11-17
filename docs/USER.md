@@ -743,7 +743,31 @@ void DamageSystem::onUpdate(const ecs::SystemState& state) {
 
 The engine has a peer-to-peer networking layer: no server is required, any
 instance can connect to any other, and a game works with typed messages rather
-than sockets or bytes. It is idle (no socket, no cost) until you open it.
+than sockets or bytes.
+
+### Turning it on
+
+Networking is optional and lives in its own library, `ComponEngNet`. A game that
+does not use it contains none of its code. To opt in:
+
+```cmake
+target_link_libraries(MyGame PRIVATE ComponEngNet)   # brings ComponEng along
+```
+
+```cpp
+#include "componeng/net/network_system.hpp"
+
+void init(World &world) override {
+  componeng::net::installNetworking(world);   // creates the resources, once
+  ...
+}
+```
+
+`installNetworking` creates the `Network`, `Session`, `LanBrowser` and `EcsBridge`
+resources and registers `NetworkSystem`, which updates them each frame and, when
+the world shuts down, leaves the session and closes the network. No socket is
+opened until you call `Network::open`. The build option `COMPONENG_NETWORKING`
+(default ON) controls whether `ComponEngNet` and its tests are built at all.
 
 ### Defining messages
 
@@ -775,7 +799,9 @@ auto &net = world.getResource<componeng::net::Network>();
 
 net.registerMessage<MoveMessage>();                 // reliable, in order
 net.registerMessage<CursorMessage>(net::Channel::Unreliable); // may be lost
-net.open(7777);                      // port 0 picks a free one
+net::TransportConfig config;
+config.protocolId = 0x4D594741;      // required: a number of your game's own
+net.open(7777, config);              // port 0 picks a free one
 net.setAcceptIncoming(true);         // on the peer that others join
 
 net.connect("192.168.1.20:7777");    // on the peer that joins (numeric IP)
@@ -783,7 +809,9 @@ net.send(peer, MoveMessage{12, 28, 0});
 net.broadcast(MoveMessage{12, 28, 0});             // every connected peer
 ```
 
-Every peer registers the same message types. Use `Channel::Reliable` for
+`protocolId` identifies your game (and its protocol version): peers with another
+value ignore each other, so two games on one network never mix. `open` refuses
+to run without one. Every peer registers the same message types. Use `Channel::Reliable` for
 anything that must arrive exactly once and in order (a chess move), and
 `Channel::Unreliable` for what is stale a moment later (a cursor position).
 
@@ -795,15 +823,19 @@ As callbacks (run during the network update), as ECS events, or both:
 net.onMessage<MoveMessage>([](const net::Address &from, const MoveMessage &m) { ... });
 net.onPeerConnected([](const net::Address &peer) { ... });
 
-// ECS events, readable the frame after they arrive:
+// ECS events are opt in per message type, through the EcsBridge:
+world.getResource<net::EcsBridge>().forward<MoveMessage>(net);
+// then, in a system, readable the frame after they arrive:
 for (const auto &e : world.getEvents<events::MessageReceivedEvent<MoveMessage>>())
   use(e.from, e.message);
-// Also: PeerConnectedEvent, PeerDisconnectedEvent, ConnectFailedEvent
-// (events/network_event.hpp).
+// Peer events (PeerConnectedEvent, PeerDisconnectedEvent, ConnectFailedEvent) and
+// session events need no opt-in once installNetworking has run
+// (events/network_event.hpp, events/session_event.hpp).
 ```
 
-The engine's `NetworkSystem` runs the network every frame; outside the engine,
-call `net.update(now)` yourself with seconds from a steady clock.
+`NetworkSystem` runs the network every frame. The networking core does not depend
+on the ECS, so it can also be used without `installNetworking`: construct a
+`Network` yourself and call `net.update(now)` with seconds from a steady clock.
 
 ### Sessions: more than two peers
 
@@ -835,8 +867,9 @@ the host, and if it leaves, the peer with the lowest id. Everything else is
 symmetric; a game that wants an authority (for example to settle conflicting
 moves) can use the leader as one. ECS events: `SessionJoinedEvent`,
 `SessionJoinFailedEvent`, `SessionPeerJoinedEvent`, `SessionPeerLeftEvent`,
-`SessionLeaderChangedEvent` and `SessionMessageEvent<T>`
-(`events/session_event.hpp`).
+`SessionLeaderChangedEvent` (all emitted once `installNetworking` has run) and
+`SessionMessageEvent<T>`, which is opt in per type with
+`bridge.forward<T>(session)` (`events/session_event.hpp`).
 
 ### Shared objects: one owner at a time
 

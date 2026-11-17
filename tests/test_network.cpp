@@ -2,10 +2,13 @@
 #include "componeng/events/network_event.hpp"
 #include "componeng/net/archive.hpp"
 #include "componeng/net/archive_math.hpp"
+#include "componeng/net/ecs_bridge.hpp"
 #include "componeng/net/loopback_socket.hpp"
 #include "componeng/net/message_registry.hpp"
 #include "componeng/net/network.hpp"
 #include "componeng/net/network_system.hpp"
+#include "componeng/net/session.hpp"
+#include "net_test_config.hpp"
 #include "gtest/gtest.h"
 
 #include <chrono>
@@ -73,7 +76,7 @@ struct Rig {
 
   Network &add(bool accept = true) {
     auto net = std::make_unique<Network>();
-    EXPECT_TRUE(net->open(loopback.open()));
+    EXPECT_TRUE(net->open(loopback.open(), testConfig()));
     net->setAcceptIncoming(accept);
     nets.push_back(std::move(net));
     return *nets.back();
@@ -400,19 +403,19 @@ TEST(Network, CanBeMovedAfterRegistering) {
 TEST(NetworkSystem, TurnsNetworkActivityIntoWorldEvents) {
   LoopbackNetwork loopback;
   componeng::ecs::World world;
-  world.setResource<Network>(Network());
-  world.registerSystem<NetworkSystem>(
-      componeng::ecs::SystemGroup::Initialization);
+  installNetworking(world);
   world.createSystems();
 
   auto &net = world.getResource<Network>();
   ASSERT_TRUE(net.registerMessage<MoveMessage>());
-  ASSERT_TRUE(net.open(loopback.open()));
+  // Message events are opt in per type; peer events come with the bridge.
+  ASSERT_TRUE(world.getResource<EcsBridge>().forward<MoveMessage>(net));
+  ASSERT_TRUE(net.open(loopback.open(), testConfig()));
   net.setAcceptIncoming(true);
 
   Network remote;
   ASSERT_TRUE(remote.registerMessage<MoveMessage>());
-  ASSERT_TRUE(remote.open(loopback.open()));
+  ASSERT_TRUE(remote.open(loopback.open(), testConfig()));
   Address worldAddress = Address::loopback(net.localAddress().port());
   ASSERT_TRUE(remote.connect(worldAddress));
 
@@ -452,6 +455,67 @@ TEST(NetworkSystem, TurnsNetworkActivityIntoWorldEvents) {
   world.destroySystems();
 }
 
+TEST(NetworkSystem, InstallNetworkingCreatesTheResourcesOnce) {
+  componeng::ecs::World world;
+  EXPECT_FALSE(world.hasResource<Network>());
+  installNetworking(world);
+  EXPECT_TRUE(world.hasResource<Network>());
+  EXPECT_TRUE(world.hasResource<Session>());
+  EXPECT_TRUE(world.hasResource<LanBrowser>());
+  EXPECT_TRUE(world.hasResource<EcsBridge>());
+  installNetworking(world); // a second call changes nothing
+  world.createSystems();
+  world.updateSystems(0.01f);
+  // Nothing is opened until the game asks.
+  EXPECT_FALSE(world.getResource<Network>().isOpen());
+  world.destroySystems();
+}
+
+TEST(NetworkSystem, ClosesTheNetworkAndLeavesTheSessionWhenTheWorldEnds) {
+  LoopbackNetwork loopback;
+  componeng::ecs::World world;
+  installNetworking(world);
+  world.createSystems();
+  auto &net = world.getResource<Network>();
+  ASSERT_TRUE(net.open(loopback.open(), testConfig()));
+  SessionConfig config;
+  config.advertiseOnLan = false;
+  ASSERT_TRUE(world.getResource<Session>().host(config));
+
+  // A guest joins, then the world shuts down: the guest is told.
+  Network guestNet;
+  ASSERT_TRUE(guestNet.open(loopback.open(), testConfig()));
+  Session guest(guestNet);
+  ASSERT_TRUE(guest.join(Address::loopback(net.localAddress().port()), config));
+  bool left = false;
+  guest.onPeerLeft([&](PeerId, DisconnectReason) { left = true; });
+  double now = 0.0;
+  for (int i = 0; i < 300 && !guest.isActive(); ++i) {
+    now += 0.01;
+    world.time = now;
+    world.updateSystems(0.01f);
+    guestNet.update(now);
+    guest.update(now);
+  }
+  ASSERT_TRUE(guest.isActive());
+  world.destroySystems();
+  EXPECT_FALSE(net.isOpen());
+  for (int i = 0; i < 100 && !left; ++i) {
+    now += 0.01;
+    guestNet.update(now);
+    guest.update(now);
+  }
+  EXPECT_TRUE(left);
+}
+
+TEST(Network, OpenRefusesAnUnsetProtocolId) {
+  LoopbackNetwork loopback;
+  Network net;
+  EXPECT_FALSE(net.open(loopback.open(), TransportConfig())); // protocolId 0
+  EXPECT_FALSE(net.isOpen());
+  EXPECT_TRUE(net.open(loopback.open(), testConfig()));
+}
+
 TEST(NetworkSystem, DoesNothingWithoutANetworkResource) {
   componeng::ecs::World world;
   world.registerSystem<NetworkSystem>(
@@ -470,8 +534,8 @@ TEST(Network, PlaysAGameOfMessagesOverRealUdp) {
   ASSERT_TRUE(black.registerMessage<MoveMessage>());
   ASSERT_TRUE(white.registerMessage<ChatMessage>(Channel::Unreliable));
   ASSERT_TRUE(black.registerMessage<ChatMessage>(Channel::Unreliable));
-  ASSERT_TRUE(white.open(0));
-  ASSERT_TRUE(black.open(0));
+  ASSERT_TRUE(white.open(0, testConfig()));
+  ASSERT_TRUE(black.open(0, testConfig()));
   white.setAcceptIncoming(true);
 
   std::vector<MoveMessage> whiteSaw, blackSaw;

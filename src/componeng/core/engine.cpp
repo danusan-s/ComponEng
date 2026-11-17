@@ -10,10 +10,6 @@
 #include "componeng/core/transform_component.hpp"
 #include "componeng/ecs/entity.hpp"
 #include "componeng/input/input_system.hpp"
-#include "componeng/net/lan_discovery.hpp"
-#include "componeng/net/network.hpp"
-#include "componeng/net/network_system.hpp"
-#include "componeng/net/session.hpp"
 #include "componeng/physics/collider_component.hpp"
 #include "componeng/physics/physics_system.hpp"
 #include "componeng/physics/rigidbody_component.hpp"
@@ -329,11 +325,6 @@ void Engine::init() {
   DebugUI::init();
 
   m_world.setResource<audio::AudioManager>(audio::AudioManager());
-  // Idle until the game opens it: no socket, no cost.
-  m_world.setResource<net::Network>(net::Network());
-  m_world.setResource<net::Session>(
-      net::Session(m_world.getResource<net::Network>()));
-  m_world.setResource<net::LanBrowser>(net::LanBrowser());
   auto &audioManager = m_world.getResource<audio::AudioManager>();
   audioManager.init();
 
@@ -415,7 +406,6 @@ void Engine::registerComponents() {
 
 void Engine::registerSystems() {
   m_world.registerSystem<input::InputSystem>(ecs::SystemGroup::Initialization);
-  m_world.registerSystem<net::NetworkSystem>(ecs::SystemGroup::Initialization);
   m_world.registerSystem<physics::PhysicsSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<camera::CameraSystem>(ecs::SystemGroup::Simulation);
   m_world.registerSystem<audio::AudioSystem>(ecs::SystemGroup::Simulation);
@@ -531,10 +521,6 @@ void Engine::shutdown() {
   DebugUI::shutdown();
   auto &assetManager = m_world.getResource<renderer::AssetManager>();
   auto &audioEngine = m_world.getResource<audio::AudioManager>();
-  // The session says goodbye through the network, so it leaves first.
-  m_world.getResource<net::Session>().leave();
-  m_world.getResource<net::LanBrowser>().stop();
-  m_world.getResource<net::Network>().close();
   assetManager.clear();
   audioEngine.shutdown();
   m_window.shutdown();

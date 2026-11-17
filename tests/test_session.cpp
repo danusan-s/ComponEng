@@ -1,10 +1,12 @@
 #include "componeng/ecs/world.hpp"
 #include "componeng/events/session_event.hpp"
+#include "componeng/net/ecs_bridge.hpp"
 #include "componeng/net/lan_discovery.hpp"
 #include "componeng/net/loopback_socket.hpp"
 #include "componeng/net/network.hpp"
 #include "componeng/net/network_system.hpp"
 #include "componeng/net/session.hpp"
+#include "net_test_config.hpp"
 #include "gtest/gtest.h"
 
 #include <chrono>
@@ -44,7 +46,7 @@ struct Member {
   bool paused = false;
 
   explicit Member(LoopbackNetwork &loopback) : session(net) {
-    EXPECT_TRUE(net.open(loopback.open()));
+    EXPECT_TRUE(net.open(loopback.open(), testConfig()));
     EXPECT_TRUE(session.registerMessage<PieceMoved>());
     session.onJoined([this] { ++joined; });
     session.onJoinFailed([this](JoinFailure f) { failures.push_back(f); });
@@ -281,7 +283,7 @@ TEST(Session, MessagesFromStrangersAreNotDelivered) {
 
   // Connects to the host's port but never joins the session.
   Network stranger;
-  ASSERT_TRUE(stranger.open(rig.loopback.open()));
+  ASSERT_TRUE(stranger.open(rig.loopback.open(), testConfig()));
   ASSERT_TRUE(stranger.registerMessage<PieceMoved>());
   ASSERT_TRUE(stranger.connect(host.address()));
   bool sent = false;
@@ -303,7 +305,7 @@ TEST(Session, StrangersAreDroppedAfterAGracePeriod) {
   Member &host = rig.add();
   ASSERT_TRUE(host.session.host(rig.config()));
   Network stranger;
-  ASSERT_TRUE(stranger.open(rig.loopback.open()));
+  ASSERT_TRUE(stranger.open(rig.loopback.open(), testConfig()));
   bool dropped = false;
   stranger.onPeerDisconnected(
       [&](const Address &, DisconnectReason) { dropped = true; });
@@ -586,7 +588,7 @@ TEST(Session, SurvivesBeingMoved) {
   rig.join(guest, host);
   // The Member keeps its Session in place, so build a second one to move.
   Network net;
-  ASSERT_TRUE(net.open(rig.loopback.open()));
+  ASSERT_TRUE(net.open(rig.loopback.open(), testConfig()));
   Session original(net);
   int joined = 0;
   original.onJoined([&] { ++joined; });
@@ -607,7 +609,7 @@ TEST(Session, ADestroyedSessionLeavesTheNetworkHarmless) {
   Member &host = rig.add();
   ASSERT_TRUE(host.session.host(rig.config()));
   Network net;
-  ASSERT_TRUE(net.open(rig.loopback.open()));
+  ASSERT_TRUE(net.open(rig.loopback.open(), testConfig()));
   {
     Session session(net);
     ASSERT_TRUE(session.join(host.address(), rig.config()));
@@ -632,23 +634,21 @@ TEST(Session, ADestroyedSessionLeavesTheNetworkHarmless) {
 TEST(Session, ReportsToTheWorldAsEvents) {
   LoopbackNetwork loopback;
   componeng::ecs::World world;
-  world.setResource<Network>(Network());
-  auto &net = world.getResource<Network>();
-  world.setResource<Session>(Session(net));
-  world.setResource<LanBrowser>(LanBrowser());
-  world.registerSystem<NetworkSystem>(
-      componeng::ecs::SystemGroup::Initialization);
+  installNetworking(world);
   world.createSystems();
 
-  ASSERT_TRUE(net.open(loopback.open()));
+  auto &net = world.getResource<Network>();
+  ASSERT_TRUE(net.open(loopback.open(), testConfig()));
   auto &session = world.getResource<Session>();
   ASSERT_TRUE(session.registerMessage<PieceMoved>());
+  // Session lifecycle events come with the bridge; message events are opt in.
+  ASSERT_TRUE(world.getResource<EcsBridge>().forward<PieceMoved>(session));
   SessionConfig config;
   config.advertiseOnLan = false;
   ASSERT_TRUE(session.host(config));
 
   Network remoteNet;
-  ASSERT_TRUE(remoteNet.open(loopback.open()));
+  ASSERT_TRUE(remoteNet.open(loopback.open(), testConfig()));
   Session remote(remoteNet);
   ASSERT_TRUE(remote.registerMessage<PieceMoved>());
   config.advertiseOnLan = false;
@@ -705,7 +705,7 @@ TEST(Session, ThreePeersFindEachOtherOverRealUdp) {
   Network netA, netB, netC;
   Session a(netA), b(netB), c(netC);
   for (Network *net : {&netA, &netB, &netC}) {
-    ASSERT_TRUE(net->open(0));
+    ASSERT_TRUE(net->open(0, testConfig()));
   }
   for (Session *session : {&a, &b, &c}) {
     ASSERT_TRUE(session->registerMessage<PieceMoved>());

@@ -32,15 +32,15 @@ public:
   void attach(const std::weak_ptr<Impl> &weak) {
     using namespace sync_msg;
     constexpr auto kReliable = Channel::Reliable;
-    bool ok = m_session.registerMessage<Add>(kReliable, false) &&
-              m_session.registerMessage<Remove>(kReliable, false) &&
-              m_session.registerMessage<Claim>(kReliable, false) &&
-              m_session.registerMessage<Owner>(kReliable, false) &&
-              m_session.registerMessage<Deny>(kReliable, false) &&
-              m_session.registerMessage<Release>(kReliable, false) &&
-              m_session.registerMessage<Update>(Channel::Unreliable, false) &&
-              m_session.registerMessage<SnapshotRequest>(kReliable, false) &&
-              m_session.registerMessage<Snapshot>(kReliable, false);
+    bool ok = m_session.registerMessage<Add>(kReliable) &&
+              m_session.registerMessage<Remove>(kReliable) &&
+              m_session.registerMessage<Claim>(kReliable) &&
+              m_session.registerMessage<Owner>(kReliable) &&
+              m_session.registerMessage<Deny>(kReliable) &&
+              m_session.registerMessage<Release>(kReliable) &&
+              m_session.registerMessage<Update>(Channel::Unreliable) &&
+              m_session.registerMessage<SnapshotRequest>(kReliable) &&
+              m_session.registerMessage<Snapshot>(kReliable);
     if (!ok) {
       LOG_ERROR("Could not register the object sync messages");
     }

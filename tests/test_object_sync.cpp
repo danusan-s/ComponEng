@@ -4,6 +4,7 @@
 #include "componeng/net/object_sync.hpp"
 #include "componeng/net/object_sync_messages.hpp"
 #include "componeng/net/session.hpp"
+#include "net_test_config.hpp"
 #include "gtest/gtest.h"
 
 #include <cstdint>
@@ -92,7 +93,7 @@ struct Member {
       : session(net), pieces(session, "test.pieces") {
     auto bad = std::make_unique<BadSocket>(loopback.open(), impairment);
     socket = bad.get();
-    EXPECT_TRUE(net.open(std::move(bad)));
+    EXPECT_TRUE(net.open(std::move(bad), testConfig()));
     pieces.onAdded([this](ObjectId id, const Piece &) { added.push_back(id); });
     pieces.onRemoved([this](ObjectId id) { removed.push_back(id); });
     pieces.onChanged(

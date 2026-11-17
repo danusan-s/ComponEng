@@ -1,7 +1,5 @@
 #pragma once
 
-#include "componeng/ecs/world.hpp"
-#include "componeng/events/network_event.hpp"
 #include "componeng/net/address.hpp"
 #include "componeng/net/idatagram_socket.hpp"
 #include "componeng/net/message_registry.hpp"
@@ -15,8 +13,6 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <typeindex>
-#include <unordered_set>
 #include <vector>
 
 namespace componeng::net {
@@ -27,9 +23,9 @@ namespace componeng::net {
 // Peers are equal: whoever connect()s and whoever accepts get the same kind of
 // connection. For more than two players connect each to each (a mesh).
 //
-// Arrivals come as callbacks (run inside update()) and/or ECS events (next
-// frame; see events/network_event.hpp). NetworkSystem calls update() in the
-// engine; elsewhere call update(now) yourself.
+// Arrivals come as callbacks, run inside update(). The engine's NetworkSystem
+// calls update() each frame (see network_system.hpp); elsewhere call
+// update(now) yourself. ECS events are an opt-in layer (ecs_bridge.hpp).
 class Network {
 public:
   Network();
@@ -41,12 +37,13 @@ public:
   Network &operator=(const Network &) = delete;
 
   // Opens a UDP socket on `port` (0 = any free) on every interface; closes any
-  // previous one.
-  bool open(uint16_t port = 0, Address::Family family = Address::Family::IPv4,
-            const TransportConfig &config = TransportConfig());
+  // previous one. The config is required: its protocolId must be set to a
+  // number of your game's own, or open() fails.
+  bool open(uint16_t port, const TransportConfig &config,
+            Address::Family family = Address::Family::IPv4);
   // Uses a socket you made (e.g. a LoopbackSocket in tests).
   bool open(std::unique_ptr<IDatagramSocket> socket,
-            const TransportConfig &config = TransportConfig());
+            const TransportConfig &config);
   void close();
   bool isOpen() const {
     return m_transport != nullptr;
@@ -97,27 +94,10 @@ public:
 
   // Registers a message type on its channel (Reliable for what must arrive,
   // Unreliable for what goes stale). Every peer must register the same types;
-  // unknown ones are counted in rejectedMessages(). Also emits
-  // MessageReceivedEvent<T> unless `emitEvents` is false (engine-internal
-  // messages).
+  // unknown ones are counted in rejectedMessages().
   template <typename T>
-  bool registerMessage(Channel channel = Channel::Reliable,
-                       bool emitEvents = true) {
-    if (!m_registry.add<T>(channel)) {
-      return false;
-    }
-    if (emitEvents && m_registry.contains<T>() &&
-        !m_forwarded.count(std::type_index(typeid(T)))) {
-      m_forwarded.insert(std::type_index(typeid(T)));
-      std::shared_ptr<WorldBinding> binding = m_binding;
-      m_registry.onReceive<T>([binding](const Address &from, const T &message) {
-        if (binding->world) {
-          binding->world->emitEvent(
-              events::MessageReceivedEvent<T>{from, message});
-        }
-      });
-    }
-    return true;
+  bool registerMessage(Channel channel = Channel::Reliable) {
+    return m_registry.add<T>(channel);
   }
   template <typename T> bool onMessage(MessageRegistry::Handler<T> handler) {
     return m_registry.onReceive<T>(std::move(handler));
@@ -167,22 +147,12 @@ public:
   // `now` is seconds on one steady clock.
   void update(double now);
 
-  void bindWorld(ecs::World *world) {
-    m_binding->world = world;
-  }
-
   // Dropped arrivals: unknown type, wrong channel or unparsable.
   uint64_t rejectedMessages() const {
     return m_rejectedMessages;
   }
 
 private:
-  // Shared with the handlers registerMessage() installs, so moving a Network
-  // (an ECS resource) leaves them valid.
-  struct WorldBinding {
-    ecs::World *world = nullptr;
-  };
-
   void dispatch(const Event &event);
   void updateNatDiscovery(double now);
 
@@ -193,9 +163,7 @@ private:
     std::vector<Address> servers;
   };
 
-  std::shared_ptr<WorldBinding> m_binding;
   MessageRegistry m_registry;
-  std::unordered_set<std::type_index> m_forwarded;
   // The transport refers to the socket, so both live on the heap and survive a
   // move.
   std::unique_ptr<IDatagramSocket> m_socket;

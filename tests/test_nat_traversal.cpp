@@ -3,6 +3,7 @@
 #include "componeng/net/network.hpp"
 #include "componeng/net/session.hpp"
 #include "nat_sim.hpp"
+#include "net_test_config.hpp"
 #include "gtest/gtest.h"
 
 #include <chrono>
@@ -59,7 +60,7 @@ struct World {
     auto nat =
         std::make_unique<nat_sim::NatSocket>(internet, kind, nextPrivatePort++);
     peer->nat = nat.get();
-    EXPECT_TRUE(peer->net.open(std::move(nat)));
+    EXPECT_TRUE(peer->net.open(std::move(nat), testConfig()));
     EXPECT_TRUE(peer->net.registerMessage<Chat>());
     Peer *raw = peer.get();
     peer->net.onMessage<Chat>([raw](const Address &, const Chat &m) {
@@ -302,7 +303,7 @@ TEST(NatTraversal, RealStunServersAnswer) {
     GTEST_SKIP() << "set COMPONENG_REAL_STUN=1 to try the real public servers";
   }
   Network net;
-  ASSERT_TRUE(net.open(0));
+  ASSERT_TRUE(net.open(0, testConfig()));
   bool fired = false, ok = false;
   NatInfo info;
   net.onNatDiscovery([&](bool success, const NatInfo &result) {

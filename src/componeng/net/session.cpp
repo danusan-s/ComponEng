@@ -117,12 +117,11 @@ public:
     });
 
     constexpr auto kReliable = Channel::Reliable;
-    bool ok =
-        m_net.registerMessage<session_msg::JoinRequest>(kReliable, false) &&
-        m_net.registerMessage<session_msg::JoinAccept>(kReliable, false) &&
-        m_net.registerMessage<session_msg::JoinReject>(kReliable, false) &&
-        m_net.registerMessage<session_msg::Hello>(kReliable, false) &&
-        m_net.registerMessage<session_msg::ExpectJoiner>(kReliable, false);
+    bool ok = m_net.registerMessage<session_msg::JoinRequest>(kReliable) &&
+              m_net.registerMessage<session_msg::JoinAccept>(kReliable) &&
+              m_net.registerMessage<session_msg::JoinReject>(kReliable) &&
+              m_net.registerMessage<session_msg::Hello>(kReliable) &&
+              m_net.registerMessage<session_msg::ExpectJoiner>(kReliable);
     if (!ok) {
       LOG_ERROR("Could not register the session messages");
     }
@@ -450,9 +449,6 @@ private:
     for (size_t i = 0; i < onPeerJoinedHandlers.size(); ++i) {
       onPeerJoinedHandlers[i](id);
     }
-    if (m_sh->world) {
-      m_sh->world->emitEvent(events::SessionPeerJoinedEvent{id});
-    }
   }
 
   void removePeer(PeerId id, DisconnectReason reason) {
@@ -464,9 +460,6 @@ private:
     m_sh->byId.erase(it);
     for (size_t i = 0; i < onPeerLeftHandlers.size(); ++i) {
       onPeerLeftHandlers[i](id, reason);
-    }
-    if (m_sh->world) {
-      m_sh->world->emitEvent(events::SessionPeerLeftEvent{id, reason});
     }
 
     // The leader is the lowest id still here; it only changes when the leader
@@ -480,9 +473,6 @@ private:
       for (size_t i = 0; i < onLeaderChangedHandlers.size(); ++i) {
         onLeaderChangedHandlers[i](next);
       }
-      if (m_sh->world) {
-        m_sh->world->emitEvent(events::SessionLeaderChangedEvent{next});
-      }
     }
   }
 
@@ -493,9 +483,6 @@ private:
     m_state = State::Active;
     for (size_t i = 0; i < onJoinedHandlers.size(); ++i) {
       onJoinedHandlers[i]();
-    }
-    if (m_sh->world) {
-      m_sh->world->emitEvent(events::SessionJoinedEvent{});
     }
   }
 
@@ -543,9 +530,6 @@ private:
     reset();
     for (size_t i = 0; i < onJoinFailedHandlers.size(); ++i) {
       onJoinFailedHandlers[i](reason);
-    }
-    if (m_sh->world) {
-      m_sh->world->emitEvent(events::SessionJoinFailedEvent{reason});
     }
   }
 

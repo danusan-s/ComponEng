@@ -35,7 +35,6 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/camera/*.cpp"
     "src/componeng/physics/*.cpp"
     "src/componeng/ecs/*.cpp"
-    "src/componeng/net/*.cpp"
     "src/componeng/utils/*.cpp"
 )
 # Two independent switches for what a build shows and measures. ImGui is always
@@ -50,6 +49,10 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
 #   should not pay for its own measurement.
 option(COMPONENG_DEBUG_UI "Show the ImGui debug panels (off: only the FPS window)" ON)
 option(COMPONENG_PROFILING "Measure GPU/CPU timings and show the timing panes" ON)
+# COMPONENG_NETWORKING: build the ComponEngNet library (peer-to-peer networking).
+#   The engine does not depend on it: a game links ComponEngNet and calls
+#   net::installNetworking(world). OFF skips building it and its tests.
+option(COMPONENG_NETWORKING "Build the optional networking library (ComponEngNet)" ON)
 
 file(GLOB ENGINE_THIRD_PARTY_SOURCES
     "src/third_party/glad/*.c"
@@ -121,11 +124,6 @@ target_link_libraries(ComponEng
         OpenGL::GL
 )
 
-# Winsock is a separate library on Windows; POSIX sockets are part of libc.
-if(WIN32)
-    target_link_libraries(ComponEng PUBLIC ws2_32)
-endif()
-
 # GLFW must not pull in the system GL header: glad provides the GL API, and only
 # the OpenGL backend includes it. Public so games that include GLFW agree.
 target_compile_definitions(ComponEng PUBLIC GLFW_INCLUDE_NONE)
@@ -157,6 +155,25 @@ if(RENDERER_BACKEND STREQUAL "vulkan")
     message(STATUS "Renderer backend: Vulkan")
 else()
     message(STATUS "Renderer backend: OpenGL")
+endif()
+
+# Networking is a library of its own; the engine does not link it. A game opts
+# in with target_link_libraries(Game ComponEngNet), which brings ComponEng along
+# (the ECS glue needs the World).
+if(COMPONENG_NETWORKING)
+    file(GLOB NET_SOURCES "src/componeng/net/*.cpp")
+    add_library(ComponEngNet STATIC ${NET_SOURCES})
+    target_link_libraries(ComponEngNet PUBLIC ComponEng)
+    target_compile_options(ComponEngNet PRIVATE
+        -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror
+    )
+    # Winsock is a separate library on Windows; POSIX sockets are part of libc.
+    if(WIN32)
+        target_link_libraries(ComponEngNet PUBLIC ws2_32)
+    endif()
+    message(STATUS "Networking: ComponEngNet enabled")
+else()
+    message(STATUS "Networking disabled (COMPONENG_NETWORKING=OFF)")
 endif()
 
 if (EXCLUDE_EXAMPLE)
@@ -201,6 +218,9 @@ set(TEST_SOURCES
     tests/test_utils.cpp
     tests/test_world.cpp
     tests/test_audio.cpp
+)
+
+set(NET_TEST_SOURCES
     tests/test_net.cpp
     tests/test_transport.cpp
     tests/test_net_archive.cpp
@@ -218,3 +238,12 @@ foreach(TEST_SRC ${TEST_SOURCES})
     target_link_libraries(${TEST_NAME} PRIVATE ComponEng gtest_main)
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()
+
+if(COMPONENG_NETWORKING)
+    foreach(TEST_SRC ${NET_TEST_SOURCES})
+        get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
+        add_executable(${TEST_NAME} ${TEST_SRC})
+        target_link_libraries(${TEST_NAME} PRIVATE ComponEngNet gtest_main)
+        add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    endforeach()
+endif()

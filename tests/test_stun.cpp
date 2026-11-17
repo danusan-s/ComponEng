@@ -7,6 +7,7 @@
 #include "componeng/net/stun_socket.hpp"
 #include "componeng/net/transport.hpp"
 #include "nat_sim.hpp"
+#include "net_test_config.hpp"
 #include "gtest/gtest.h"
 
 #include <chrono>
@@ -616,7 +617,7 @@ struct NetworkRig {
   NatInfo callbackInfo;
 
   NetworkRig() : one(internet, 3478), two(internet, 3479) {
-    EXPECT_TRUE(net.open(internet.open()));
+    EXPECT_TRUE(net.open(internet.open(), testConfig()));
     net.onNatDiscovery([this](bool ok, const NatInfo &info) {
       callbackFired = true;
       callbackOk = ok;
@@ -706,7 +707,7 @@ TEST(NetworkNat, ClosingWhileLookingUpIsSafe) {
 TEST(NetworkNat, TheStunTrafficDoesNotDisturbTheGame) {
   NetworkRig rig;
   Network other;
-  ASSERT_TRUE(other.open(rig.internet.open()));
+  ASSERT_TRUE(other.open(rig.internet.open(), testConfig()));
   other.setAcceptIncoming(true);
   rig.net.discoverPublicAddress({"127.0.0.1:3478"});
   ASSERT_TRUE(rig.net.connect(Address::loopback(other.localAddress().port())));
