@@ -7,7 +7,7 @@
 
 #include "componeng/net/idatagram_socket.hpp"
 #include "componeng/net/loopback_socket.hpp"
-#include "componeng/net/stun.hpp"
+#include "componeng/net/nat/stun.hpp"
 
 #include <map>
 #include <memory>

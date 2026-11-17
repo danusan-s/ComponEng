@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/net/idatagram_socket.hpp"
-#include "componeng/net/nat_discovery.hpp"
+#include "componeng/net/nat/nat_discovery.hpp"
 
 #include <memory>
 #include <string>

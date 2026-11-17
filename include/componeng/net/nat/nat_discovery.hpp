@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/net/address.hpp"
-#include "componeng/net/stun.hpp"
+#include "componeng/net/nat/stun.hpp"
 
 #include <cstddef>
 #include <cstdint>

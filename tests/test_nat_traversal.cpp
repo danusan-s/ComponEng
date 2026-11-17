@@ -1,5 +1,6 @@
-#include "componeng/net/invite_code.hpp"
 #include "componeng/net/loopback_socket.hpp"
+#include "componeng/net/nat/invite_code.hpp"
+#include "componeng/net/nat/nat_traversal.hpp"
 #include "componeng/net/network.hpp"
 #include "componeng/net/session.hpp"
 #include "nat_sim.hpp"
@@ -33,15 +34,16 @@ struct Chat {
 struct Peer {
   nat_sim::NatSocket *nat = nullptr; // owned by net
   Network net;
+  NatTraversal traversal;
   Session session;
   std::vector<std::string> heard;
   std::vector<DisconnectReason> connectFailures;
 
-  Peer() : session(net) {
+  Peer() : traversal(net), session(net) {
   }
 
   Address publicAddress() const {
-    return net.publicAddress();
+    return traversal.publicAddress();
   }
 };
 
@@ -99,11 +101,11 @@ struct World {
 
   void discover() {
     for (auto &p : peers) {
-      p->net.discoverPublicAddress({"127.0.0.1:3478", "127.0.0.1:3479"});
+      p->traversal.discoverPublicAddress({"127.0.0.1:3478", "127.0.0.1:3479"});
     }
     ASSERT_TRUE(runUntil([&] {
       for (auto &p : peers) {
-        if (p->net.natDiscoveryState() != NatDiscovery::State::Done) {
+        if (p->traversal.discoveryState() != NatDiscovery::State::Done) {
           return false;
         }
       }
@@ -132,9 +134,9 @@ TEST(NatTraversal, ConeAndSymmetricRoutersAreToldApart) {
   Peer &restricted = world.add(NatKind::PortRestricted);
   Peer &symmetric = world.add(NatKind::Symmetric);
   world.discover();
-  EXPECT_EQ(full.net.natType(), NatType::Cone);
-  EXPECT_EQ(restricted.net.natType(), NatType::Cone);
-  EXPECT_EQ(symmetric.net.natType(), NatType::Symmetric);
+  EXPECT_EQ(full.traversal.natType(), NatType::Cone);
+  EXPECT_EQ(restricted.traversal.natType(), NatType::Cone);
+  EXPECT_EQ(symmetric.traversal.natType(), NatType::Symmetric);
 }
 
 // ---- Getting through ----
@@ -162,9 +164,9 @@ TEST(NatTraversal, TheHostPunchingForTheJoinerLetsItIn) {
   host.net.setAcceptIncoming(true);
 
   Address joinersAddress;
-  ASSERT_TRUE(decodeInvite(joiner.net.inviteCode(), joinersAddress));
+  ASSERT_TRUE(decodeInvite(joiner.traversal.inviteCode(), joinersAddress));
   host.net.punch(joinersAddress);
-  ASSERT_TRUE(joiner.net.connectToInvite(host.net.inviteCode()));
+  ASSERT_TRUE(joiner.traversal.connectToInvite(host.traversal.inviteCode()));
   ASSERT_TRUE(world.runUntil([&] {
     return joiner.net.isConnected(host.publicAddress()) &&
            host.net.isConnected(joiner.publicAddress());
@@ -184,8 +186,8 @@ TEST(NatTraversal, BothPeersConnectingToEachOtherAtOnceWorksToo) {
   Peer &a = world.add(NatKind::PortRestricted);
   Peer &b = world.add(NatKind::PortRestricted);
   world.discover();
-  ASSERT_TRUE(a.net.connectToInvite(b.net.inviteCode()));
-  ASSERT_TRUE(b.net.connectToInvite(a.net.inviteCode()));
+  ASSERT_TRUE(a.traversal.connectToInvite(b.traversal.inviteCode()));
+  ASSERT_TRUE(b.traversal.connectToInvite(a.traversal.inviteCode()));
   ASSERT_TRUE(world.runUntil([&] {
     return a.net.isConnected(b.publicAddress()) &&
            b.net.isConnected(a.publicAddress());
@@ -198,7 +200,7 @@ TEST(NatTraversal, AFullConeHostNeedsNoPunching) {
   Peer &joiner = world.add(NatKind::PortRestricted);
   world.discover();
   host.net.setAcceptIncoming(true);
-  ASSERT_TRUE(joiner.net.connectToInvite(host.net.inviteCode()));
+  ASSERT_TRUE(joiner.traversal.connectToInvite(host.traversal.inviteCode()));
   ASSERT_TRUE(world.runUntil(
       [&] { return joiner.net.isConnected(host.publicAddress()); }));
 }
@@ -211,7 +213,7 @@ TEST(NatTraversal, ASymmetricJoinerCanStillReachAnOpenHost) {
   Peer &joiner = world.add(NatKind::Symmetric);
   world.discover();
   host.net.setAcceptIncoming(true);
-  ASSERT_TRUE(joiner.net.connectToInvite(host.net.inviteCode()));
+  ASSERT_TRUE(joiner.traversal.connectToInvite(host.traversal.inviteCode()));
   ASSERT_TRUE(world.runUntil([&] {
     return joiner.net.isConnected(host.publicAddress()) &&
            host.net.peers().size() == 1;
@@ -225,10 +227,10 @@ TEST(NatTraversal, ASymmetricHostCannotBeReachedEvenWithPunching) {
   Peer &host = world.add(NatKind::Symmetric);
   Peer &joiner = world.add(NatKind::PortRestricted);
   world.discover();
-  ASSERT_EQ(host.net.natType(), NatType::Symmetric);
+  ASSERT_EQ(host.traversal.natType(), NatType::Symmetric);
   host.net.setAcceptIncoming(true);
   host.net.punch(joiner.publicAddress(), 20.0);
-  ASSERT_TRUE(joiner.net.connectToInvite(host.net.inviteCode()));
+  ASSERT_TRUE(joiner.traversal.connectToInvite(host.traversal.inviteCode()));
   world.run(8.0);
   EXPECT_FALSE(joiner.net.isConnected(host.publicAddress()));
   EXPECT_EQ(joiner.connectFailures.size(), 1u);
@@ -239,8 +241,8 @@ TEST(NatTraversal, TwoSymmetricPeersCannotReachEachOther) {
   Peer &a = world.add(NatKind::Symmetric);
   Peer &b = world.add(NatKind::Symmetric);
   world.discover();
-  ASSERT_TRUE(a.net.connectToInvite(b.net.inviteCode()));
-  ASSERT_TRUE(b.net.connectToInvite(a.net.inviteCode()));
+  ASSERT_TRUE(a.traversal.connectToInvite(b.traversal.inviteCode()));
+  ASSERT_TRUE(b.traversal.connectToInvite(a.traversal.inviteCode()));
   world.run(8.0);
   EXPECT_FALSE(a.net.isConnected(b.publicAddress()));
   EXPECT_FALSE(b.net.isConnected(a.publicAddress()));
@@ -263,17 +265,17 @@ TEST(NatTraversal, ASessionOfThreeHomesFormsAFullMesh) {
 
   // The first joiner: codes swapped, host punches, joiner joins.
   Address address;
-  ASSERT_TRUE(decodeInvite(first.net.inviteCode(), address));
+  ASSERT_TRUE(decodeInvite(first.traversal.inviteCode(), address));
   host.session.expectJoiner(address);
-  ASSERT_TRUE(decodeInvite(host.net.inviteCode(), address));
+  ASSERT_TRUE(decodeInvite(host.traversal.inviteCode(), address));
   ASSERT_TRUE(first.session.join(address, config));
   ASSERT_TRUE(world.runUntil([&] { return first.session.isActive(); }));
 
   // The second does the same with the host; the leader then introduces it to
   // the first, which punches toward it without being asked by a person.
-  ASSERT_TRUE(decodeInvite(second.net.inviteCode(), address));
+  ASSERT_TRUE(decodeInvite(second.traversal.inviteCode(), address));
   host.session.expectJoiner(address);
-  ASSERT_TRUE(decodeInvite(host.net.inviteCode(), address));
+  ASSERT_TRUE(decodeInvite(host.traversal.inviteCode(), address));
   ASSERT_TRUE(second.session.join(address, config));
   ASSERT_TRUE(world.runUntil([&] {
     return second.session.isActive() && host.session.peerCount() == 3 &&
@@ -303,15 +305,16 @@ TEST(NatTraversal, RealStunServersAnswer) {
     GTEST_SKIP() << "set COMPONENG_REAL_STUN=1 to try the real public servers";
   }
   Network net;
+  NatTraversal traversal(net);
   ASSERT_TRUE(net.open(0, testConfig()));
   bool fired = false, ok = false;
   NatInfo info;
-  net.onNatDiscovery([&](bool success, const NatInfo &result) {
+  traversal.onDiscovery([&](bool success, const NatInfo &result) {
     fired = true;
     ok = success;
     info = result;
   });
-  net.discoverPublicAddress();
+  traversal.discoverPublicAddress();
 
   using Clock = std::chrono::steady_clock;
   auto start = Clock::now();
@@ -324,12 +327,12 @@ TEST(NatTraversal, RealStunServersAnswer) {
   }
   ASSERT_TRUE(fired);
   ASSERT_TRUE(ok);
-  EXPECT_TRUE(net.publicAddress().isValid());
-  EXPECT_FALSE(net.inviteCode().empty());
-  std::cout << "public address: " << net.publicAddress().toString()
-            << "  invite code: " << net.inviteCode() << "  nat: "
-            << (net.natType() == NatType::Cone        ? "cone"
-                : net.natType() == NatType::Symmetric ? "symmetric"
-                                                      : "unknown")
+  EXPECT_TRUE(traversal.publicAddress().isValid());
+  EXPECT_FALSE(traversal.inviteCode().empty());
+  std::cout << "public address: " << traversal.publicAddress().toString()
+            << "  invite code: " << traversal.inviteCode() << "  nat: "
+            << (traversal.natType() == NatType::Cone        ? "cone"
+                : traversal.natType() == NatType::Symmetric ? "symmetric"
+                                                            : "unknown")
             << "\n";
 }

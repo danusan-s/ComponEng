@@ -1,4 +1,4 @@
-#include "componeng/net/nat_discovery.hpp"
+#include "componeng/net/nat/nat_discovery.hpp"
 
 #include <algorithm>
 

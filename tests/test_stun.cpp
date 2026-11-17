@@ -1,10 +1,11 @@
 #include "componeng/net/address.hpp"
-#include "componeng/net/invite_code.hpp"
 #include "componeng/net/loopback_socket.hpp"
-#include "componeng/net/nat_discovery.hpp"
+#include "componeng/net/nat/invite_code.hpp"
+#include "componeng/net/nat/nat_discovery.hpp"
+#include "componeng/net/nat/nat_traversal.hpp"
+#include "componeng/net/nat/stun.hpp"
+#include "componeng/net/nat/stun_socket.hpp"
 #include "componeng/net/network.hpp"
-#include "componeng/net/stun.hpp"
-#include "componeng/net/stun_socket.hpp"
 #include "componeng/net/transport.hpp"
 #include "nat_sim.hpp"
 #include "net_test_config.hpp"
@@ -611,6 +612,7 @@ struct NetworkRig {
   nat_sim::MockStunServer one;
   nat_sim::MockStunServer two;
   Network net;
+  NatTraversal nat{net};
   double now = 0.0;
   bool callbackFired = false;
   bool callbackOk = false;
@@ -618,7 +620,7 @@ struct NetworkRig {
 
   NetworkRig() : one(internet, 3478), two(internet, 3479) {
     EXPECT_TRUE(net.open(internet.open(), testConfig()));
-    net.onNatDiscovery([this](bool ok, const NatInfo &info) {
+    nat.onDiscovery([this](bool ok, const NatInfo &info) {
       callbackFired = true;
       callbackOk = ok;
       callbackInfo = info;
@@ -649,59 +651,59 @@ struct NetworkRig {
 
 TEST(NetworkNat, DiscoversItsPublicAddressFromNumericServers) {
   NetworkRig rig;
-  EXPECT_FALSE(rig.net.publicAddress().isValid());
-  EXPECT_EQ(rig.net.natDiscoveryState(), NatDiscovery::State::Idle);
-  EXPECT_EQ(rig.net.inviteCode(), "");
+  EXPECT_FALSE(rig.nat.publicAddress().isValid());
+  EXPECT_EQ(rig.nat.discoveryState(), NatDiscovery::State::Idle);
+  EXPECT_EQ(rig.nat.inviteCode(), "");
 
-  rig.net.discoverPublicAddress({"127.0.0.1:3478", "127.0.0.1:3479"});
+  rig.nat.discoverPublicAddress({"127.0.0.1:3478", "127.0.0.1:3479"});
   ASSERT_TRUE(rig.runUntil([&] { return rig.callbackFired; }, 10.0, true));
   EXPECT_TRUE(rig.callbackOk);
   Address expected = Address::loopback(rig.net.localAddress().port());
-  EXPECT_EQ(rig.net.publicAddress(), expected);
+  EXPECT_EQ(rig.nat.publicAddress(), expected);
   EXPECT_EQ(rig.callbackInfo.publicAddress, expected);
-  EXPECT_EQ(rig.net.natType(), NatType::Cone);
+  EXPECT_EQ(rig.nat.natType(), NatType::Cone);
   Address decoded;
-  ASSERT_TRUE(decodeInvite(rig.net.inviteCode(), decoded));
+  ASSERT_TRUE(decodeInvite(rig.nat.inviteCode(), decoded));
   EXPECT_EQ(decoded, expected);
 }
 
 TEST(NetworkNat, ResolvesServerNamesInTheBackground) {
   NetworkRig rig;
-  rig.net.discoverPublicAddress({"localhost:3478"});
+  rig.nat.discoverPublicAddress({"localhost:3478"});
   ASSERT_TRUE(rig.runUntil([&] { return rig.callbackFired; }, 10.0, true));
   EXPECT_TRUE(rig.callbackOk);
-  EXPECT_EQ(rig.net.publicAddress(),
+  EXPECT_EQ(rig.nat.publicAddress(),
             Address::loopback(rig.net.localAddress().port()));
 }
 
 TEST(NetworkNat, ReportsFailureWhenNoServerAnswers) {
   NetworkRig rig;
   rig.one.silent = true;
-  rig.net.discoverPublicAddress({"127.0.0.1:3478"});
+  rig.nat.discoverPublicAddress({"127.0.0.1:3478"});
   ASSERT_TRUE(rig.runUntil([&] { return rig.callbackFired; }, 15.0, true));
   EXPECT_FALSE(rig.callbackOk);
-  EXPECT_FALSE(rig.net.publicAddress().isValid());
-  EXPECT_EQ(rig.net.natDiscoveryState(), NatDiscovery::State::Failed);
-  EXPECT_EQ(rig.net.inviteCode(), "");
+  EXPECT_FALSE(rig.nat.publicAddress().isValid());
+  EXPECT_EQ(rig.nat.discoveryState(), NatDiscovery::State::Failed);
+  EXPECT_EQ(rig.nat.inviteCode(), "");
 }
 
 TEST(NetworkNat, ReportsFailureForNamesThatDoNotResolve) {
   NetworkRig rig;
-  rig.net.discoverPublicAddress({"no-such-host.invalid:3478", "garbage", ":5"});
+  rig.nat.discoverPublicAddress({"no-such-host.invalid:3478", "garbage", ":5"});
   ASSERT_TRUE(rig.runUntil([&] { return rig.callbackFired; }, 20.0, true));
   EXPECT_FALSE(rig.callbackOk);
 }
 
 TEST(NetworkNat, ClosingWhileLookingUpIsSafe) {
   NetworkRig rig;
-  rig.net.discoverPublicAddress({"no-such-host.invalid:3478"});
+  rig.nat.discoverPublicAddress({"no-such-host.invalid:3478"});
   rig.net.close();
   rig.step();
-  EXPECT_FALSE(rig.net.publicAddress().isValid());
-  EXPECT_EQ(rig.net.natDiscoveryState(), NatDiscovery::State::Idle);
-  rig.net.discoverPublicAddress();
+  EXPECT_FALSE(rig.nat.publicAddress().isValid());
+  EXPECT_EQ(rig.nat.discoveryState(), NatDiscovery::State::Idle);
+  rig.nat.discoverPublicAddress();
   rig.net.punch(Address::loopback(1));
-  EXPECT_FALSE(rig.net.connectToInvite(encodeInvite(Address::loopback(1))));
+  EXPECT_FALSE(rig.nat.connectToInvite(encodeInvite(Address::loopback(1))));
 }
 
 TEST(NetworkNat, TheStunTrafficDoesNotDisturbTheGame) {
@@ -709,7 +711,7 @@ TEST(NetworkNat, TheStunTrafficDoesNotDisturbTheGame) {
   Network other;
   ASSERT_TRUE(other.open(rig.internet.open(), testConfig()));
   other.setAcceptIncoming(true);
-  rig.net.discoverPublicAddress({"127.0.0.1:3478"});
+  rig.nat.discoverPublicAddress({"127.0.0.1:3478"});
   ASSERT_TRUE(rig.net.connect(Address::loopback(other.localAddress().port())));
   for (int i = 0; i < 600; ++i) {
     rig.step(0.01, true); // the name lookup runs on a real thread
@@ -717,12 +719,12 @@ TEST(NetworkNat, TheStunTrafficDoesNotDisturbTheGame) {
   }
   EXPECT_TRUE(
       rig.net.isConnected(Address::loopback(other.localAddress().port())));
-  EXPECT_TRUE(rig.net.publicAddress().isValid());
+  EXPECT_TRUE(rig.nat.publicAddress().isValid());
   EXPECT_EQ(rig.net.rejectedMessages(), 0u);
 }
 
 TEST(NetworkNat, ConnectToInviteRejectsBadCodes) {
   NetworkRig rig;
-  EXPECT_FALSE(rig.net.connectToInvite("not a code"));
-  EXPECT_FALSE(rig.net.connectToInvite(""));
+  EXPECT_FALSE(rig.nat.connectToInvite("not a code"));
+  EXPECT_FALSE(rig.nat.connectToInvite(""));
 }

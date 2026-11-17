@@ -1,4 +1,4 @@
-#include "componeng/net/invite_code.hpp"
+#include "componeng/net/nat/invite_code.hpp"
 
 #include <cstdint>
 #include <vector>

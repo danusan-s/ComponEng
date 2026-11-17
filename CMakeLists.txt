@@ -159,7 +159,8 @@ endif()
 
 # Networking is a library of its own; the engine does not link it. A game opts
 # in with target_link_libraries(Game ComponEngNet), which brings ComponEng along
-# (the ECS glue needs the World).
+# (the ECS glue needs the World). Internet play (STUN, invite codes) is a second
+# opt-in on top: ComponEngNetNat.
 if(COMPONENG_NETWORKING)
     file(GLOB NET_SOURCES "src/componeng/net/*.cpp")
     add_library(ComponEngNet STATIC ${NET_SOURCES})
@@ -171,7 +172,16 @@ if(COMPONENG_NETWORKING)
     if(WIN32)
         target_link_libraries(ComponEngNet PUBLIC ws2_32)
     endif()
-    message(STATUS "Networking: ComponEngNet enabled")
+
+    # STUN, NAT detection and invite codes: a game that only plays on a LAN
+    # leaves this one out.
+    file(GLOB NAT_SOURCES "src/componeng/net/nat/*.cpp")
+    add_library(ComponEngNetNat STATIC ${NAT_SOURCES})
+    target_link_libraries(ComponEngNetNat PUBLIC ComponEngNet)
+    target_compile_options(ComponEngNetNat PRIVATE
+        -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror
+    )
+    message(STATUS "Networking: ComponEngNet and ComponEngNetNat enabled")
 else()
     message(STATUS "Networking disabled (COMPONENG_NETWORKING=OFF)")
 endif()
@@ -228,6 +238,9 @@ set(NET_TEST_SOURCES
     tests/test_lan_discovery.cpp
     tests/test_session.cpp
     tests/test_object_sync.cpp
+)
+
+set(NAT_TEST_SOURCES
     tests/test_stun.cpp
     tests/test_nat_traversal.cpp
 )
@@ -244,6 +257,13 @@ if(COMPONENG_NETWORKING)
         get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
         add_executable(${TEST_NAME} ${TEST_SRC})
         target_link_libraries(${TEST_NAME} PRIVATE ComponEngNet gtest_main)
+        add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    endforeach()
+
+    foreach(TEST_SRC ${NAT_TEST_SOURCES})
+        get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
+        add_executable(${TEST_NAME} ${TEST_SRC})
+        target_link_libraries(${TEST_NAME} PRIVATE ComponEngNetNat gtest_main)
         add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     endforeach()
 endif()

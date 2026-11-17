@@ -1,4 +1,4 @@
-#include "componeng/net/stun_socket.hpp"
+#include "componeng/net/nat/stun_socket.hpp"
 
 namespace componeng::net {
 

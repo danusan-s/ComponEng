@@ -946,13 +946,18 @@ hole punching, and no server of your own:
 3. **Both send to each other at about the same moment**, which makes each router
    let the other's packets in.
 
+Internet play is a second opt-in on top of networking: link `ComponEngNetNat` and
+create a `NatTraversal` for the `Network` **before it opens** (it wraps the
+socket). A game that only plays on a LAN leaves it out.
+
 ```cpp
 auto &net = world.getResource<net::Network>();
-net.open(0);
-net.onNatDiscovery([&](bool ok, const net::NatInfo &info) {
-  if (ok) show(net.inviteCode());           // "0K10-R218-2E45-0": give this to the other player
+net::NatTraversal nat(net);                 // before net.open
+net.open(0, config);
+nat.onDiscovery([&](bool ok, const net::NatInfo &info) {
+  if (ok) show(nat.inviteCode());           // "0K10-R218-2E45-0": give this to the other player
 });
-net.discoverPublicAddress();                // a second or two
+nat.discoverPublicAddress();                // a second or two
 
 // The player being joined, once they have the joiner's code:
 session.expectJoiner(addressFromCode);      // or net.punch(address) without a session
@@ -962,7 +967,7 @@ if (net::decodeInvite(codeTypedByPlayer, host))
   session.join(host);
 ```
 
-`net.connectToInvite(code)` does the decode and `connect` for a plain `Network`.
+`nat.connectToInvite(code)` does the decode and `connect` for a plain `Network`.
 Peers that join later need no codes: the session's leader introduces them to
 each other. Raise `TransportConfig::connectTimeout` (default 5 s) if players
 exchange codes slowly.
@@ -970,7 +975,7 @@ exchange codes slowly.
 **It works through most home routers, and not through all.** A router that
 gives each destination a different public port (a *symmetric* NAT, common on
 mobile data, some campus and company networks) cannot be punched through, as the
-address STUN reports is only valid toward the STUN server. `net.natType()` says
+address STUN reports is only valid toward the STUN server. `nat.natType()` says
 which you have (`Cone` is fine, `Symmetric` is not), once discovery is done.
 A symmetric peer can still *connect to* a host that is reachable without
 punching (a public IP, a forwarded port, or a "full cone" router). For the rest only a relay (TURN) helps, which the engine does not provide.
