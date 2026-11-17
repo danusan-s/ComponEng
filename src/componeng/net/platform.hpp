@@ -15,6 +15,7 @@
 #else
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -24,6 +25,7 @@
 #include <cerrno>
 #endif
 
+#include <mutex>
 #include <string>
 #include <system_error>
 
@@ -74,6 +76,41 @@ inline void closeSocket(SocketHandle handle) {
   closesocket(handle);
 #else
   ::close(handle);
+#endif
+}
+
+// Winsock must be started before the first socket or lookup and stopped after
+// the last, so users are counted.
+inline std::mutex &stackMutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+inline int &stackUsers() {
+  static int users = 0;
+  return users;
+}
+
+// Each true must be paired with releaseNetwork().
+inline bool acquireNetwork() {
+#ifdef _WIN32
+  std::lock_guard<std::mutex> lock(stackMutex());
+  if (stackUsers() == 0) {
+    WSADATA data;
+    if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
+      return false;
+    }
+  }
+  ++stackUsers();
+#endif
+  return true;
+}
+
+inline void releaseNetwork() {
+#ifdef _WIN32
+  std::lock_guard<std::mutex> lock(stackMutex());
+  if (--stackUsers() == 0) {
+    WSACleanup();
+  }
 #endif
 }
 

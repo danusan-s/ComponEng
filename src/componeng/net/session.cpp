@@ -65,6 +65,18 @@ struct Hello {
   }
 };
 
+// Leader to each peer already in: expect this joiner. Behind a NAT a peer only
+// hears from addresses it has sent to, so peers must reach out as the joiner
+// does.
+struct ExpectJoiner {
+  static constexpr const char *kName = "componeng.session.expect_joiner";
+  uint32_t sessionId = 0;
+  Address joiner;
+  template <typename Ar> void serialize(Ar &ar) {
+    ar(sessionId, joiner);
+  }
+};
+
 } // namespace session_msg
 
 namespace {
@@ -109,7 +121,8 @@ public:
         m_net.registerMessage<session_msg::JoinRequest>(kReliable, false) &&
         m_net.registerMessage<session_msg::JoinAccept>(kReliable, false) &&
         m_net.registerMessage<session_msg::JoinReject>(kReliable, false) &&
-        m_net.registerMessage<session_msg::Hello>(kReliable, false);
+        m_net.registerMessage<session_msg::Hello>(kReliable, false) &&
+        m_net.registerMessage<session_msg::ExpectJoiner>(kReliable, false);
     if (!ok) {
       LOG_ERROR("Could not register the session messages");
     }
@@ -135,6 +148,12 @@ public:
         [weak](const Address &from, const session_msg::Hello &m) {
           if (auto self = weak.lock()) {
             self->onHello(from, m);
+          }
+        });
+    m_net.onMessage<session_msg::ExpectJoiner>(
+        [weak](const Address &from, const session_msg::ExpectJoiner &m) {
+          if (auto self = weak.lock()) {
+            self->onExpectJoiner(from, m);
           }
         });
   }
@@ -309,8 +328,23 @@ private:
     }
     m_net.send(from, accept);
     if (known == m_sh->byAddress.end()) {
+      // The others reach out to the newcomer while it reaches out to them.
+      for (const auto &peer : sortedPeers()) {
+        m_net.send(peer.second, session_msg::ExpectJoiner{m_sessionId, from});
+      }
       addPeer(id, from);
     }
+  }
+
+  void onExpectJoiner(const Address &from, const session_msg::ExpectJoiner &m) {
+    // Only the leader gets to point this peer at an address.
+    auto leader = m_sh->byId.find(m_sh->leader);
+    if (m_state == State::Idle || m.sessionId != m_sessionId ||
+        leader == m_sh->byId.end() || leader->second != from ||
+        !m.joiner.isValid()) {
+      return;
+    }
+    m_net.punch(m.joiner);
   }
 
   void onJoinAccept(const Address &from, const session_msg::JoinAccept &m) {

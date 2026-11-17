@@ -831,6 +831,60 @@ TEST(ObjectSync, ChangesThatArriveBeforeTheSnapshotLandAfterIt) {
   EXPECT_EQ(*late.pieces.get(id), (Piece{8, 8, 8, true}));
 }
 
+// Callbacks run in the middle of the set changing, and a game is free to answer
+// one by changing the set (for example by deleting an object that has just
+// become free). That must be safe whichever way the callback was triggered.
+TEST(ObjectSync, CallbacksMayRemoveObjectsWhileTheSetIsChanging) {
+  Rig rig;
+  Member &a = rig.add();
+  Member &b = rig.add();
+  Member &c = rig.add();
+  ASSERT_TRUE(a.session.host(rig.config()));
+  rig.join(b, a);
+  rig.join(c, a);
+  ASSERT_TRUE(rig.runUntil([&] { return rig.allMeshed(); }));
+
+  std::vector<ObjectId> ids;
+  for (int i = 0; i < 6; ++i) {
+    ids.push_back(a.pieces.newId());
+    a.pieces.add(ids.back(), Piece{float(i), 0, 0, false});
+  }
+  ASSERT_TRUE(rig.runUntil([&] { return c.pieces.size() == 6; }));
+
+  for (Member *m : {&a, &b}) {
+    m->pieces.onOwnerChanged([m](ObjectId id, PeerId owner) {
+      if (owner == kNoPeer) {
+        m->pieces.remove(id);
+      }
+    });
+    m->pieces.onChanged([m](ObjectId id, const Piece &) {
+      if (m->pieces.ownedByMe(id)) {
+        return;
+      }
+      m->pieces.remove(id);
+    });
+  }
+  for (int i = 0; i < 4; ++i) {
+    c.pieces.claim(ids[i]);
+  }
+  ASSERT_TRUE(rig.runUntil([&] {
+    for (int i = 0; i < 4; ++i) {
+      if (a.pieces.ownerOf(ids[i]) != 2) {
+        return false;
+      }
+    }
+    return true;
+  }));
+  c.session.leave();
+  ASSERT_TRUE(rig.runUntil([&] { return a.pieces.size() <= 2; }));
+  EXPECT_EQ(a.pieces.size(), 2u);
+
+  ASSERT_TRUE(b.pieces.claim(ids[4]));
+  ASSERT_TRUE(rig.runUntil([&] { return b.pieces.ownedByMe(ids[4]); }));
+  ASSERT_TRUE(b.pieces.release(ids[4], Piece{9, 9, 9, true}));
+  ASSERT_TRUE(rig.runUntil([&] { return !a.pieces.contains(ids[4]); }));
+}
+
 TEST(ObjectSync, SetsWithDifferentNamesDoNotInterfere) {
   Rig rig;
   Member &a = rig.add();

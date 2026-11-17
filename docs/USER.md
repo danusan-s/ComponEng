@@ -897,14 +897,61 @@ Searching asks the broadcast address once a second; nothing is sent while idle.
 If two hosts on one machine use the same discovery port, only one of them hears
 a given search.
 
+### Playing over the internet
+
+Behind a home router a peer's own address is no use to anyone outside, and the
+router drops packets it did not expect. The engine gets through with STUN and
+hole punching, and no server of your own:
+
+1. **Each peer asks a public STUN server what its address looks like from
+   outside.** The defaults are Google's and Cloudflare's public servers; they
+   are third-party services with no guarantee, and they see your IP.
+2. **The peers swap those addresses themselves**, as a short *invite code*
+   (`0K10-R218-2E45-0`) read out, pasted into a chat, or sent any way you like.
+   STUN cannot introduce peers to each other; this step is yours (or your
+   game's lobby).
+3. **Both send to each other at about the same moment**, which makes each router
+   let the other's packets in.
+
+```cpp
+auto &net = world.getResource<net::Network>();
+net.open(0);
+net.onNatDiscovery([&](bool ok, const net::NatInfo &info) {
+  if (ok) show(net.inviteCode());           // "0K10-R218-2E45-0": give this to the other player
+});
+net.discoverPublicAddress();                // a second or two
+
+// The player being joined, once they have the joiner's code:
+session.expectJoiner(addressFromCode);      // or net.punch(address) without a session
+// The joiner, with the host's code:
+net::Address host;
+if (net::decodeInvite(codeTypedByPlayer, host))
+  session.join(host);
+```
+
+`net.connectToInvite(code)` does the decode and `connect` for a plain `Network`.
+Peers that join later need no codes: the session's leader introduces them to
+each other. Raise `TransportConfig::connectTimeout` (default 5 s) if players
+exchange codes slowly.
+
+**It works through most home routers, and not through all.** A router that
+gives each destination a different public port (a *symmetric* NAT, common on
+mobile data, some campus and company networks) cannot be punched through, as the
+address STUN reports is only valid toward the STUN server. `net.natType()` says
+which you have (`Cone` is fine, `Symmetric` is not), once discovery is done.
+A symmetric peer can still *connect to* a host that is reachable without
+punching (a public IP, a forwarded port, or a "full cone" router). For the rest only a relay (TURN) helps, which the engine does not provide.
+Peers on the same home network as each other, reaching each other through the
+router's public address, may also fail ("hairpinning"); use the LAN address
+there.
+
 ### Scope
 
-LAN and direct-IP play works, for up to a handful of peers (every peer keeps a
-connection to every other, so keep `maxPeers` a few under
-`TransportConfig::maxConnections`). Two peers that stay connected to the rest
-but lose contact with each other are not reconnected. Reaching a peer across
-the internet needs the peers' public addresses and, for most home routers, NAT
-traversal, which is not part of the engine yet.
+LAN play and direct-IP play work, as does internet play through ordinary home
+routers, for up to a handful of peers (every peer keeps a connection to every
+other, so keep `maxPeers` a few under `TransportConfig::maxConnections`). Two
+peers that stay connected to the rest but lose contact with each other are not
+reconnected.
 
 ---
 

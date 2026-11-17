@@ -110,6 +110,10 @@ public:
   // is invalid, already known, or the connection limit is reached.
   bool connect(const Address &remote);
   void disconnect(const Address &remote);
+  // Sends small ignorable packets to `to` for `duration` seconds or until
+  // connected, so this peer's NAT expects traffic from `to`. Use it on the side
+  // being connected to; two peers that connect() to each other already punch.
+  void punch(const Address &to, double duration = 10.0);
   void setAcceptIncoming(bool accept) {
     m_acceptIncoming = accept;
   }
@@ -156,6 +160,14 @@ private:
   std::unordered_map<Address, std::unique_ptr<Connection>> m_connections;
   std::deque<Event> m_events;
   std::vector<std::vector<uint8_t>> m_outgoing;
+
+  struct Punch {
+    Address to;
+    double duration = 0.0;
+    double until = -1.0;
+    double nextSend = 0.0;
+  };
+  std::vector<Punch> m_punches;
 };
 
 } // namespace componeng::net

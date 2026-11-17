@@ -30,6 +30,10 @@ public:
   // untouched on failure.
   static bool parse(const std::string &text, Address &out);
 
+  // Blocking name lookup (can take seconds): keep it off the game loop.
+  static bool resolve(const std::string &host, uint16_t port, Family family,
+                      Address &out);
+
   bool isValid() const {
     return m_family != Family::None;
   }

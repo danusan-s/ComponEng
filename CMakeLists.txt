@@ -208,6 +208,8 @@ set(TEST_SOURCES
     tests/test_lan_discovery.cpp
     tests/test_session.cpp
     tests/test_object_sync.cpp
+    tests/test_stun.cpp
+    tests/test_nat_traversal.cpp
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})

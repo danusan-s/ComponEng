@@ -4,7 +4,6 @@
 #include "platform.hpp"
 
 #include <cstring>
-#include <mutex>
 #include <utility>
 
 #ifdef _WIN32
@@ -21,41 +20,17 @@ namespace {
 using platform::SocketHandle;
 using platform::SockLen;
 
-#ifdef _WIN32
-// Winsock must be started before the first socket and stopped after the last,
-// so sockets are counted.
-std::mutex g_winsockMutex;
-int g_winsockUsers = 0;
-
 bool acquireSockets() {
-  std::lock_guard<std::mutex> lock(g_winsockMutex);
-  if (g_winsockUsers == 0) {
-    WSADATA data;
-    int result = WSAStartup(MAKEWORD(2, 2), &data);
-    if (result != 0) {
-      LOG_ERROR("WSAStartup failed: %s",
-                platform::errorMessage(result).c_str());
-      return false;
-    }
+  if (!platform::acquireNetwork()) {
+    LOG_ERROR("The network stack failed to start");
+    return false;
   }
-  ++g_winsockUsers;
   return true;
 }
 
 void releaseSockets() {
-  std::lock_guard<std::mutex> lock(g_winsockMutex);
-  if (--g_winsockUsers == 0) {
-    WSACleanup();
-  }
+  platform::releaseNetwork();
 }
-#else
-bool acquireSockets() {
-  return true;
-}
-
-void releaseSockets() {
-}
-#endif
 
 bool setNonBlocking(SocketHandle handle) {
 #ifdef _WIN32

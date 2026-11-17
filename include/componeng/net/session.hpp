@@ -74,6 +74,13 @@ public:
   bool join(const LanSessionInfo &info,
             const SessionConfig &config = SessionConfig());
 
+  // Across the internet the joined peer must punch toward the joiner: call this
+  // with the joiner's public address as it calls join(). The leader announces
+  // later joiners to the other peers itself.
+  void expectJoiner(const Address &joinerPublicAddress) {
+    m_network.punch(joinerPublicAddress);
+  }
+
   // Leaves, telling the other peers. No callbacks fire for the leaving peer.
   void leave();
 

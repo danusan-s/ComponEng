@@ -12,6 +12,7 @@ namespace {
 
 // Disconnect and reject are unacked, so send a few copies.
 constexpr int kDisconnectRepeats = 3;
+constexpr double kPunchInterval = 0.25;
 
 } // namespace
 
@@ -129,6 +130,23 @@ void Transport::removeConnection(const Address &peer, DisconnectReason reason) {
   m_events.push_back(std::move(event));
 }
 
+void Transport::punch(const Address &to, double duration) {
+  if (!to.isValid()) {
+    return;
+  }
+  for (Punch &existing : m_punches) {
+    if (existing.to == to) {
+      existing.duration = duration;
+      existing.until = -1.0; // starts over from the next update
+      return;
+    }
+  }
+  Punch punch;
+  punch.to = to;
+  punch.duration = duration;
+  m_punches.push_back(punch);
+}
+
 void Transport::update(double now) {
   uint8_t buffer[kMaxPacketSize];
   size_t received = 0;
@@ -183,6 +201,28 @@ void Transport::update(double now) {
   for (const auto &drop : dropped) {
     removeConnection(drop.first, drop.second);
   }
+
+  // Punching: a packet now and then until connected or time is up; peers ignore
+  // it.
+  for (size_t i = 0; i < m_punches.size();) {
+    Punch &punch = m_punches[i];
+    if (punch.until < 0.0) {
+      punch.until = now + punch.duration;
+      punch.nextSend = now;
+    }
+    if (now >= punch.until || isConnected(punch.to)) {
+      m_punches.erase(m_punches.begin() + static_cast<std::ptrdiff_t>(i));
+      continue;
+    }
+    if (now >= punch.nextSend) {
+      PacketWriter writer;
+      writer.u32(m_config.protocolId);
+      writer.u8(static_cast<uint8_t>(PacketType::Punch));
+      m_socket.sendTo(punch.to, writer.data(), writer.size());
+      punch.nextSend = now + kPunchInterval;
+    }
+    ++i;
+  }
 }
 
 void Transport::handlePacket(const Address &from, const uint8_t *data,
@@ -231,6 +271,8 @@ void Transport::handlePacket(const Address &from, const uint8_t *data,
     }
     case PacketType::Data:
       handleData(from, size, reader, now);
+      break;
+    case PacketType::Punch:
       break;
   }
 }

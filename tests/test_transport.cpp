@@ -752,3 +752,52 @@ TEST(Transport, PeerThatRestartsReplacesItsOldConnection) {
   ASSERT_TRUE(net.runUntil(
       [&] { return !b.messages(Channel::Reliable).empty(); }, 2.0));
 }
+
+// Packet sequence numbers and reliable ids are 16 bits and wrap at 65536; drive
+// both well past it on a bad network.
+TEST(Transport, SequenceNumbersAndMessageIdsSurviveWrappingAround) {
+  Net net;
+  Impairment rough;
+  rough.loss = 0.05;
+  rough.duplicate = 0.05;
+  rough.latency = 0.005;
+  rough.jitter = 0.02;
+  Peer &a = net.add(TransportConfig(), rough);
+  Peer &b = net.add(TransportConfig(), rough);
+  net.connect(a, b);
+
+  const uint32_t total = 80000; // more than 65536 reliable messages
+  uint32_t sent = 0;
+  Bytes filler(1100);
+  uint64_t unreliableSent = 0;
+  bool ok = net.runUntil(
+      [&] {
+        // A reliable burst plus enough unreliable payload for about a dozen
+        // packets per step, so the packet sequence wraps too.
+        for (int i = 0; i < 10 && sent < total; ++i, ++sent) {
+          Bytes payload = counterPayload(sent);
+          EXPECT_TRUE(a.transport->send(b.address, Channel::Reliable,
+                                        payload.data(), payload.size()));
+        }
+        for (int i = 0; i < 12; ++i) {
+          if (a.transport->send(b.address, Channel::Unreliable, filler.data(),
+                                filler.size())) {
+            ++unreliableSent;
+          }
+        }
+        return sent == total && b.messages(Channel::Reliable).size() == total;
+      },
+      600.0);
+  ASSERT_TRUE(ok) << "received " << b.messages(Channel::Reliable).size()
+                  << " of " << total;
+
+  auto received = b.messages(Channel::Reliable);
+  ASSERT_EQ(received.size(), total);
+  for (uint32_t i = 0; i < total; ++i) {
+    ASSERT_EQ(counterOf(received[i]), i) << "message " << i;
+  }
+  EXPECT_GT(a.transport->stats(b.address).packetsSent, 65536u);
+  EXPECT_TRUE(a.transport->isConnected(b.address));
+  EXPECT_TRUE(b.transport->isConnected(a.address));
+  EXPECT_GT(unreliableSent, 0u);
+}

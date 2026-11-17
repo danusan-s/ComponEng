@@ -131,6 +131,7 @@ public:
     }
     if (m_session.isLeader()) {
       decideClaim(m_session.self(), id);
+      flushNotices();
       return true;
     }
     m_pendingClaims.insert(id);
@@ -227,6 +228,39 @@ public:
   std::vector<std::function<void(ObjectId, PeerId)>> onClaimDeniedHandlers;
   std::vector<std::function<void()>> onSyncedHandlers;
 
+  // Callbacks are queued, not run mid-change: the code changing the set holds
+  // references into it, and a callback may delete the very object it is told
+  // about. Notices carry a copy of the state and run once the operation has
+  // finished; a callback that changes the set queues more, run in the same
+  // loop.
+  struct Notice {
+    enum class Kind { Added, Removed, Changed, OwnerChanged, Denied, Synced };
+    Kind kind = Kind::Synced;
+    ObjectId id = 0;
+    PeerId peer = kNoPeer;
+    Bytes state;
+  };
+
+  void notify(Notice::Kind kind, ObjectId id, PeerId peer = kNoPeer,
+              Bytes state = Bytes()) {
+    m_notices.push_back(Notice{kind, id, peer, std::move(state)});
+  }
+
+  void flushNotices() {
+    if (m_flushing) {
+      return;
+    }
+    m_flushing = true;
+    while (!m_notices.empty()) {
+      std::vector<Notice> batch;
+      batch.swap(m_notices);
+      for (const Notice &notice : batch) {
+        dispatch(notice);
+      }
+    }
+    m_flushing = false;
+  }
+
 private:
   struct Object {
     Bytes state;
@@ -266,6 +300,7 @@ private:
     refreshSyncState();
     if (m_synced) {
       apply(from, message);
+      flushNotices();
       return;
     }
     m_buffer.push_back([this, from, message] { apply(from, message); });
@@ -276,12 +311,14 @@ private:
   // These do not touch the set's contents, so they never wait.
   void receive(PeerId from, const sync_msg::Claim &message) {
     applyClaim(from, message);
+    flushNotices();
   }
   void receive(PeerId from, const sync_msg::SnapshotRequest &) {
     sendSnapshot(from);
   }
   void receive(PeerId from, const sync_msg::Snapshot &message) {
     applySnapshot(from, message);
+    flushNotices();
   }
 
   // A set outside any session has nothing to wait for; mid-join it has
@@ -305,9 +342,7 @@ private:
     Object object;
     object.state = m.state;
     auto it = m_objects.emplace(m.id, std::move(object)).first;
-    for (size_t i = 0; i < onAddedHandlers.size(); ++i) {
-      onAddedHandlers[i](m.id, it->second.state);
-    }
+    notify(Notice::Kind::Added, m.id, kNoPeer, it->second.state);
   }
 
   void apply(PeerId, const sync_msg::Remove &m) {
@@ -317,9 +352,7 @@ private:
     }
     m_objects.erase(it);
     m_pendingClaims.erase(m.id);
-    for (size_t i = 0; i < onRemovedHandlers.size(); ++i) {
-      onRemovedHandlers[i](m.id);
-    }
+    notify(Notice::Kind::Removed, m.id);
   }
 
   void apply(PeerId, const sync_msg::Owner &m) {
@@ -337,9 +370,7 @@ private:
     }
     adoptOwner(m.id, it->second, m.owner, m.epoch);
     m_pendingClaims.erase(m.id);
-    for (size_t i = 0; i < onClaimDeniedHandlers.size(); ++i) {
-      onClaimDeniedHandlers[i](m.id, m.owner);
-    }
+    notify(Notice::Kind::Denied, m.id, m.owner);
   }
 
   void apply(PeerId, const sync_msg::Release &m) {
@@ -350,9 +381,7 @@ private:
     Object &object = it->second;
     object.state = m.state;
     ++object.version;
-    for (size_t i = 0; i < onChangedHandlers.size(); ++i) {
-      onChangedHandlers[i](m.id, object.state);
-    }
+    notify(Notice::Kind::Changed, m.id, kNoPeer, object.state);
     adoptOwner(m.id, object, kNoPeer, m.epoch);
   }
 
@@ -374,9 +403,7 @@ private:
     object.state = m.state;
     object.seq = m.seq;
     ++object.version;
-    for (size_t i = 0; i < onChangedHandlers.size(); ++i) {
-      onChangedHandlers[i](m.id, object.state);
-    }
+    notify(Notice::Kind::Changed, m.id, kNoPeer, object.state);
   }
 
   // Takes news of a new owner if it is newer than what is known.
@@ -391,9 +418,7 @@ private:
     // Whatever the outcome, this peer's request has been decided.
     m_pendingClaims.erase(id);
     if (owner != previous) {
-      for (size_t i = 0; i < onOwnerChangedHandlers.size(); ++i) {
-        onOwnerChangedHandlers[i](id, owner);
-      }
+      notify(Notice::Kind::OwnerChanged, id, owner);
     }
   }
 
@@ -426,9 +451,7 @@ private:
                                                   object.epoch});
       }
     } else if (requester == self) {
-      for (size_t i = 0; i < onClaimDeniedHandlers.size(); ++i) {
-        onClaimDeniedHandlers[i](id, object.owner);
-      }
+      notify(Notice::Kind::Denied, id, object.owner);
     } else {
       m_session.send(requester,
                      sync_msg::Deny{m_setId, id, object.owner, object.epoch});
@@ -498,13 +521,9 @@ private:
         object.owner = entry.owner;
         object.epoch = entry.epoch;
         auto added = m_objects.emplace(entry.id, std::move(object)).first;
-        for (size_t i = 0; i < onAddedHandlers.size(); ++i) {
-          onAddedHandlers[i](entry.id, added->second.state);
-        }
+        notify(Notice::Kind::Added, entry.id, kNoPeer, added->second.state);
         if (entry.owner != kNoPeer) {
-          for (size_t i = 0; i < onOwnerChangedHandlers.size(); ++i) {
-            onOwnerChangedHandlers[i](entry.id, entry.owner);
-          }
+          notify(Notice::Kind::OwnerChanged, entry.id, entry.owner);
         }
       } else if (entry.epoch > it->second.epoch) {
         // Newer than ours; at the same epoch our copy is at least as fresh (it
@@ -512,9 +531,7 @@ private:
         Object &object = it->second;
         object.state = entry.state;
         ++object.version;
-        for (size_t i = 0; i < onChangedHandlers.size(); ++i) {
-          onChangedHandlers[i](entry.id, object.state);
-        }
+        notify(Notice::Kind::Changed, entry.id, kNoPeer, object.state);
         adoptOwner(entry.id, object, entry.owner, entry.epoch);
       }
     }
@@ -531,9 +548,7 @@ private:
     for (auto &replay : held) {
       replay();
     }
-    for (size_t i = 0; i < onSyncedHandlers.size(); ++i) {
-      onSyncedHandlers[i]();
-    }
+    notify(Notice::Kind::Synced, 0);
   }
 
   // ---- Session events ----
@@ -544,17 +559,17 @@ private:
     m_objects.clear();
     m_pendingClaims.clear();
     for (ObjectId id : old) {
-      for (size_t i = 0; i < onRemovedHandlers.size(); ++i) {
-        onRemovedHandlers[i](id);
-      }
+      notify(Notice::Kind::Removed, id);
     }
     m_synced = false;
     requestSnapshot();
+    flushNotices();
   }
 
   void onPeerLeft(PeerId peer) {
     if (m_session.isLeader()) {
       freeOrphans(peer);
+      flushNotices();
     }
   }
 
@@ -565,6 +580,7 @@ private:
         finishSync();
       }
       freeOrphans(kNoPeer);
+      flushNotices();
       return;
     }
     // The new leader never saw requests that went to the old one.
@@ -576,8 +592,47 @@ private:
     }
   }
 
+  void dispatch(const Notice &n) {
+    using Kind = Notice::Kind;
+    // By index: a callback may add another callback.
+    switch (n.kind) {
+      case Kind::Added:
+        for (size_t i = 0; i < onAddedHandlers.size(); ++i) {
+          onAddedHandlers[i](n.id, n.state);
+        }
+        break;
+      case Kind::Removed:
+        for (size_t i = 0; i < onRemovedHandlers.size(); ++i) {
+          onRemovedHandlers[i](n.id);
+        }
+        break;
+      case Kind::Changed:
+        for (size_t i = 0; i < onChangedHandlers.size(); ++i) {
+          onChangedHandlers[i](n.id, n.state);
+        }
+        break;
+      case Kind::OwnerChanged:
+        for (size_t i = 0; i < onOwnerChangedHandlers.size(); ++i) {
+          onOwnerChangedHandlers[i](n.id, n.peer);
+        }
+        break;
+      case Kind::Denied:
+        for (size_t i = 0; i < onClaimDeniedHandlers.size(); ++i) {
+          onClaimDeniedHandlers[i](n.id, n.peer);
+        }
+        break;
+      case Kind::Synced:
+        for (size_t i = 0; i < onSyncedHandlers.size(); ++i) {
+          onSyncedHandlers[i]();
+        }
+        break;
+    }
+  }
+
   Session &m_session;
   uint32_t m_setId;
+  std::vector<Notice> m_notices;
+  bool m_flushing = false;
   std::map<ObjectId, Object> m_objects;
   std::set<ObjectId> m_pendingClaims;
   bool m_synced = true;

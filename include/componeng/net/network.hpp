@@ -5,12 +5,15 @@
 #include "componeng/net/address.hpp"
 #include "componeng/net/idatagram_socket.hpp"
 #include "componeng/net/message_registry.hpp"
+#include "componeng/net/nat_discovery.hpp"
+#include "componeng/net/stun_socket.hpp"
 #include "componeng/net/transport.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <typeindex>
 #include <unordered_set>
@@ -61,6 +64,32 @@ public:
   bool connect(const Address &peer);
   bool connect(const std::string &text);
   void disconnect(const Address &peer);
+
+  // ---- Reaching peers across the internet ----
+  // STUN tells a socket its public address; it does not introduce peers. Peers
+  // swap addresses themselves (inviteCode()), then both send to each other at
+  // about the same time so the routers let the packets in (hole punching):
+  // discoverPublicAddress(), show inviteCode(), the host punch()es the joiner's
+  // address and the joiner connectToInvite()s the host's code. Fails through
+  // symmetric NATs (see natType()).
+
+  // Asks STUN servers (host:port, resolved in the background; defaults are
+  // Google's and Cloudflare's) for this socket's public address.
+  // onNatDiscovery() fires when done; two answering servers also give
+  // natType().
+  void discoverPublicAddress(std::vector<std::string> servers = {});
+  NatDiscovery::State natDiscoveryState() const;
+  Address publicAddress() const;
+  NatType natType() const;
+  // Fires once per discoverPublicAddress(); the bool says whether any server
+  // answered.
+  void onNatDiscovery(std::function<void(bool, const NatInfo &)> handler);
+  // Empty until the public address is known.
+  std::string inviteCode() const;
+  // False if `code` is not a valid invite code.
+  bool connectToInvite(const std::string &code);
+  void punch(const Address &peerPublicAddress, double duration = 10.0);
+  static std::vector<std::string> defaultStunServers();
 
   bool isConnected(const Address &peer) const;
   std::vector<Address> peers() const;
@@ -155,6 +184,14 @@ private:
   };
 
   void dispatch(const Event &event);
+  void updateNatDiscovery(double now);
+
+  // Where the lookup thread leaves its answer (lookups can take seconds).
+  struct ResolveJob {
+    std::mutex mutex;
+    bool done = false;
+    std::vector<Address> servers;
+  };
 
   std::shared_ptr<WorldBinding> m_binding;
   MessageRegistry m_registry;
@@ -162,6 +199,11 @@ private:
   // The transport refers to the socket, so both live on the heap and survive a
   // move.
   std::unique_ptr<IDatagramSocket> m_socket;
+  // m_socket seen as a StunSocket; null when closed.
+  StunSocket *m_stun = nullptr;
+  std::shared_ptr<ResolveJob> m_resolve;
+  bool m_discoveryPending = false;
+  std::vector<std::function<void(bool, const NatInfo &)>> m_onNatDiscovery;
   std::unique_ptr<Transport> m_transport;
   std::vector<std::function<void(const Address &)>> m_onConnected;
   std::vector<std::function<void(const Address &, DisconnectReason)>>

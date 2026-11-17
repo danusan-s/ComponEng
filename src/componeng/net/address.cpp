@@ -99,6 +99,39 @@ bool Address::parse(const std::string &text, Address &out) {
   return true;
 }
 
+bool Address::resolve(const std::string &host, uint16_t port, Family family,
+                      Address &out) {
+  if (host.empty() || family == Family::None || !platform::acquireNetwork()) {
+    return false;
+  }
+  const int af = family == Family::IPv6 ? AF_INET6 : AF_INET;
+  addrinfo hints{};
+  hints.ai_family = af;
+  hints.ai_socktype = SOCK_DGRAM;
+  addrinfo *results = nullptr;
+  bool found = false;
+  if (getaddrinfo(host.c_str(), nullptr, &hints, &results) == 0) {
+    for (const addrinfo *r = results; r && !found; r = r->ai_next) {
+      if (r->ai_family != af) {
+        continue;
+      }
+      if (af == AF_INET) {
+        const auto *in = reinterpret_cast<const sockaddr_in *>(r->ai_addr);
+        out = fromBytes(family,
+                        reinterpret_cast<const uint8_t *>(&in->sin_addr), port);
+      } else {
+        const auto *in6 = reinterpret_cast<const sockaddr_in6 *>(r->ai_addr);
+        out = fromBytes(
+            family, reinterpret_cast<const uint8_t *>(&in6->sin6_addr), port);
+      }
+      found = true;
+    }
+    freeaddrinfo(results);
+  }
+  platform::releaseNetwork();
+  return found;
+}
+
 std::string Address::toString() const {
   if (m_family == Family::None) {
     return "(invalid)";

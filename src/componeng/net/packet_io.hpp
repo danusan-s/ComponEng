@@ -117,6 +117,7 @@ private:
 //   Accept:     echoed salt u32, sender's own salt u32
 //   Reject:     echoed salt u32
 //   Disconnect: connection id u32
+//   Punch:      nothing; only there to be sent (see Transport::punch)
 //   Data:       connection id u32, sequence u16, ack u16, ack bits u32, entries
 // A Data entry is: flags u8 (bit 0 reliable, bit 1 more fragments follow),
 // message id u16 (reliable only), length u16, payload.
@@ -125,7 +126,8 @@ enum class PacketType : uint8_t {
   Accept = 2,
   Reject = 3,
   Data = 4,
-  Disconnect = 5
+  Disconnect = 5,
+  Punch = 6
 };
 
 constexpr size_t kCommonHeaderSize = 5;
