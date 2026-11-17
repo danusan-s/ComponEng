@@ -3,7 +3,6 @@
 #include "componeng/core/types.hpp"
 #include "componeng/utils/logger.hpp"
 #include "json.hpp"
-#include <glm/glm.hpp>
 
 #include <array>
 #include <stdexcept>

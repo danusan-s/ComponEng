@@ -139,6 +139,12 @@ target_link_libraries(ComponEng
 # the OpenGL backend includes it. Public so games that include GLFW agree.
 target_compile_definitions(ComponEng PUBLIC GLFW_INCLUDE_NONE)
 
+# windows.h (pulled in by miniaudio) defines min/max macros that break std::min
+# and std::max.
+if(WIN32)
+    target_compile_definitions(ComponEng PUBLIC NOMINMAX)
+endif()
+
 # Vulkan backend (-DRENDERER_BACKEND=vulkan). Needs the Vulkan loader and
 # glslang: GLSL is compiled to SPIR-V at load time, so there is no offline
 # shader step.

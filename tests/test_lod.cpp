@@ -54,10 +54,10 @@ struct LodScene {
   }
 };
 
-LodComponent twoLevels(HandleID near, HandleID far) {
+LodComponent twoLevels(HandleID nearMesh, HandleID farMesh) {
   LodComponent lod;
-  lod.mesh[0] = near;
-  lod.mesh[1] = far;
+  lod.mesh[0] = nearMesh;
+  lod.mesh[1] = farMesh;
   lod.distance[0] = 10.0f;
   lod.distance[1] = 50.0f;
   return lod;
@@ -79,9 +79,9 @@ TEST(Lod, ChoosesTheLevelWhoseRangeCoversTheDistance) {
 
 TEST(Lod, HidesTheEntityBeyondTheLastLevel) {
   LodScene s;
-  EntityID far = s.spawn(80.0f, twoLevels(s.tri, s.quad));
+  EntityID farEntity = s.spawn(80.0f, twoLevels(s.tri, s.quad));
   s.run();
-  EXPECT_FALSE(s.mesh(far).visible);
+  EXPECT_FALSE(s.mesh(farEntity).visible);
 }
 
 TEST(Lod, SkipsLevelsThatHaveNoMesh) {
@@ -177,10 +177,10 @@ TEST(LodScreenHeight, AZeroThresholdKeepsTheLastLevelAtAnyDistance) {
   LodScene s;
   LodComponent lod = screenLevels(s);
   lod.screenHeight[1] = 0.0f;
-  EntityID far = s.spawn(5000.0f, lod);
+  EntityID farEntity = s.spawn(5000.0f, lod);
   s.run();
-  EXPECT_TRUE(s.mesh(far).visible);
-  EXPECT_EQ(s.mesh(far).meshID, s.quad);
+  EXPECT_TRUE(s.mesh(farEntity).visible);
+  EXPECT_EQ(s.mesh(farEntity).meshID, s.quad);
 }
 
 TEST(LodScreenHeight, ZeroSizeStaysInDistanceMode) {
