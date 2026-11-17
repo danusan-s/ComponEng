@@ -142,7 +142,7 @@ public:
   }
 
   void show() const {
-    if (ProfilerUI::beginPane("Frame timing (ms)")) {
+    if (ProfilerUI::beginTab("Frame (ms)")) {
       ProfilerUI::addValue("CPU frame", static_cast<float>(m_cpu.value));
       if (m_gpu.value >= 0.0)
         ProfilerUI::addValue("GPU frame", static_cast<float>(m_gpu.value));
@@ -153,15 +153,17 @@ public:
       if (ProfilerUI::addSection("System CPU (ms), slowest first"))
         showSorted(m_systems);
     }
-    ProfilerUI::endPane();
+    ProfilerUI::endTab();
 
-    if (ProfilerUI::beginPane("Render passes"))
+    if (ProfilerUI::beginTab("Render passes"))
       showPasses();
-    ProfilerUI::endPane();
+    ProfilerUI::endTab();
 
-    if (ProfilerUI::beginPane("Shader GPU (ms), slowest first"))
+    if (ProfilerUI::beginTab("Shaders")) {
+      ProfilerUI::addText("Shader GPU (ms)", "slowest first");
       showSorted(m_shaders);
-    ProfilerUI::endPane();
+    }
+    ProfilerUI::endTab();
   }
 
 private:
