@@ -228,6 +228,7 @@ set(TEST_SOURCES
     tests/test_utils.cpp
     tests/test_world.cpp
     tests/test_audio.cpp
+    tests/test_plugins.cpp
 )
 
 set(NET_TEST_SOURCES
@@ -243,6 +244,7 @@ set(NET_TEST_SOURCES
 set(NAT_TEST_SOURCES
     tests/test_stun.cpp
     tests/test_nat_traversal.cpp
+    tests/test_nat_plugin.cpp
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})

@@ -5,7 +5,7 @@ This guide covers what you need to know to build a game or application using Com
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [The IGame Interface](#the-igame-interface)
+- [Plugins](#plugins)
 - [Creating Components](#creating-components)
 - [Creating Systems](#creating-systems)
 - [Using Queries](#using-queries)
@@ -18,66 +18,125 @@ This guide covers what you need to know to build a game or application using Com
 
 ## Quick Start
 
-1. **Create a game class** that inherits from `IGame`
-2. **Implement `init()`** to create entities and register your systems
-3. **Implement `shutdown()`** for cleanup (optional)
-4. **Pass your game to `Engine::run()`**
+1. **Create a game plugin**: a class that inherits from `IPlugin`
+2. **Register your systems in `build()`**
+3. **Create entities and load things in `ready()`**
+4. **Add `DefaultPlugins` and your plugin to an `Engine`, then `run()`**
 
 ```cpp
+#include "componeng/core/default_plugins.hpp"
 #include "componeng/core/engine.hpp"
-#include "componeng/core/game.hpp"
 
-class MyGame : public componeng::core::IGame {
+class MyGame : public componeng::core::IPlugin {
 public:
-    void init(componeng::ecs::World& world) override {
-        // Create entities, add components, register systems
+    void build(componeng::core::Engine& engine) override {
+        // Register systems, resources and components
+        engine.world().registerSystem<MySystem>(componeng::ecs::SystemGroup::Simulation);
     }
-    
-    void shutdown(componeng::ecs::World& world) override {
+
+    void ready(componeng::ecs::World& world) override {
+        // Create entities, load assets
+    }
+
+    void cleanup(componeng::ecs::World& world) override {
         // Cleanup
     }
 };
 
 int main() {
-    componeng::core::Engine::get().init();
-    MyGame game;
-    componeng::core::Engine::get().run(game);
-    componeng::core::Engine::get().shutdown();
+    componeng::core::Engine engine;
+    engine.add(componeng::core::DefaultPlugins{}).add(MyGame{}).run();
     return 0;
 }
 ```
 
 ---
 
-## The IGame Interface
+## Plugins
 
-Your game class is the entry point for initializing your world:
+Everything the engine does comes from a plugin: the window and render device
+(`WindowPlugin`), input, physics, the camera, audio and rendering. `DefaultPlugins`
+adds all of them. Your game is a plugin too, and so is networking if you use it.
+A plugin is a bundle of registrations (components, resources, systems and the
+order between them). It has no per-frame hook: per-frame work is a system the
+plugin registers.
 
 ```cpp
-#include "componeng/core/game.hpp"
-
-class MyGame : public componeng::core::IGame {
+class MyGame : public componeng::core::IPlugin {
 public:
-    // Called once after engine init, before the main loop
-    void init(ecs::World& world) override {
-        // Create entities
-        // Add components
-        // Register custom systems
-    }
+    // When added: register things. Cheap; nothing is opened or loaded yet.
+    void build(Engine& engine) override;
 
-    // Called once after the main loop ends, before engine shutdown
-    void shutdown(ecs::World& world) override {
-        // Cleanup resources, save state, etc.
+    // Once every plugin is built, before the first frame: create entities,
+    // load assets, open sockets. Systems are created right after.
+    void ready(ecs::World& world) override;
+
+    // After the systems are destroyed, in reverse order: save state, clean up.
+    void cleanup(ecs::World& world) override;
+};
+```
+
+**Phases run in the order plugins were added.** `ready` of an earlier plugin runs
+before a later one's, so by the time your game's `ready` runs, the window is open,
+the built-in assets are loaded and the audio engine is up. `cleanup` runs in the
+opposite order, so your game cleans up first.
+
+**What to do in `build()`:**
+
+- Register components with `engine.world().registerComponents<A, B>()`
+- Register systems with `engine.world().registerSystem<MySystem>(group)`
+- Add resources with `engine.world().setResource(MyResource{...})`
+- Order systems with `addSystemDependencies` / `addSystemBefore` (see below)
+- Declare a dependency on another plugin with `engine.require<OtherPlugin>()`
+
+**What to do in `ready()`:**
+
+- Create entities with `world.createEntity()`
+- Add components with `world.addComponents(entity, component1, component2, ...)`
+- Load assets, register sounds, load scenes
+
+### Configuring and replacing the defaults
+
+Plugins are plain objects, so configuration is data on them:
+
+```cpp
+core::DefaultPlugins plugins;
+plugins.window.title = "My game";
+plugins.disable<audio::AudioPlugin>();   // no audio at all
+engine.add(plugins).add(MyGame{}).run();
+```
+
+A disabled plugin can still be added on its own, or replaced by your own.
+Adding the same plugin type twice (say `AudioPlugin` while it is still part of
+`DefaultPlugins`) throws and says so. `RenderPlugin` requires `WindowPlugin`; if
+you disable the window it builds a default one.
+
+### Writing a plugin for a feature
+
+A reusable feature (networking is one) is a plugin plus its systems:
+
+```cpp
+class ScoreboardPlugin : public core::IPlugin {
+public:
+    int maxPlayers = 8;                       // configuration
+
+    void build(core::Engine& engine) override {
+        engine.require<net::NetPlugin>();     // built, and cleaned up after, first
+        engine.world().setResource(Scoreboard{maxPlayers});
+        engine.world().registerSystem<ScoreboardSystem>(ecs::SystemGroup::Simulation);
     }
 };
 ```
 
-**What to do in `init()`:**
+`require<P>()` adds a default `P` if there is none yet. If `P` needs constructor
+arguments, add it yourself first, otherwise `require` throws.
 
-- Create entities with `world.createEntity()`
-- Add components with `world.addComponents(entity, component1, component2, ...)`
-- Register your custom systems with `world.registerSystem<MySystem>(group)`
-- Set up resources with `world.set_resource(MyResource{...})`
+### Running without a window
+
+With no `WindowPlugin` the engine has no window and `run()` uses a fixed-rate loop
+(60 per second) until a system calls `world.getResource<core::EngineControl>().requestExit()`.
+That is what a dedicated server or a test wants. `engine.initialize()`,
+`engine.update(dt)` and `engine.shutdown()` step the same thing by hand.
 
 ---
 
@@ -110,12 +169,12 @@ struct VelocityComponent {
 
 ### Registering Components
 
-Components must be registered before use. In your game's `init()`:
+Components must be registered before use. In your plugin's `build()`:
 
 ```cpp
-void init(ecs::World& world) override {
+void build(core::Engine& engine) override {
     // Register your custom components
-    world.registerComponents<
+    engine.world().registerComponents<
         mygame::HealthComponent,
         mygame::VelocityComponent
     >();
@@ -129,7 +188,7 @@ void init(ecs::World& world) override {
 ### Adding Components to Entities
 
 ```cpp
-void init(ecs::World& world) override {
+void ready(ecs::World& world) override {
     ecs::EntityID player = world.createEntity();
     
     // Add single component
@@ -227,23 +286,37 @@ public:
 
 ### System Groups
 
-Systems are executed in three groups in this order:
+Systems are executed in four groups in this order:
 
 | Group | When | Common Systems |
 |-------|------|----------------|
-| `SystemGroup::Initialization` | First | Input processing |
+| `SystemGroup::PreUpdate` | First | Input processing, networking |
 | `SystemGroup::Simulation` | Second | Physics, AI, game logic |
-| `SystemGroup::Presentation` | Third | Rendering |
+| `SystemGroup::Presentation` | Third | Culling, batching, rendering |
+| `SystemGroup::FrameEnd` | Last | Rolling the frame over (input buffers) |
+
+A system never runs before one in an earlier group. Inside a group, systems run in
+registration order unless you constrain them:
+
+```cpp
+world.addSystemDependencies<MySystem, PhysicsSystem>(); // MySystem runs after PhysicsSystem
+world.addSystemBefore<MySystem, CameraSystem>();        // MySystem runs before CameraSystem
+```
+
+Constraints are resolved when the systems are created, so they can be added in any
+order and before the other system is registered. An unknown system, a constraint
+that points into a later group, or a cycle throws at that point instead of being
+ignored. Systems are destroyed in reverse of the order they were created.
 
 ### Registering Systems
 
-In your game's `init()`:
+In your plugin's `build()`:
 
 ```cpp
-void init(ecs::World& world) override {
+void build(core::Engine& engine) override {
     // Register your system with a group
-    world.registerSystem<mygame::HealthSystem>(ecs::SystemGroup::Simulation);
-    world.registerSystem<mygame::DamageSystem>(ecs::SystemGroup::Simulation);
+    engine.world().registerSystem<mygame::HealthSystem>(ecs::SystemGroup::Simulation);
+    engine.world().registerSystem<mygame::DamageSystem>(ecs::SystemGroup::Simulation);
 }
 ```
 
@@ -408,10 +481,10 @@ void MySystem::onUpdate(const ecs::SystemState& state) {
 
 ### Setting Resources
 
-In your game's `init()`:
+In your plugin's `build()` (or `ready()`):
 
 ```cpp
-void init(ecs::World& world) override {
+void ready(ecs::World& world) override {
     // Set the main camera entity
     ecs::EntityID camera = world.createEntity();
     world.addComponent(camera, componeng::components::TransformComponent{});
@@ -429,10 +502,10 @@ The AssetManager provides static methods to load and access shaders, textures, a
 
 ### Loading Assets
 
-Assets are loaded on first access and cached. Load them early in your game's `init()`:
+Assets are loaded on first access and cached. Load them early, in your plugin's `ready()` (the asset manager exists by then):
 
 ```cpp
-void init(ecs::World& world) override {
+void ready(ecs::World& world) override {
     using namespace componeng::renderer;
     
     // Load shaders (vertex, fragment, optional geometry)
@@ -473,7 +546,7 @@ const Mesh& mesh = assetManager.getMesh(meshID);
 ### Using Assets with Components
 
 ```cpp
-void init(ecs::World& world) override {
+void ready(ecs::World& world) override {
     using namespace componeng;
     using namespace componeng::components;
     using namespace componeng::renderer;
@@ -502,7 +575,7 @@ void init(ecs::World& world) override {
 
 `Utils::getAssetPath("assets/...")` resolves against the engine's own source
 tree. A game that keeps its assets elsewhere registers its root once, before
-`Engine::init()`; roots added this way are searched first (newest first), then
+`Engine::run()` (or `initialize()`); roots added this way are searched first (newest first), then
 the engine's:
 
 ```cpp
@@ -755,19 +828,19 @@ target_link_libraries(MyGame PRIVATE ComponEngNet)   # brings ComponEng along
 ```
 
 ```cpp
-#include "componeng/net/network_system.hpp"
+#include "componeng/net/net_plugin.hpp"
 
-void init(World &world) override {
-  componeng::net::installNetworking(world);   // creates the resources, once
-  ...
-}
+engine.add(DefaultPlugins{})
+      .add(componeng::net::NetPlugin{})   // the resources and the system, once
+      .add(MyGame{});
 ```
 
-`installNetworking` creates the `Network`, `Session`, `LanBrowser` and `EcsBridge`
-resources and registers `NetworkSystem`, which updates them each frame and, when
-the world shuts down, leaves the session and closes the network. No socket is
-opened until you call `Network::open`. The build option `COMPONENG_NETWORKING`
-(default ON) controls whether `ComponEngNet` and its tests are built at all.
+`NetPlugin` creates the `Network`, `Session`, `LanBrowser` and `EcsBridge`
+resources and registers a system that updates them each frame ahead of the
+systems that read the results. On cleanup it leaves the session and closes the
+network. No socket is opened until you call `Network::open`. The build option
+`COMPONENG_NETWORKING` (default ON) controls whether `ComponEngNet` and its tests
+are built at all.
 
 ### Defining messages
 
@@ -829,12 +902,12 @@ world.getResource<net::EcsBridge>().forward<MoveMessage>(net);
 for (const auto &e : world.getEvents<events::MessageReceivedEvent<MoveMessage>>())
   use(e.from, e.message);
 // Peer events (PeerConnectedEvent, PeerDisconnectedEvent, ConnectFailedEvent) and
-// session events need no opt-in once installNetworking has run
+// session events need no opt-in once NetPlugin has been added
 // (events/network_event.hpp, events/session_event.hpp).
 ```
 
-`NetworkSystem` runs the network every frame. The networking core does not depend
-on the ECS, so it can also be used without `installNetworking`: construct a
+`NetPlugin`'s system runs the network every frame. The networking core does not depend
+on the ECS, so it can also be used without `NetPlugin`: construct a
 `Network` yourself and call `net.update(now)` with seconds from a steady clock.
 
 ### Sessions: more than two peers
@@ -867,7 +940,7 @@ the host, and if it leaves, the peer with the lowest id. Everything else is
 symmetric; a game that wants an authority (for example to settle conflicting
 moves) can use the leader as one. ECS events: `SessionJoinedEvent`,
 `SessionJoinFailedEvent`, `SessionPeerJoinedEvent`, `SessionPeerLeftEvent`,
-`SessionLeaderChangedEvent` (all emitted once `installNetworking` has run) and
+`SessionLeaderChangedEvent` (all emitted once `NetPlugin` has been added) and
 `SessionMessageEvent<T>`, which is opt in per type with
 `bridge.forward<T>(session)` (`events/session_event.hpp`).
 
@@ -947,12 +1020,13 @@ hole punching, and no server of your own:
    let the other's packets in.
 
 Internet play is a second opt-in on top of networking: link `ComponEngNetNat` and
-create a `NatTraversal` for the `Network` **before it opens** (it wraps the
-socket). A game that only plays on a LAN leaves it out.
+add `NatPlugin` (it requires `NetPlugin`), which creates a `NatTraversal` for the
+`Network` before it opens, as it has to (it wraps the socket). A game that only
+plays on a LAN leaves it out.
 
 ```cpp
 auto &net = world.getResource<net::Network>();
-net::NatTraversal nat(net);                 // before net.open
+auto &nat = world.getResource<net::NatTraversal>();   // from NatPlugin
 net.open(0, config);
 nat.onDiscovery([&](bool ok, const net::NatInfo &info) {
   if (ok) show(nat.inviteCode());           // "0K10-R218-2E45-0": give this to the other player
@@ -1010,9 +1084,13 @@ Here's a simplified version of how the example game works:
 
 #include "player_controller.hpp"  // Custom system
 
-class Game : public componeng::core::IGame {
+class Game : public componeng::core::IPlugin {
 public:
-    void init(componeng::ecs::World& world) override {
+    void build(componeng::core::Engine& engine) override {
+        engine.world().registerSystem<PlayerController>(componeng::ecs::SystemGroup::Simulation);
+    }
+
+    void ready(componeng::ecs::World& world) override {
         // Create 100 cubes with physics
         for (int i = 0; i < 100; ++i) {
             componeng::ecs::EntityID entity = world.createEntity();
@@ -1050,21 +1128,16 @@ public:
                 }
             );
         }
-        
-        // Register custom system
-        world.registerSystem<PlayerController>(componeng::ecs::SystemGroup::Simulation);
     }
-    
-    void shutdown(componeng::ecs::World& world) override {
+
+    void cleanup(componeng::ecs::World& world) override {
         // Cleanup if needed
     }
 };
 
 int main() {
-    componeng::core::Engine::get().init();
-    Game game;
-    componeng::core::Engine::get().run(game);
-    componeng::core::Engine::get().shutdown();
+    componeng::core::Engine engine;
+    engine.add(componeng::core::DefaultPlugins{}).add(Game{}).run();
     return 0;
 }
 ```

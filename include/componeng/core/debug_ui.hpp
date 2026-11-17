@@ -5,6 +5,10 @@
 
 #include <string>
 
+namespace componeng::ecs {
+class World;
+}
+
 namespace componeng::core {
 
 #ifdef COMPONENG_DISABLE_DEBUG_UI
@@ -104,13 +108,14 @@ public:
    *  The FPS window is shown either way. */
   static constexpr bool kEnabled = kDebugPanelsEnabled;
 
-  // Setup and teardown of ImGui context and OpenGL bindings
-  static void init();
-  static void shutdown();
+  // Setup and teardown of ImGui context and the render device's bindings. The
+  // world holds the device; the window is the one ImGui draws into.
+  static void init(ecs::World &world, void *windowHandle);
+  static void shutdown(ecs::World &world);
 
   // Convenience functions to wrap ImGui frame calls
-  static void beginFrame();
-  static void endFrame();
+  static void beginFrame(ecs::World &world);
+  static void endFrame(ecs::World &world);
 
   /** Shows the frame rate: two lines in "Debug Info" when the debug panels are
    *  on, otherwise a small window of its own in the top-left corner. */

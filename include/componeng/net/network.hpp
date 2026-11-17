@@ -21,8 +21,8 @@ namespace componeng::net {
 // Peers are equal: whoever connect()s and whoever accepts get the same kind of
 // connection. For more than two players connect each to each (a mesh).
 //
-// Arrivals come as callbacks, run inside update(). The engine's NetworkSystem
-// calls update() each frame (see network_system.hpp); elsewhere call
+// Arrivals come as callbacks, run inside update(). NetPlugin's system
+// calls update() each frame (see net_plugin.hpp); elsewhere call
 // update(now) yourself. ECS events are an opt-in layer (ecs_bridge.hpp).
 class Network {
 public:

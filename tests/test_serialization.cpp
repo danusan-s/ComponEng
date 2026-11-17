@@ -180,7 +180,6 @@ namespace {
 
 std::unique_ptr<World> makeSceneWorld() {
   auto world = std::make_unique<World>();
-  world->init();
   world->registerComponents<TransformComponent, MeshComponent,
                             MaterialComponent, ColorComponent>();
   return world;

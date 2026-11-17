@@ -3,6 +3,10 @@
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include <GLFW/glfw3.h>
 
+namespace componeng::ecs {
+class World;
+}
+
 namespace componeng::core {
 
 /**
@@ -14,8 +18,10 @@ namespace componeng::core {
  */
 class Window {
 public:
-  // Initialize GLFW, create window and OpenGL context, set up input callbacks
-  void init(int width, int height, const char *title);
+  // Initialize GLFW, create window and OpenGL context, set up input callbacks.
+  // The world must hold the render device, and stay put while the window lives
+  // (the callbacks point at it); input goes to its InputState if it has one.
+  void init(ecs::World &world, int width, int height, const char *title);
 
   // Clean up GLFW resources and destroy window
   void shutdown();

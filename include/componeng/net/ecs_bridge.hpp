@@ -13,18 +13,19 @@ namespace componeng::net {
 
 // Turns network and session callbacks into ECS events, for games that prefer to
 // read them in systems. Optional: the net core knows nothing about the ECS.
-// installNetworking() creates one as a world resource; message events are opt
+// NetPlugin creates one as a world resource; message events are opt
 // in per type:
 //
 //   bridge.forward<MoveMessage>(session);  // SessionMessageEvent<MoveMessage>
 //
-// Events can be read for one frame, the one after NetworkSystem produced them.
+// Events can be read for one frame, the one after the network system produced
+// them.
 class EcsBridge {
 public:
   EcsBridge() : m_binding(std::make_shared<Binding>()) {
   }
 
-  // Events are emitted only while a world is bound; NetworkSystem does this.
+  // Events are emitted only while a world is bound; NetPlugin does this.
   void bindWorld(ecs::World *world) {
     m_binding->world = world;
   }

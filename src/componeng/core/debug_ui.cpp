@@ -1,6 +1,6 @@
 #include "componeng/core/debug_ui.hpp"
 
-#include "componeng/core/engine.hpp"
+#include "componeng/ecs/world.hpp"
 #include "componeng/utils/logger.hpp"
 #include "imgui/imgui.h"
 
@@ -14,10 +14,8 @@ namespace componeng::core {
 // reaching ImGui without a frame in progress.
 static bool s_frameActive = false;
 
-void DebugUI::init() {
+void DebugUI::init(ecs::World &world, void *windowHandle) {
   LOG_INFO("Initializing UI System...");
-
-  Engine &engine = Engine::get();
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -25,17 +23,17 @@ void DebugUI::init() {
   io.FontGlobalScale = 1.5f;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-  engine.m_world.getRenderDevice().initImGui(engine.m_window.getHandle());
+  world.getRenderDevice().initImGui(windowHandle);
 }
 
-void DebugUI::shutdown() {
+void DebugUI::shutdown(ecs::World &world) {
   LOG_INFO("Shutting down UI System...");
-  Engine::get().m_world.getRenderDevice().shutdownImGui();
+  world.getRenderDevice().shutdownImGui();
   ImGui::DestroyContext();
 }
 
-void DebugUI::beginFrame() {
-  Engine::get().m_world.getRenderDevice().imguiNewFrame();
+void DebugUI::beginFrame(ecs::World &world) {
+  world.getRenderDevice().imguiNewFrame();
   ImGui::NewFrame();
   // The default window only exists for the debug panels; without them nothing
   // is added outside a pane of its own.
@@ -44,12 +42,12 @@ void DebugUI::beginFrame() {
   s_frameActive = true;
 }
 
-void DebugUI::endFrame() {
+void DebugUI::endFrame(ecs::World &world) {
   s_frameActive = false;
   if constexpr (kEnabled)
     ImGui::End();
   ImGui::Render();
-  Engine::get().m_world.getRenderDevice().imguiRender();
+  world.getRenderDevice().imguiRender();
 }
 
 void DebugUI::showFps(float fps, float avgFps) {

@@ -37,10 +37,10 @@ struct SessionConfig {
 // The leader admits joiners and answers LAN searches: the host, or if it
 // leaves, the lowest id; everything else is symmetric.
 //
-// One Session per Network; update(now) each frame (NetworkSystem does it) and
-// callbacks run inside it. Call leave() before the Network goes away so peers
-// are told. A broken link between two peers that both stay connected to the
-// rest is not repaired.
+// One Session per Network; update(now) each frame (NetPlugin's system does it)
+// and callbacks run inside it. Call leave() before the Network goes away so
+// peers are told. A broken link between two peers that both stay connected to
+// the rest is not repaired.
 class Session {
 public:
   enum class State : uint8_t {

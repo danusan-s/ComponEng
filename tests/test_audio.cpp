@@ -188,7 +188,6 @@ struct SystemScene : ::testing::Test {
   std::string blip, longTone;
 
   void SetUp() override {
-    world->init();
     world->registerComponents<core::TransformComponent, AudioComponent>();
     ecs::EntityID cam = world->createEntity();
     world->addComponents(cam, core::TransformComponent{});

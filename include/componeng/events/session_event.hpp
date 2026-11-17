@@ -6,7 +6,7 @@
 namespace componeng::events {
 
 // Emitted by net::EcsBridge. Readable for one frame: the one after
-// NetworkSystem produced them.
+// the network system produced them.
 
 // join() finished: this peer is in the session and connected to all the others.
 struct SessionJoinedEvent {};

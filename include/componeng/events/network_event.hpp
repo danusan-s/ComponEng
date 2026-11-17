@@ -6,7 +6,7 @@
 namespace componeng::events {
 
 // Emitted by net::EcsBridge. Like all events, readable for one frame: the one
-// after NetworkSystem produced them.
+// after the network system produced them.
 
 struct PeerConnectedEvent {
   net::Address peer;

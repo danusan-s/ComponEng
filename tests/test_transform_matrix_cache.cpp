@@ -20,7 +20,6 @@ struct Tag {
 
 std::unique_ptr<World> makeWorld() {
   auto world = std::make_unique<World>();
-  world->init();
   world->registerComponents<TransformComponent, MeshComponent, Tag>();
   return world;
 }

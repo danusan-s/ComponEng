@@ -41,4 +41,11 @@ void InputSystem::onUpdate(const ecs::SystemState &state) {
       inputState.isMouseButtonPressed(AIM_KEY);
 }
 
+void InputBufferSystem::onUpdate(const ecs::SystemState &state) {
+  auto &inputState = state.world->getResource<InputState>();
+  auto &actionState = state.world->getResource<ActionState>();
+  inputState.previous_state = inputState.current_state;
+  actionState.swapBuffers();
+}
+
 } // namespace componeng::input

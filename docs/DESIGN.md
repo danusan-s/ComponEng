@@ -13,11 +13,10 @@ ComponEng is an archetype-based Entity-Component-System (ECS) game engine built 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Engine                                  │
-│                    (Singleton Entry Point)                      │
+│          (owns the World and the plugins, runs the loop)        │
 ├─────────────────────────────────────────────────────────────────┤
-│  m_world: World          │  m_window: Window                    │
-│  m_render_device:        │  m_renderDevice: IRenderDevice*      │
-│    IRenderDevice*        │                                      │
+│  plugins: Window, Input, Physics, Camera, Audio, Render, Game   │
+│  runner:  windowed loop (WindowPlugin) or fixed-rate headless   │
 └─────────────────────────────────────────────────────────────────┘
            │
            ▼
@@ -34,21 +33,32 @@ ComponEng is an archetype-based Entity-Component-System (ECS) game engine built 
 
 ## Core Subsystems
 
-### 1. Engine (`core/engine.hpp`)
+### 1. Engine and plugins (`core/engine.hpp`, `core/plugin.hpp`)
 
-The `Engine` class is a singleton that bootstraps the entire application:
+The `Engine` owns the `World` and a list of plugins and drives the frame loop. On
+its own it is a bare world; everything else is a plugin (`IPlugin`):
 
-- **Initialization**: Sets up GLFW window, OpenGL context via GLRenderDevice, initializes World
-- **Asset Loading**: Loads default shaders ("diffuse"), textures ("white"), meshes ("cube", "sphere")
-- **Component Registration**: Registers all built-in components (Transform, Mesh, Material, Camera, RigidBody, Collider)
-- **System Registration**: Registers built-in systems (InputSystem, CameraSystem, PhysicsSystem, RenderSystem)
-- **Main Loop**: Runs the frame loop with delta time tracking, system updates, and buffer swapping
+- **WindowPlugin**: GLFW window, the render device, ImGui, and the windowed main loop (becomes the engine's runner)
+- **InputPlugin**: `InputState`/`ActionState`, `InputSystem` (PreUpdate), `InputBufferSystem` (FrameEnd)
+- **PhysicsPlugin**, **CameraPlugin**, **AudioPlugin**: their components, resources and systems
+- **RenderPlugin**: mesh/material/light components, the `AssetManager` with the built-in assets, and the LOD, culling, batching and render systems. Requires `WindowPlugin`
+- **DefaultPlugins**: all of the above, with per-plugin `disable<>()` and `window` config
+- **NetPlugin** / **NatPlugin** (separate libraries): networking, and internet play on top of it
+
+A plugin has three phases: `build(Engine&)` when added (register components,
+resources, systems), `ready(World&)` once all are built (open, load, create
+entities) and `cleanup(World&)` in reverse order after the systems are destroyed.
+`engine.require<P>()` inside `build` pulls in a dependency first.
 
 **Key Methods**:
 ```cpp
-void init();           // Load resources, init world and window
-void run(IGame&);      // Run game init, main loop, shutdown
-void shutdown();       // Cleanup
+Engine& add(Plugin);   // build it now; throws on a duplicate
+void require<P>();     // inside build(): make sure P is built first
+void initialize();     // every plugin's ready(), then create systems
+void update(double);   // one frame of systems
+void shutdown();       // destroy systems, cleanup plugins in reverse
+void run();            // initialize, runner, shutdown
+void setRunner(fn);    // replace the frame loop
 ```
 
 ### 2. World (`ecs/world.hpp`)
@@ -302,10 +312,11 @@ struct SystemState {
 
 #### System Groups (Execution Order)
 ```cpp
-enum SystemGroup {
-    Initialization, // Runs first, e.g., InputSystem
+enum class SystemGroup {
+    PreUpdate,     // Runs first, e.g., InputSystem, networking
     Simulation,    // Physics, logic, e.g., CameraSystem, PhysicsSystem
-    Presentation   // Rendering, e.g., RenderSystem
+    Presentation,  // Culling, batching, rendering, e.g., RenderSystem
+    FrameEnd       // Rolls the frame over, e.g., InputBufferSystem
 };
 ```
 
@@ -370,7 +381,7 @@ const auto& events = world.get_events<CollisionEvent>();
 ## Systems
 
 ### InputSystem (`systems/input_system.hpp`)
-- **Group**: Initialization
+- **Group**: PreUpdate
 - **Purpose**: Polls raw GLFW input, updates InputComponent and MouseInputComponent
 - **Runs**: Before simulation systems
 
@@ -621,15 +632,15 @@ OpenGL 3.3 Core Profile implementation. Creates OpenGL-backed resources, manages
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Game Init  │────▶│  Register   │────▶│   Create    │
-│  (IGame)    │     │Components   │     │   Systems   │
+│ Plugin build│────▶│  Register   │────▶│   Create    │
+│ (IPlugin)   │     │Components   │     │   Systems   │
 └─────────────┘     └─────────────┘     └─────────────┘
                                               │
                     ┌─────────────────────────┼─────────────────────────┐
                     │                         │                         │
                     ▼                         ▼                         ▼
              ┌──────────────┐           ┌────────────┐           ┌────────────┐
-             │Initialization│           │Simulation  │           │Presentation│
+             │  PreUpdate   │           │Simulation  │           │Presentation│
              │   Systems    │           │   Systems  │           │   Systems  │
              └──────────────┘           └────────────┘           └────────────┘
                     │                         │                         │
@@ -679,7 +690,8 @@ include/componeng/
 │   └── transform_component.hpp
 ├── core/
 │   ├── engine.hpp
-│   ├── game.hpp
+│   ├── plugin.hpp
+│   ├── default_plugins.hpp
 │   ├── scene.hpp
 │   ├── types.hpp
 │   ├── window.hpp

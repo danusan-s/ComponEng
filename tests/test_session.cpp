@@ -1,10 +1,11 @@
+#include "componeng/core/engine.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/events/session_event.hpp"
 #include "componeng/net/ecs_bridge.hpp"
 #include "componeng/net/lan_discovery.hpp"
 #include "componeng/net/loopback_socket.hpp"
+#include "componeng/net/net_plugin.hpp"
 #include "componeng/net/network.hpp"
-#include "componeng/net/network_system.hpp"
 #include "componeng/net/session.hpp"
 #include "net_test_config.hpp"
 #include "gtest/gtest.h"
@@ -75,7 +76,7 @@ struct Member {
 };
 
 // Several peers on one simulated network and clock, stepped the way the
-// engine's NetworkSystem does: network first, then session.
+// NetPlugin's system does: network first, then session.
 struct Rig {
   LoopbackNetwork loopback;
   std::vector<std::unique_ptr<Member>> members;
@@ -633,9 +634,10 @@ TEST(Session, ADestroyedSessionLeavesTheNetworkHarmless) {
 
 TEST(Session, ReportsToTheWorldAsEvents) {
   LoopbackNetwork loopback;
-  componeng::ecs::World world;
-  installNetworking(world);
-  world.createSystems();
+  componeng::core::Engine engine;
+  engine.add(NetPlugin{});
+  engine.initialize();
+  componeng::ecs::World &world = engine.world();
 
   auto &net = world.getResource<Network>();
   ASSERT_TRUE(net.open(loopback.open(), testConfig()));
@@ -662,7 +664,6 @@ TEST(Session, ReportsToTheWorldAsEvents) {
   double now = 0.0;
   for (int frame = 0; frame < 400; ++frame) {
     now += 0.01;
-    world.time = now;
     remoteNet.update(now);
     remote.update(now);
     if (remote.isActive() && !sent) {
@@ -672,7 +673,7 @@ TEST(Session, ReportsToTheWorldAsEvents) {
     if (frame == 300) {
       remote.leave();
     }
-    world.updateSystems(0.01f);
+    engine.update(0.01);
     joinedPeers +=
         static_cast<int>(world.getEvents<SessionPeerJoinedEvent>().size());
     leftPeers +=
@@ -689,7 +690,6 @@ TEST(Session, ReportsToTheWorldAsEvents) {
   EXPECT_EQ(movePeer, 1);
   EXPECT_EQ(lastMove.piece, 5);
   EXPECT_EQ(lastMove.x, 0.5f);
-  world.destroySystems();
 }
 
 // ---- A whole session over real UDP, found by LAN search ----

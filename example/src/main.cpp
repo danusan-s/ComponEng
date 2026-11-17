@@ -1,8 +1,8 @@
 #include "componeng/audio/audio_component.hpp"
 #include "componeng/audio/audio_manager.hpp"
 #include "componeng/camera/main_camera.hpp"
+#include "componeng/core/default_plugins.hpp"
 #include "componeng/core/engine.hpp"
-#include "componeng/core/game.hpp"
 #include "componeng/core/transform_component.hpp"
 #include "componeng/ecs/scene_serializer.hpp"
 #include "componeng/ecs/world.hpp"
@@ -27,9 +27,14 @@ using namespace componeng::camera;
 bool loadFromFile = false;
 bool saveToFile = true;
 
-class Game : public IGame {
+class Game : public IPlugin {
 public:
-  void init(World &world) override {
+  void build(Engine &engine) override {
+    engine.world().registerSystem<PlayerController>(SystemGroup::Simulation);
+    engine.world().registerSystem<OrbitingSound>(SystemGroup::Simulation);
+  }
+
+  void ready(World &world) override {
     constexpr float positionRange = 2000.0f;
     // Walls are a little taller than the arena so they overlap floor and roof
     constexpr float wallHeight = positionRange * 1.1f;
@@ -43,8 +48,6 @@ public:
     auto &audioManager = world.getResource<AudioManager>();
     audioManager.registerSound(
         Utils::getAssetPath("assets/audio/boop.wav").c_str(), "boop");
-    world.registerSystem<PlayerController>(SystemGroup::Simulation);
-    world.registerSystem<OrbitingSound>(SystemGroup::Simulation);
 
     if (loadFromFile) {
       SceneSerializer::load(
@@ -213,7 +216,7 @@ public:
     playerPos.rotation = Vec3(0.0f, 0.0f, 0.0f);
   }
 
-  void shutdown(World &world) override {
+  void cleanup(World &world) override {
     if (saveToFile) {
       SceneSerializer::save(
           world, Utils::getAssetPath("assets/scenes/test_scene.json"));
@@ -222,12 +225,7 @@ public:
 };
 
 int main() {
-  Engine &engine = Engine::get();
-  engine.init();
-
-  Game testScene;
-  engine.run(testScene);
-
-  engine.shutdown();
+  Engine engine;
+  engine.add(DefaultPlugins{}).add(Game{}).run();
   return 0;
 }

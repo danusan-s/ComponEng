@@ -38,49 +38,60 @@ target_link_libraries(MyGame PRIVATE ComponEng)
 
 ---
 
-## 2. The game entry point (`IGame`)
+## 2. The game entry point (a plugin)
 
-Your game is a class inheriting from `componeng::core::IGame`. The engine calls
-`init()` once after startup (before the main loop) and `shutdown()` once before
-teardown. The `World` is passed to both — this is your handle to everything.
+Your game is a plugin: a class inheriting from `componeng::core::IPlugin`. The
+engine is built from plugins (window, input, physics, camera, audio, rendering;
+`DefaultPlugins` adds them all) and you add yours on top.
 
 ```cpp
+#include "componeng/core/default_plugins.hpp"
 #include "componeng/core/engine.hpp"
-#include "componeng/core/game.hpp"
 
-class MyGame : public componeng::core::IGame {
+class MyGame : public componeng::core::IPlugin {
 public:
-    void init(componeng::ecs::World& world) override {
+    // When added: register components, systems and resources.
+    void build(componeng::core::Engine& engine) override {
         // 1. Register custom components
-        // 2. Create entities + add components
-        // 3. Load assets (shaders, textures, meshes, materials)
-        // 4. Register custom systems
-        // 5. Set resources (main camera, etc.)
+        // 2. Register custom systems
+        // 3. Set resources
     }
 
-    void shutdown(componeng::ecs::World& world) override {
+    // Before the first frame, once every plugin is ready (window open,
+    // built-in assets loaded): create the starting state.
+    void ready(componeng::ecs::World& world) override {
+        // 4. Create entities + add components
+        // 5. Load assets (shaders, textures, meshes, materials)
+    }
+
+    // After systems are destroyed, before the window closes.
+    void cleanup(componeng::ecs::World& world) override {
         // Optional: save scene, write telemetry, etc.
     }
 };
 
 int main() {
-    componeng::core::Engine::get().init();
-    MyGame game;
-    componeng::core::Engine::get().run(game);
-    componeng::core::Engine::get().shutdown();
+    componeng::core::Engine engine;
+    engine.add(componeng::core::DefaultPlugins{}).add(MyGame{}).run();
     return 0;
 }
 ```
 
-`Engine::run(game)` does: `ensureDefaultCamera()` → `game.init(world)` →
-`world.createSystems()` → main loop (system updates, ImGui, swap buffers) →
-`game.shutdown(world)` → `world.destroySystems()`.
+`Engine::run()` does: every plugin's `ready()` in the order added →
+`world.createSystems()` → the runner (the window's main loop: system updates,
+ImGui, swap buffers) → `world.destroySystems()` → every plugin's `cleanup()` in
+reverse order. A plugin's `build()` runs as soon as it is added.
+
+Plugins are also how features are packaged. `plugins.disable<audio::AudioPlugin>()`
+drops one from the defaults, `engine.require<OtherPlugin>()` inside `build()`
+declares a dependency, and without `WindowPlugin` the engine runs headless.
+See the User Guide's Plugins section.
 
 ---
 
 ## 3. Creating components
 
-Components are plain data structs. Put them in a header, register them in `init()`,
+Components are plain data structs. Put them in a header, register them in your plugin's `build()`,
 and add them to entities.
 
 ### Define a component
@@ -109,7 +120,7 @@ struct VelocityComponent {
 
 Built-in components (Transform, Mesh, Material, Color, Camera, RigidBody, Collider,
 Audio, DirectionalLight, PointLight) are registered by the engine automatically.
-Register your own in `init()`:
+Register your own in `build()`:
 
 ```cpp
 world.registerComponents<
@@ -193,13 +204,14 @@ void HealthSystem::onUpdate(const componeng::ecs::SystemState& state) {
 
 ### System groups & execution order
 
-Systems run in three groups, in this order:
+Systems run in four groups, in this order:
 
 | Group | Typical systems |
 |-------|-----------------|
-| `Initialization` | Input processing |
+| `PreUpdate` | Input processing, networking |
 | `Simulation` | Physics, AI, gameplay logic |
 | `Presentation` | Culling, batching, rendering |
+| `FrameEnd` | Rolling the frame over (input buffers) |
 
 Register with a group:
 
@@ -207,12 +219,16 @@ Register with a group:
 world.registerSystem<mygame::HealthSystem>(componeng::ecs::SystemGroup::Simulation);
 ```
 
-You can also declare ordering dependencies so one system runs after another:
+You can also declare ordering inside a group, so one system runs after (or before)
+another:
 
 ```cpp
-world.addSystemDependencies<renderer::BatchingSystem, renderer::CullingSystem>();
-world.addSystemDependencies<renderer::RenderSystem, renderer::BatchingSystem>();
+world.addSystemDependencies<renderer::BatchingSystem, renderer::CullingSystem>(); // after
+world.addSystemBefore<MySystem, camera::CameraSystem>();                          // before
 ```
+
+They are resolved when the systems are created, so order of declaration does not
+matter, and an unknown system, a reference to a later group or a cycle throws.
 
 ### SystemState
 
@@ -323,7 +339,7 @@ auto& settings = world.getResource<GameSettings>();
 `renderer::AssetManager` loads shaders, textures, meshes, and materials on first
 access and caches them by name. All access is static.
 
-Load assets early in `init()`:
+Load assets early, in `ready()`:
 
 ```cpp
 using namespace componeng::renderer;
@@ -701,8 +717,8 @@ controller.
 
 ```cpp
 // main.cpp
+#include "componeng/core/default_plugins.hpp"
 #include "componeng/core/engine.hpp"
-#include "componeng/core/game.hpp"
 #include "componeng/components/transform_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
 #include "componeng/renderer/component/material_component.hpp"
@@ -715,9 +731,13 @@ controller.
 
 using namespace componeng;
 
-class Game : public core::IGame {
+class Game : public core::IPlugin {
 public:
-    void init(ecs::World& world) override {
+    void build(core::Engine& engine) override {
+        engine.world().registerSystem<PlayerController>(ecs::SystemGroup::Simulation);
+    }
+
+    void ready(ecs::World& world) override {
         using namespace componeng::renderer;
         using namespace componeng::physics;
 
@@ -762,17 +782,12 @@ public:
                 ColliderComponent{.type = ColliderType::Box});
         }
 
-        world.registerSystem<PlayerController>(ecs::SystemGroup::Simulation);
     }
-
-    void shutdown(ecs::World& world) override {}
 };
 
 int main() {
-    componeng::core::Engine::get().init();
-    Game game;
-    componeng::core::Engine::get().run(game);
-    componeng::core::Engine::get().shutdown();
+    core::Engine engine;
+    engine.add(core::DefaultPlugins{}).add(Game{}).run();
     return 0;
 }
 ```
@@ -914,14 +929,14 @@ componeng::renderer::AssetManager (static)
 componeng::audio::AudioManager
 
 // Systems
-componeng::ecs::ISystem, SystemState, SystemGroup::{Initialization,Simulation,Presentation}
+componeng::ecs::ISystem, SystemState, SystemGroup::{PreUpdate,Simulation,Presentation,FrameEnd}
 ```
 
 ### Where to find things
 
 ```
 include/componeng/
-├── core/              engine.hpp, game.hpp, transform_component.hpp, types.hpp, window.hpp
+├── core/              engine.hpp, plugin.hpp, default_plugins.hpp, transform_component.hpp, types.hpp, window.hpp
 ├── ecs/               world.hpp, system.hpp, query.hpp, scene_serializer.hpp
 ├── components/        (builtin components)
 ├── renderer/          asset_manager.hpp, render_system.hpp,

@@ -1,19 +1,9 @@
 #include "componeng/ecs/world.hpp"
 
 #include "componeng/events/entity_event.hpp"
-#include "componeng/input/action_state.hpp"
-#include "componeng/input/input_state.hpp"
-#include "componeng/physics/physics_config.hpp"
 #include "componeng/utils/logger.hpp"
 
 namespace componeng::ecs {
-
-void World::init() {
-  setResource(input::InputState());
-  setResource(input::ActionState());
-  setResource(physics::PhysicsConfig());
-  time = 0.0f;
-}
 
 EntityID World::createEntity() {
   EntityID entity = m_entityManager.createEntity();
@@ -55,14 +45,6 @@ void World::destroySystems() {
 
 ThreadPool &World::threadPool() {
   return m_threadPool;
-}
-
-void World::setWindowHandle(void *handle) {
-  m_windowHandle = handle;
-}
-
-void *World::getWindowHandle() const {
-  return m_windowHandle;
 }
 
 renderer::api::IRenderDevice &World::getRenderDevice() {

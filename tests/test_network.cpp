@@ -1,3 +1,4 @@
+#include "componeng/core/engine.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/events/network_event.hpp"
 #include "componeng/net/archive.hpp"
@@ -5,8 +6,8 @@
 #include "componeng/net/ecs_bridge.hpp"
 #include "componeng/net/loopback_socket.hpp"
 #include "componeng/net/message_registry.hpp"
+#include "componeng/net/net_plugin.hpp"
 #include "componeng/net/network.hpp"
-#include "componeng/net/network_system.hpp"
 #include "componeng/net/session.hpp"
 #include "net_test_config.hpp"
 #include "gtest/gtest.h"
@@ -400,11 +401,12 @@ TEST(Network, CanBeMovedAfterRegistering) {
 
 // ---- ECS integration ----
 
-TEST(NetworkSystem, TurnsNetworkActivityIntoWorldEvents) {
+TEST(NetPlugin, TurnsNetworkActivityIntoWorldEvents) {
   LoopbackNetwork loopback;
-  componeng::ecs::World world;
-  installNetworking(world);
-  world.createSystems();
+  componeng::core::Engine engine;
+  engine.add(NetPlugin{});
+  engine.initialize();
+  componeng::ecs::World &world = engine.world();
 
   auto &net = world.getResource<Network>();
   ASSERT_TRUE(net.registerMessage<MoveMessage>());
@@ -426,7 +428,6 @@ TEST(NetworkSystem, TurnsNetworkActivityIntoWorldEvents) {
   double now = 0.0;
   for (int frame = 0; frame < 300; ++frame) {
     now += 0.01;
-    world.time = now;
     remote.update(now);
     if (remote.isConnected(worldAddress) && !sentMove) {
       remote.send(worldAddress, MoveMessage{4, 28, 0});
@@ -435,7 +436,7 @@ TEST(NetworkSystem, TurnsNetworkActivityIntoWorldEvents) {
     if (frame == 200) {
       remote.disconnect(worldAddress);
     }
-    world.updateSystems(0.01f);
+    engine.update(0.01);
     // Events live for one frame, so they are tallied as they appear.
     connected += static_cast<int>(world.getEvents<PeerConnectedEvent>().size());
     lost += static_cast<int>(world.getEvents<PeerDisconnectedEvent>().size());
@@ -452,30 +453,30 @@ TEST(NetworkSystem, TurnsNetworkActivityIntoWorldEvents) {
   EXPECT_EQ(lastMove.from, 4);
   EXPECT_EQ(lastMove.to, 28);
   EXPECT_TRUE(remoteAddress.isValid());
-  world.destroySystems();
 }
 
-TEST(NetworkSystem, InstallNetworkingCreatesTheResourcesOnce) {
-  componeng::ecs::World world;
-  EXPECT_FALSE(world.hasResource<Network>());
-  installNetworking(world);
-  EXPECT_TRUE(world.hasResource<Network>());
-  EXPECT_TRUE(world.hasResource<Session>());
-  EXPECT_TRUE(world.hasResource<LanBrowser>());
-  EXPECT_TRUE(world.hasResource<EcsBridge>());
-  installNetworking(world); // a second call changes nothing
-  world.createSystems();
-  world.updateSystems(0.01f);
+TEST(NetPlugin, AddsTheResourcesOnce) {
+  componeng::core::Engine engine;
+  EXPECT_FALSE(engine.world().hasResource<Network>());
+  engine.add(NetPlugin{});
+  EXPECT_TRUE(engine.has<NetPlugin>());
+  EXPECT_TRUE(engine.world().hasResource<Network>());
+  EXPECT_TRUE(engine.world().hasResource<Session>());
+  EXPECT_TRUE(engine.world().hasResource<LanBrowser>());
+  EXPECT_TRUE(engine.world().hasResource<EcsBridge>());
+  EXPECT_THROW(engine.add(NetPlugin{}), std::runtime_error);
+  engine.initialize();
+  engine.update(0.01);
   // Nothing is opened until the game asks.
-  EXPECT_FALSE(world.getResource<Network>().isOpen());
-  world.destroySystems();
+  EXPECT_FALSE(engine.world().getResource<Network>().isOpen());
 }
 
-TEST(NetworkSystem, ClosesTheNetworkAndLeavesTheSessionWhenTheWorldEnds) {
+TEST(NetPlugin, ClosesTheNetworkAndLeavesTheSessionWhenTheEngineShutsDown) {
   LoopbackNetwork loopback;
-  componeng::ecs::World world;
-  installNetworking(world);
-  world.createSystems();
+  componeng::core::Engine engine;
+  engine.add(NetPlugin{});
+  engine.initialize();
+  componeng::ecs::World &world = engine.world();
   auto &net = world.getResource<Network>();
   ASSERT_TRUE(net.open(loopback.open(), testConfig()));
   SessionConfig config;
@@ -492,13 +493,12 @@ TEST(NetworkSystem, ClosesTheNetworkAndLeavesTheSessionWhenTheWorldEnds) {
   double now = 0.0;
   for (int i = 0; i < 300 && !guest.isActive(); ++i) {
     now += 0.01;
-    world.time = now;
-    world.updateSystems(0.01f);
+    engine.update(0.01);
     guestNet.update(now);
     guest.update(now);
   }
   ASSERT_TRUE(guest.isActive());
-  world.destroySystems();
+  engine.shutdown();
   EXPECT_FALSE(net.isOpen());
   for (int i = 0; i < 100 && !left; ++i) {
     now += 0.01;
@@ -514,15 +514,6 @@ TEST(Network, OpenRefusesAnUnsetProtocolId) {
   EXPECT_FALSE(net.open(loopback.open(), TransportConfig())); // protocolId 0
   EXPECT_FALSE(net.isOpen());
   EXPECT_TRUE(net.open(loopback.open(), testConfig()));
-}
-
-TEST(NetworkSystem, DoesNothingWithoutANetworkResource) {
-  componeng::ecs::World world;
-  world.registerSystem<NetworkSystem>(
-      componeng::ecs::SystemGroup::Initialization);
-  world.createSystems();
-  world.updateSystems(0.01f);
-  world.destroySystems();
 }
 
 // ---- A whole exchange over real UDP sockets ----

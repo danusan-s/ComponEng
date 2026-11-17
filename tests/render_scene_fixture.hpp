@@ -90,7 +90,6 @@ makeScene(const std::function<void(fake::Recorder &)> &configure = {},
   auto scene = std::make_unique<Scene>();
   scene->world = std::make_unique<World>();
   World &world = *scene->world;
-  world.init();
 
   auto device = std::make_unique<fake::FakeRenderDevice>();
   scene->device = device.get();
