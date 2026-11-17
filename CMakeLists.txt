@@ -52,6 +52,17 @@ option(COMPONENG_PROFILING "Measure GPU/CPU timings and show the timing panes" O
 # COMPONENG_NETWORKING: build the ComponEngNet library (peer-to-peer networking).
 #   The engine does not depend on it: a game links ComponEngNet and calls
 #   net::installNetworking(world). OFF skips building it and its tests.
+# COMPONENG_MARCH: CPU target for Release builds. "native" is fastest on the
+#   build machine but the binary may crash elsewhere; use x86-64-v3 for a binary
+#   you hand to someone else (any x86-64 CPU from about 2015 on).
+set(COMPONENG_MARCH "native" CACHE STRING "-march value for Release builds")
+# COMPONENG_WERROR: treat warnings in engine code as errors.
+option(COMPONENG_WERROR "Treat engine warnings as errors" ON)
+if(COMPONENG_WERROR)
+    set(COMPONENG_WARNING_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror)
+else()
+    set(COMPONENG_WARNING_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual)
+endif()
 option(COMPONENG_NETWORKING "Build the optional networking library (ComponEngNet)" ON)
 
 file(GLOB ENGINE_THIRD_PARTY_SOURCES
@@ -101,7 +112,7 @@ target_compile_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-fsanitize=address>
     $<$<CONFIG:Release>:-ffast-math>
     $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Release>:-march=native>
+    $<$<CONFIG:Release>:-march=${COMPONENG_MARCH}>
 )
 target_link_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-fsanitize=address>
@@ -110,7 +121,7 @@ target_link_options(ComponEng PUBLIC
 # PRIVATE: don't force these diagnostics onto example/ and tests
 # -Werror: the engine builds warning-clean, so keep it that way
 target_compile_options(ComponEng PRIVATE
-    -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror
+    ${COMPONENG_WARNING_FLAGS}
 )
 # Vendored code isn't ours to fix; silence it so it can't drown out our warnings
 set_source_files_properties(${ENGINE_THIRD_PARTY_SOURCES} PROPERTIES
@@ -166,7 +177,7 @@ if(COMPONENG_NETWORKING)
     add_library(ComponEngNet STATIC ${NET_SOURCES})
     target_link_libraries(ComponEngNet PUBLIC ComponEng)
     target_compile_options(ComponEngNet PRIVATE
-        -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror
+        ${COMPONENG_WARNING_FLAGS}
     )
     # Winsock is a separate library on Windows; POSIX sockets are part of libc.
     if(WIN32)
@@ -179,7 +190,7 @@ if(COMPONENG_NETWORKING)
     add_library(ComponEngNetNat STATIC ${NAT_SOURCES})
     target_link_libraries(ComponEngNetNat PUBLIC ComponEngNet)
     target_compile_options(ComponEngNetNat PRIVATE
-        -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror
+        ${COMPONENG_WARNING_FLAGS}
     )
     message(STATUS "Networking: ComponEngNet and ComponEngNetNat enabled")
 else()

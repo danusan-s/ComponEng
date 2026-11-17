@@ -10,8 +10,8 @@ namespace componeng::ecs {
 /**
  * @brief A growable, aligned block of raw bytes.
  *
- * Allocates memory via std::aligned_alloc to guarantee proper alignment for
- * extended-alignment types. Supports manual growth, move semantics, and
+ * Allocates memory via the aligned operator new to guarantee proper alignment
+ * for extended-alignment types. Supports manual growth, move semantics, and
  * disallows copies.
  */
 class AlignedBuffer {
@@ -21,13 +21,21 @@ private:
   size_t m_capacity = 0;
   size_t m_alignment = 0;
 
+  // Not std::aligned_alloc: Windows has no such function.
+  void release() {
+    if (m_data) {
+      ::operator delete(m_data, std::align_val_t(m_alignment));
+      m_data = nullptr;
+    }
+  }
+
 public:
   explicit AlignedBuffer(size_t alignment)
       : m_alignment(std::max(alignment, sizeof(void *))) {
   }
 
   ~AlignedBuffer() {
-    std::free(m_data);
+    release();
   }
 
   AlignedBuffer(AlignedBuffer &&other) noexcept
@@ -40,7 +48,7 @@ public:
 
   AlignedBuffer &operator=(AlignedBuffer &&other) noexcept {
     if (this != &other) {
-      std::free(m_data);
+      release();
       m_data = other.m_data;
       m_size = other.m_size;
       m_capacity = other.m_capacity;
@@ -62,14 +70,11 @@ public:
     if (allocSize % m_alignment != 0) {
       allocSize = (allocSize / m_alignment + 1) * m_alignment;
     }
-    std::byte *newData =
-        static_cast<std::byte *>(std::aligned_alloc(m_alignment, allocSize));
-    if (!newData) {
-      throw std::bad_alloc();
-    }
+    std::byte *newData = static_cast<std::byte *>(
+        ::operator new(allocSize, std::align_val_t(m_alignment)));
     if (m_data) {
       std::memcpy(newData, m_data, m_size);
-      std::free(m_data);
+      release();
     }
     m_data = newData;
     m_capacity = newCapacity;
