@@ -7,9 +7,9 @@ namespace componeng::core {
  * pass, shader), per-pass and per-system CPU timings, and the panes that show
  * them.
  *
- * Configure with -DCOMPONENG_PROFILING=OFF to compile all of that out, for a
- * benchmark or a profile (perf, a GPU debugger) that should not pay for its own
- * measurement. The counters in resources::RenderStats are plain increments and
+ * Off by default. Configure with -DCOMPONENG_PROFILING=ON to measure; with it
+ * off all of that is compiled out, which is what a benchmark or a profile (perf,
+ * a GPU debugger) wants, since it does not pay for its own measurement. The counters in resources::RenderStats are plain increments and
  * are always filled in.
  *
  * Independent of the debug UI (COMPONENG_DEBUG_UI): the timing panes are drawn

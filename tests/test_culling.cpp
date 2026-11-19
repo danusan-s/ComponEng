@@ -135,8 +135,8 @@ TEST(Culling, EverythingIsDrawnOnTheFirstFrameBeforeIdsAreResolved) {
   auto s = makeScene({}, /*withCulling=*/true);
   setCamera(*s, lookDownMinusZ());
   s->spawn("tri", "matA", 0); // placed at z = 0 by spawn(); in front is below
-  EntityID far = s->spawn("tri", "matA", 5000);
-  (void)far;
+  EntityID farEntity = s->spawn("tri", "matA", 5000);
+  (void)farEntity;
   s->frame();
   EXPECT_EQ(drawnInstances(*s), 2u)
       << "ids resolve during the first batching pass; culling starts after";

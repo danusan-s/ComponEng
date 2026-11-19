@@ -5,78 +5,138 @@ This guide covers what you need to know to build a game or application using Com
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [The IGame Interface](#the-igame-interface)
+- [Plugins](#plugins)
 - [Creating Components](#creating-components)
 - [Creating Systems](#creating-systems)
 - [Using Queries](#using-queries)
 - [Working with Resources](#working-with-resources)
 - [Working with Assets](#working-with-assets)
 - [Emitting and Handling Events](#emitting-and-handling-events)
+- [Networking](#networking)
 
 ---
 
 ## Quick Start
 
-1. **Create a game class** that inherits from `IGame`
-2. **Implement `init()`** to create entities and register your systems
-3. **Implement `shutdown()`** for cleanup (optional)
-4. **Pass your game to `Engine::run()`**
+1. **Create a game plugin**: a class that inherits from `IPlugin`
+2. **Register your systems in `build()`**
+3. **Create entities and load things in `ready()`**
+4. **Add `DefaultPlugins` and your plugin to an `Engine`, then `run()`**
 
 ```cpp
+#include "componeng/core/default_plugins.hpp"
 #include "componeng/core/engine.hpp"
-#include "componeng/core/game.hpp"
 
-class MyGame : public componeng::core::IGame {
+class MyGame : public componeng::core::IPlugin {
 public:
-    void init(componeng::ecs::World& world) override {
-        // Create entities, add components, register systems
+    void build(componeng::core::Engine& engine) override {
+        // Register systems, resources and components
+        engine.world().registerSystem<MySystem>(componeng::ecs::SystemGroup::Simulation);
     }
-    
-    void shutdown(componeng::ecs::World& world) override {
+
+    void ready(componeng::ecs::World& world) override {
+        // Create entities, load assets
+    }
+
+    void cleanup(componeng::ecs::World& world) override {
         // Cleanup
     }
 };
 
 int main() {
-    componeng::core::Engine::get().init();
-    MyGame game;
-    componeng::core::Engine::get().run(game);
-    componeng::core::Engine::get().shutdown();
+    componeng::core::Engine engine;
+    engine.add(componeng::core::DefaultPlugins{}).add(MyGame{}).run();
     return 0;
 }
 ```
 
 ---
 
-## The IGame Interface
+## Plugins
 
-Your game class is the entry point for initializing your world:
+Everything the engine does comes from a plugin: the window and render device
+(`WindowPlugin`), input, physics, the camera, audio and rendering. `DefaultPlugins`
+adds all of them. Your game is a plugin too, and so is networking if you use it.
+A plugin is a bundle of registrations (components, resources, systems and the
+order between them). It has no per-frame hook: per-frame work is a system the
+plugin registers.
 
 ```cpp
-#include "componeng/core/game.hpp"
-
-class MyGame : public componeng::core::IGame {
+class MyGame : public componeng::core::IPlugin {
 public:
-    // Called once after engine init, before the main loop
-    void init(ecs::World& world) override {
-        // Create entities
-        // Add components
-        // Register custom systems
-    }
+    // When added: register things. Cheap; nothing is opened or loaded yet.
+    void build(Engine& engine) override;
 
-    // Called once after the main loop ends, before engine shutdown
-    void shutdown(ecs::World& world) override {
-        // Cleanup resources, save state, etc.
+    // Once every plugin is built, before the first frame: create entities,
+    // load assets, open sockets. Systems are created right after.
+    void ready(ecs::World& world) override;
+
+    // After the systems are destroyed, in reverse order: save state, clean up.
+    void cleanup(ecs::World& world) override;
+};
+```
+
+**Phases run in the order plugins were added.** `ready` of an earlier plugin runs
+before a later one's, so by the time your game's `ready` runs, the window is open,
+the built-in assets are loaded and the audio engine is up. `cleanup` runs in the
+opposite order, so your game cleans up first.
+
+**What to do in `build()`:**
+
+- Register components with `engine.world().registerComponents<A, B>()`
+- Register systems with `engine.world().registerSystem<MySystem>(group)`
+- Add resources with `engine.world().setResource(MyResource{...})`
+- Order systems with `addSystemDependencies` / `addSystemBefore` (see below)
+- Declare a dependency on another plugin with `engine.require<OtherPlugin>()`
+
+**What to do in `ready()`:**
+
+- Create entities with `world.createEntity()`
+- Add components with `world.addComponents(entity, component1, component2, ...)`
+- Load assets, register sounds, load scenes
+
+### Configuring and replacing the defaults
+
+Plugins are plain objects, so configuration is data on them:
+
+```cpp
+core::DefaultPlugins plugins;
+plugins.window.title = "My game";
+plugins.disable<audio::AudioPlugin>();   // no audio at all
+engine.add(plugins).add(MyGame{}).run();
+```
+
+A disabled plugin can still be added on its own, or replaced by your own.
+Adding the same plugin type twice (say `AudioPlugin` while it is still part of
+`DefaultPlugins`) throws and says so. `RenderPlugin` requires `WindowPlugin`; if
+you disable the window it builds a default one.
+
+### Writing a plugin for a feature
+
+A reusable feature (networking is one) is a plugin plus its systems:
+
+```cpp
+class ScoreboardPlugin : public core::IPlugin {
+public:
+    int maxPlayers = 8;                       // configuration
+
+    void build(core::Engine& engine) override {
+        engine.require<net::NetPlugin>();     // built, and cleaned up after, first
+        engine.world().setResource(Scoreboard{maxPlayers});
+        engine.world().registerSystem<ScoreboardSystem>(ecs::SystemGroup::Simulation);
     }
 };
 ```
 
-**What to do in `init()`:**
+`require<P>()` adds a default `P` if there is none yet. If `P` needs constructor
+arguments, add it yourself first, otherwise `require` throws.
 
-- Create entities with `world.createEntity()`
-- Add components with `world.addComponents(entity, component1, component2, ...)`
-- Register your custom systems with `world.registerSystem<MySystem>(group)`
-- Set up resources with `world.set_resource(MyResource{...})`
+### Running without a window
+
+With no `WindowPlugin` the engine has no window and `run()` uses a fixed-rate loop
+(60 per second) until a system calls `world.getResource<core::EngineControl>().requestExit()`.
+That is what a dedicated server or a test wants. `engine.initialize()`,
+`engine.update(dt)` and `engine.shutdown()` step the same thing by hand.
 
 ---
 
@@ -109,12 +169,12 @@ struct VelocityComponent {
 
 ### Registering Components
 
-Components must be registered before use. In your game's `init()`:
+Components must be registered before use. In your plugin's `build()`:
 
 ```cpp
-void init(ecs::World& world) override {
+void build(core::Engine& engine) override {
     // Register your custom components
-    world.registerComponents<
+    engine.world().registerComponents<
         mygame::HealthComponent,
         mygame::VelocityComponent
     >();
@@ -128,7 +188,7 @@ void init(ecs::World& world) override {
 ### Adding Components to Entities
 
 ```cpp
-void init(ecs::World& world) override {
+void ready(ecs::World& world) override {
     ecs::EntityID player = world.createEntity();
     
     // Add single component
@@ -226,23 +286,37 @@ public:
 
 ### System Groups
 
-Systems are executed in three groups in this order:
+Systems are executed in four groups in this order:
 
 | Group | When | Common Systems |
 |-------|------|----------------|
-| `SystemGroup::Initialization` | First | Input processing |
+| `SystemGroup::PreUpdate` | First | Input processing, networking |
 | `SystemGroup::Simulation` | Second | Physics, AI, game logic |
-| `SystemGroup::Presentation` | Third | Rendering |
+| `SystemGroup::Presentation` | Third | Culling, batching, rendering |
+| `SystemGroup::FrameEnd` | Last | Rolling the frame over (input buffers) |
+
+A system never runs before one in an earlier group. Inside a group, systems run in
+registration order unless you constrain them:
+
+```cpp
+world.addSystemDependencies<MySystem, PhysicsSystem>(); // MySystem runs after PhysicsSystem
+world.addSystemBefore<MySystem, CameraSystem>();        // MySystem runs before CameraSystem
+```
+
+Constraints are resolved when the systems are created, so they can be added in any
+order and before the other system is registered. An unknown system, a constraint
+that points into a later group, or a cycle throws at that point instead of being
+ignored. Systems are destroyed in reverse of the order they were created.
 
 ### Registering Systems
 
-In your game's `init()`:
+In your plugin's `build()`:
 
 ```cpp
-void init(ecs::World& world) override {
+void build(core::Engine& engine) override {
     // Register your system with a group
-    world.registerSystem<mygame::HealthSystem>(ecs::SystemGroup::Simulation);
-    world.registerSystem<mygame::DamageSystem>(ecs::SystemGroup::Simulation);
+    engine.world().registerSystem<mygame::HealthSystem>(ecs::SystemGroup::Simulation);
+    engine.world().registerSystem<mygame::DamageSystem>(ecs::SystemGroup::Simulation);
 }
 ```
 
@@ -407,10 +481,10 @@ void MySystem::onUpdate(const ecs::SystemState& state) {
 
 ### Setting Resources
 
-In your game's `init()`:
+In your plugin's `build()` (or `ready()`):
 
 ```cpp
-void init(ecs::World& world) override {
+void ready(ecs::World& world) override {
     // Set the main camera entity
     ecs::EntityID camera = world.createEntity();
     world.addComponent(camera, componeng::components::TransformComponent{});
@@ -428,10 +502,10 @@ The AssetManager provides static methods to load and access shaders, textures, a
 
 ### Loading Assets
 
-Assets are loaded on first access and cached. Load them early in your game's `init()`:
+Assets are loaded on first access and cached. Load them early, in your plugin's `ready()` (the asset manager exists by then):
 
 ```cpp
-void init(ecs::World& world) override {
+void ready(ecs::World& world) override {
     using namespace componeng::renderer;
     
     // Load shaders (vertex, fragment, optional geometry)
@@ -472,7 +546,7 @@ const Mesh& mesh = assetManager.getMesh(meshID);
 ### Using Assets with Components
 
 ```cpp
-void init(ecs::World& world) override {
+void ready(ecs::World& world) override {
     using namespace componeng;
     using namespace componeng::components;
     using namespace componeng::renderer;
@@ -501,7 +575,7 @@ void init(ecs::World& world) override {
 
 `Utils::getAssetPath("assets/...")` resolves against the engine's own source
 tree. A game that keeps its assets elsewhere registers its root once, before
-`Engine::init()`; roots added this way are searched first (newest first), then
+`Engine::run()` (or `initialize()`); roots added this way are searched first (newest first), then
 the engine's:
 
 ```cpp
@@ -738,6 +812,261 @@ void DamageSystem::onUpdate(const ecs::SystemState& state) {
 
 ---
 
+## Networking
+
+The engine has a peer-to-peer networking layer: no server is required, any
+instance can connect to any other, and a game works with typed messages rather
+than sockets or bytes.
+
+### Turning it on
+
+Networking is optional and lives in its own library, `ComponEngNet`. A game that
+does not use it contains none of its code. To opt in:
+
+```cmake
+target_link_libraries(MyGame PRIVATE ComponEngNet)   # brings ComponEng along
+```
+
+```cpp
+#include "componeng/net/net_plugin.hpp"
+
+engine.add(DefaultPlugins{})
+      .add(componeng::net::NetPlugin{})   // the resources and the system, once
+      .add(MyGame{});
+```
+
+`NetPlugin` creates the `Network`, `Session`, `LanBrowser` and `EcsBridge`
+resources and registers a system that updates them each frame ahead of the
+systems that read the results. On cleanup it leaves the session and closes the
+network. No socket is opened until you call `Network::open`. The build option
+`COMPONENG_NETWORKING` (default ON) controls whether `ComponEngNet` and its tests
+are built at all.
+
+### Defining messages
+
+A message is a struct with a unique `kName` and one `serialize` function, which
+is used for both writing and reading so the two cannot disagree:
+
+```cpp
+#include "componeng/net/network.hpp"
+
+struct MoveMessage {
+  static constexpr const char *kName = "chess.move";
+  uint8_t from = 0, to = 0, promotion = 0;
+  template <typename Ar> void serialize(Ar &ar) { ar(from, to, promotion); }
+};
+```
+
+Supported field types: `bool`, integers, enums, `float`/`double`, `std::string`,
+`std::vector`, `std::array`, other serializable structs, and the engine's `Vec2`,
+`Vec3`, `Vec4` (include `componeng/net/archive_math.hpp`). Use fixed-width
+integers (`uint32_t`, not `unsigned long` or `size_t`) so peers on different
+platforms agree. Data from the network is untrusted: reads are bounds-checked
+and a malformed message is dropped, but checking that an enum or float holds a
+sensible value is up to the game.
+
+### Opening, connecting, sending
+
+```cpp
+auto &net = world.getResource<componeng::net::Network>();
+
+net.registerMessage<MoveMessage>();                 // reliable, in order
+net.registerMessage<CursorMessage>(net::Channel::Unreliable); // may be lost
+net::TransportConfig config;
+config.protocolId = 0x4D594741;      // required: a number of your game's own
+net.open(7777, config);              // port 0 picks a free one
+net.setAcceptIncoming(true);         // on the peer that others join
+
+net.connect("192.168.1.20:7777");    // on the peer that joins (numeric IP)
+net.send(peer, MoveMessage{12, 28, 0});
+net.broadcast(MoveMessage{12, 28, 0});             // every connected peer
+```
+
+`protocolId` identifies your game (and its protocol version): peers with another
+value ignore each other, so two games on one network never mix. `open` refuses
+to run without one. Every peer registers the same message types. Use `Channel::Reliable` for
+anything that must arrive exactly once and in order (a chess move), and
+`Channel::Unreliable` for what is stale a moment later (a cursor position).
+
+### Receiving
+
+As callbacks (run during the network update), as ECS events, or both:
+
+```cpp
+net.onMessage<MoveMessage>([](const net::Address &from, const MoveMessage &m) { ... });
+net.onPeerConnected([](const net::Address &peer) { ... });
+
+// ECS events are opt in per message type, through the EcsBridge:
+world.getResource<net::EcsBridge>().forward<MoveMessage>(net);
+// then, in a system, readable the frame after they arrive:
+for (const auto &e : world.getEvents<events::MessageReceivedEvent<MoveMessage>>())
+  use(e.from, e.message);
+// Peer events (PeerConnectedEvent, PeerDisconnectedEvent, ConnectFailedEvent) and
+// session events need no opt-in once NetPlugin has been added
+// (events/network_event.hpp, events/session_event.hpp).
+```
+
+`NetPlugin`'s system runs the network every frame. The networking core does not depend
+on the ECS, so it can also be used without `NetPlugin`: construct a
+`Network` yourself and call `net.update(now)` with seconds from a steady clock.
+
+### Sessions: more than two peers
+
+`Network` connects peers one pair at a time. For a game with several players,
+use a `Session`: one peer hosts, others join, and every peer ends up connected
+to every other (a mesh). Peers are named by `PeerId` (the host is 0, then 1, 2,
+...), and ids are not reused while the session lives.
+
+```cpp
+auto &session = world.getResource<net::Session>();
+session.registerMessage<PieceMoved>();      // instead of net.registerMessage
+net.open(7777);
+
+session.host({.name = "Jigsaw night"});     // peer 0
+// or, on another machine:
+session.join("192.168.1.20:7777");
+
+session.onJoined([] { /* in, and connected to everyone */ });
+session.onPeerJoined([](net::PeerId id) { ... });
+session.onPeerLeft([](net::PeerId id, net::DisconnectReason why) { ... });
+
+session.broadcast(PieceMoved{...});         // to every other peer
+session.send(2, PieceMoved{...});           // to peer 2
+session.onMessage<PieceMoved>([](net::PeerId from, const PieceMoved &m) { ... });
+```
+
+The **leader** is the one peer that admits joiners and answers LAN searches:
+the host, and if it leaves, the peer with the lowest id. Everything else is
+symmetric; a game that wants an authority (for example to settle conflicting
+moves) can use the leader as one. ECS events: `SessionJoinedEvent`,
+`SessionJoinFailedEvent`, `SessionPeerJoinedEvent`, `SessionPeerLeftEvent`,
+`SessionLeaderChangedEvent` (all emitted once `NetPlugin` has been added) and
+`SessionMessageEvent<T>`, which is opt in per type with
+`bridge.forward<T>(session)` (`events/session_event.hpp`).
+
+### Shared objects: one owner at a time
+
+For state every peer sees and edits, such as the pieces of a shared jigsaw, use
+`SharedObjects<T>`. Each object is either free or owned by exactly one peer, and
+only its owner may change it, so two players cannot drag the same piece. The
+session's leader decides who gets an object when several ask at once.
+
+```cpp
+struct Piece {
+  float x = 0, y = 0;
+  bool placed = false;
+  template <typename Ar> void serialize(Ar &ar) { ar(x, y, placed); }
+};
+net::SharedObjects<Piece> pieces(session, "jigsaw.pieces"); // same name on every peer
+
+pieces.add(pieces.newId(), Piece{...});        // e.g. the host, once, at the start
+
+pieces.claim(id);                              // on mouse down: ask for it
+pieces.onOwnerChanged([&](net::ObjectId id, net::PeerId owner) { ... });
+pieces.onClaimDenied([&](net::ObjectId id, net::PeerId owner) { ... });
+
+if (pieces.ownedByMe(id)) pieces.update(id, Piece{x, y, false}); // each frame while dragging
+pieces.release(id, Piece{x, y, snapped});      // on mouse up: final state, object is free
+
+if (const Piece *p = pieces.get(id)) draw(*p); // every frame, on every peer
+```
+
+The claim is a request: the game starts dragging when `onOwnerChanged` says it
+owns the piece (or when `ownedByMe` turns true), and gives up if it is denied.
+`update` streams unreliably, so a lost update is replaced by the next one;
+`release` delivers the final state reliably, so a piece always ends where its
+owner dropped it. A peer that leaves frees what it owned. A peer that joins is
+sent the whole set (`onSynced` fires when it has arrived), and the set is
+empty and `synced()` is false until then. State sent with `update` must fit one
+packet (about 1.1 KB); `add` and `release` can be larger.
+
+Callbacks report what other peers did, and the leader's decisions about this
+peer's claims. Ownership operations need an active session; `add`, `remove` and
+`get` also work on a set used alone. Peers are trusted to play by the rules:
+this keeps friends in step, it does not stop a modified client from cheating.
+
+### Finding games on the local network
+
+A hosting session answers LAN searches by default (`SessionConfig::advertiseOnLan`).
+To list them, use the world's `LanBrowser`:
+
+```cpp
+auto &browser = world.getResource<net::LanBrowser>();
+browser.start(net.config().protocolId);     // same value on every peer of a game
+// each frame, until the player picks one:
+for (const net::LanSessionInfo &s : browser.sessions())
+  show(s.name, s.peers, s.maxPeers);
+session.join(chosen);                       // a LanSessionInfo
+```
+
+Searching asks the broadcast address once a second; nothing is sent while idle.
+If two hosts on one machine use the same discovery port, only one of them hears
+a given search.
+
+### Playing over the internet
+
+Behind a home router a peer's own address is no use to anyone outside, and the
+router drops packets it did not expect. The engine gets through with STUN and
+hole punching, and no server of your own:
+
+1. **Each peer asks a public STUN server what its address looks like from
+   outside.** The defaults are Google's and Cloudflare's public servers; they
+   are third-party services with no guarantee, and they see your IP.
+2. **The peers swap those addresses themselves**, as a short *invite code*
+   (`0K10-R218-2E45-0`) read out, pasted into a chat, or sent any way you like.
+   STUN cannot introduce peers to each other; this step is yours (or your
+   game's lobby).
+3. **Both send to each other at about the same moment**, which makes each router
+   let the other's packets in.
+
+Internet play is a second opt-in on top of networking: link `ComponEngNetNat` and
+add `NatPlugin` (it requires `NetPlugin`), which creates a `NatTraversal` for the
+`Network` before it opens, as it has to (it wraps the socket). A game that only
+plays on a LAN leaves it out.
+
+```cpp
+auto &net = world.getResource<net::Network>();
+auto &nat = world.getResource<net::NatTraversal>();   // from NatPlugin
+net.open(0, config);
+nat.onDiscovery([&](bool ok, const net::NatInfo &info) {
+  if (ok) show(nat.inviteCode());           // "0K10-R218-2E45-0": give this to the other player
+});
+nat.discoverPublicAddress();                // a second or two
+
+// The player being joined, once they have the joiner's code:
+session.expectJoiner(addressFromCode);      // or net.punch(address) without a session
+// The joiner, with the host's code:
+net::Address host;
+if (net::decodeInvite(codeTypedByPlayer, host))
+  session.join(host);
+```
+
+`nat.connectToInvite(code)` does the decode and `connect` for a plain `Network`.
+Peers that join later need no codes: the session's leader introduces them to
+each other. Raise `TransportConfig::connectTimeout` (default 5 s) if players
+exchange codes slowly.
+
+**It works through most home routers, and not through all.** A router that
+gives each destination a different public port (a *symmetric* NAT, common on
+mobile data, some campus and company networks) cannot be punched through, as the
+address STUN reports is only valid toward the STUN server. `nat.natType()` says
+which you have (`Cone` is fine, `Symmetric` is not), once discovery is done.
+A symmetric peer can still *connect to* a host that is reachable without
+punching (a public IP, a forwarded port, or a "full cone" router). For the rest only a relay (TURN) helps, which the engine does not provide.
+Peers on the same home network as each other, reaching each other through the
+router's public address, may also fail ("hairpinning"); use the LAN address
+there.
+
+### Scope
+
+LAN play and direct-IP play work, as does internet play through ordinary home
+routers, for up to a handful of peers (every peer keeps a connection to every
+other, so keep `maxPeers` a few under `TransportConfig::maxConnections`). Two
+peers that stay connected to the rest but lose contact with each other are not
+reconnected.
+
+---
+
 ## Complete Example
 
 Here's a simplified version of how the example game works:
@@ -755,9 +1084,13 @@ Here's a simplified version of how the example game works:
 
 #include "player_controller.hpp"  // Custom system
 
-class Game : public componeng::core::IGame {
+class Game : public componeng::core::IPlugin {
 public:
-    void init(componeng::ecs::World& world) override {
+    void build(componeng::core::Engine& engine) override {
+        engine.world().registerSystem<PlayerController>(componeng::ecs::SystemGroup::Simulation);
+    }
+
+    void ready(componeng::ecs::World& world) override {
         // Create 100 cubes with physics
         for (int i = 0; i < 100; ++i) {
             componeng::ecs::EntityID entity = world.createEntity();
@@ -795,21 +1128,16 @@ public:
                 }
             );
         }
-        
-        // Register custom system
-        world.registerSystem<PlayerController>(componeng::ecs::SystemGroup::Simulation);
     }
-    
-    void shutdown(componeng::ecs::World& world) override {
+
+    void cleanup(componeng::ecs::World& world) override {
         // Cleanup if needed
     }
 };
 
 int main() {
-    componeng::core::Engine::get().init();
-    Game game;
-    componeng::core::Engine::get().run(game);
-    componeng::core::Engine::get().shutdown();
+    componeng::core::Engine engine;
+    engine.add(componeng::core::DefaultPlugins{}).add(Game{}).run();
     return 0;
 }
 ```

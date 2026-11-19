@@ -3,14 +3,12 @@
 #include "componeng/ecs/system.hpp"
 #include "componeng/utils/logger.hpp"
 
-#include <array>
 #include <assert.h>
 #include <chrono>
 #include <memory>
-#include <queue>
+#include <stdexcept>
 #include <string>
 #include <typeindex>
-#include <unordered_map>
 #include <vector>
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -40,213 +38,207 @@ inline std::string readableSystemName(const char *mangled) {
 
 } // namespace detail
 
-enum class SystemGroup { Initialization, Simulation, Presentation };
+// Groups run in this order every frame. A system never runs before one in an
+// earlier group, so ordering constraints only matter inside a group.
+//   PreUpdate:    input, network
+//   Simulation:   game logic, physics
+//   Presentation: culling, batching, rendering
+//   FrameEnd:     bookkeeping that must see the finished frame
+enum class SystemGroup { PreUpdate, Simulation, Presentation, FrameEnd };
 
-constexpr SystemGroup GROUP_ORDER[] = {SystemGroup::Initialization,
-                                       SystemGroup::Simulation,
-                                       SystemGroup::Presentation};
-constexpr size_t NUM_GROUPS = sizeof(GROUP_ORDER) / sizeof(SystemGroup);
+constexpr size_t NUM_GROUPS = 4;
 
 using SystemID = size_t;
 
-/**
- * @brief Lightweight record pairing a system's type name with its shared
- * pointer.
- */
 struct SystemRecord {
-  const char *typeName;
+  std::type_index type;
+  SystemGroup group;
   std::shared_ptr<ISystem> system;
-  std::string displayName;   // typeName without namespace or mangling
+  std::string displayName;   // type name without namespace or mangling
   double lastUpdateMs = 0.0; // wall time of the most recent onUpdate
 };
 
-class SystemGroupManager {
-private:
-  std::unordered_map<std::type_index, SystemID> m_typeToIndex;
-  std::vector<std::vector<SystemID>> m_dependencies;
-  std::vector<SystemRecord> m_systems;
-  bool m_executionOrderBuilt = false;
-
+/**
+ * @brief Registers systems and runs them.
+ *
+ * Every system belongs to a group. Within a group the order comes from the
+ * constraints (addSystemDependencies, addSystemBefore), and registration order
+ * breaks ties. Constraints are resolved once, when the systems are created, so
+ * they can be added in any order and across plugins. An unknown system, a
+ * constraint that points into a later group, or a cycle throws then.
+ */
+class SystemManager {
 public:
-  template <typename T> std::shared_ptr<T> addSystem() {
-    std::type_index typeIndex = typeid(T);
-    if (m_typeToIndex.find(typeIndex) != m_typeToIndex.end()) {
-      throw std::runtime_error("System already registered in this group.");
+  template <typename T> std::shared_ptr<T> registerSystem(SystemGroup group) {
+    if (m_built) {
+      throw std::logic_error("Systems are already created: register '" +
+                             nameOf(typeid(T)) + "' before that");
+    }
+    if (static_cast<size_t>(group) >= NUM_GROUPS) {
+      throw std::runtime_error("Invalid SystemGroup.");
+    }
+    if (isRegistered<T>()) {
+      throw std::runtime_error("System '" + nameOf(typeid(T)) +
+                               "' is already registered.");
     }
     auto system = std::make_shared<T>();
-    m_systems.push_back({typeIndex.name(), system,
-                         detail::readableSystemName(typeIndex.name()), 0.0});
-    m_dependencies.push_back({});
-    m_typeToIndex[typeIndex] = m_systems.size() - 1;
+    m_systems.push_back(
+        {std::type_index(typeid(T)), group, system, nameOf(typeid(T)), 0.0});
     return system;
   }
 
+  /** T runs after each of Ts. */
   template <typename T, typename... Ts> void addSystemDependencies() {
-    SystemID systemID = m_typeToIndex[typeid(T)];
-    std::vector<SystemID> deps;
-    (
-        [&]() {
-          if (!isRegistered<Ts>()) {
-            addSystem<Ts>();
-          }
-          deps.push_back(m_typeToIndex[typeid(Ts)]);
-        }(),
-        ...);
-    m_dependencies[systemID] = deps;
+    (m_constraints.push_back(
+         {std::type_index(typeid(Ts)), std::type_index(typeid(T))}),
+     ...);
+  }
+
+  /** T runs before each of Ts. */
+  template <typename T, typename... Ts> void addSystemBefore() {
+    (m_constraints.push_back(
+         {std::type_index(typeid(T)), std::type_index(typeid(Ts))}),
+     ...);
   }
 
   template <typename T> bool isRegistered() const {
-    std::type_index typeIndex = typeid(T);
-    return m_typeToIndex.find(typeIndex) != m_typeToIndex.end();
+    return indexOf(typeid(T)) != kNone;
   }
 
+  /** Fixes the execution order. Throws on a bad constraint. Safe to repeat. */
   void buildExecutionOrder() {
-    std::vector<size_t> inDegree(m_systems.size(), 0);
-    std::vector<std::vector<SystemID>> reverseGraph(m_systems.size());
+    if (m_built) {
+      return;
+    }
+    const size_t count = m_systems.size();
+    std::vector<std::vector<size_t>> after(count);
+    std::vector<size_t> waiting(count, 0);
 
-    for (size_t i = 0; i < m_dependencies.size(); ++i) {
-      inDegree[i] = m_dependencies[i].size();
-      for (SystemID dep : m_dependencies[i]) {
-        reverseGraph[dep].push_back(i);
+    for (const Constraint &c : m_constraints) {
+      const size_t first = indexOf(c.first);
+      const size_t second = indexOf(c.second);
+      if (first == kNone || second == kNone) {
+        throw std::runtime_error(
+            "System order: '" + nameOf(first == kNone ? c.first : c.second) +
+            "' is not registered (needed by '" +
+            nameOf(first == kNone ? c.second : c.first) + "')");
+      }
+      if (m_systems[first].group > m_systems[second].group) {
+        throw std::runtime_error(
+            "System order: '" + m_systems[first].displayName +
+            "' cannot run before '" + m_systems[second].displayName +
+            "', which is in an earlier group");
+      }
+      if (m_systems[first].group == m_systems[second].group) {
+        after[first].push_back(second);
+        ++waiting[second];
       }
     }
 
-    std::queue<SystemID> q;
-
-    for (size_t i = 0; i < inDegree.size(); ++i) {
-      if (inDegree[i] == 0) {
-        q.push(i);
-      }
-    }
-
-    std::vector<SystemRecord> sortedSystems;
-    while (!q.empty()) {
-      SystemID current = q.front();
-      q.pop();
-      sortedSystems.push_back(m_systems[current]);
-      for (SystemID dependent : reverseGraph[current]) {
-        inDegree[dependent]--;
-        if (inDegree[dependent] == 0) {
-          q.push(dependent);
+    // Repeatedly take the earliest-registered system of the earliest group
+    // that has nothing left to wait for.
+    std::vector<bool> placed(count, false);
+    std::vector<SystemRecord> sorted;
+    sorted.reserve(count);
+    for (size_t round = 0; round < count; ++round) {
+      size_t pick = kNone;
+      for (size_t i = 0; i < count; ++i) {
+        if (placed[i] || waiting[i] != 0) {
+          continue;
+        }
+        if (pick == kNone || m_systems[i].group < m_systems[pick].group) {
+          pick = i;
         }
       }
+      if (pick == kNone) {
+        std::string stuck;
+        for (size_t i = 0; i < count; ++i) {
+          if (!placed[i]) {
+            stuck += (stuck.empty() ? "" : ", ") + m_systems[i].displayName;
+          }
+        }
+        throw std::runtime_error("System order has a cycle among: " + stuck);
+      }
+      placed[pick] = true;
+      for (size_t next : after[pick]) {
+        --waiting[next];
+      }
+      sorted.push_back(m_systems[pick]);
     }
-    m_executionOrderBuilt = true;
-    m_systems = std::move(sortedSystems);
+    m_systems = std::move(sorted);
+    m_built = true;
   }
 
-  void createAll(SystemState &state) {
-    if (!m_executionOrderBuilt) {
-      buildExecutionOrder();
-    }
-    for (auto const &sysRec : m_systems) {
-      LOG_INFO("Creating system: %s", sysRec.typeName);
-      auto const &system = sysRec.system;
-      system->onCreate(state);
+  void createAll(World *world) {
+    SystemState state{world, 0.0f};
+    buildExecutionOrder();
+    for (auto const &record : m_systems) {
+      LOG_INFO("Creating system: %s", record.displayName.c_str());
+      record.system->onCreate(state);
     }
   }
 
-  void updateAll(SystemState &state) {
-    if (!m_executionOrderBuilt) {
-      buildExecutionOrder();
-    }
+  void updateAll(World *world, float deltaTime) {
+    SystemState state{world, deltaTime};
+    buildExecutionOrder();
 #ifdef COMPONENG_DISABLE_PROFILING
     // The timings only feed the profiling panes; skip the clock reads without
     // them.
-    for (auto &sysRec : m_systems)
-      sysRec.system->onUpdate(state);
+    for (auto &record : m_systems)
+      record.system->onUpdate(state);
 #else
     using Clock = std::chrono::steady_clock;
-    for (auto &sysRec : m_systems) {
+    for (auto &record : m_systems) {
       const auto start = Clock::now();
-      sysRec.system->onUpdate(state);
-      sysRec.lastUpdateMs =
+      record.system->onUpdate(state);
+      record.lastUpdateMs =
           std::chrono::duration<double, std::milli>(Clock::now() - start)
               .count();
     }
 #endif
   }
 
-  /** Calls fn(name, lastUpdateMs) for each system, in execution order. */
-  template <typename Fn> void forEachTiming(Fn &&fn) const {
-    for (const auto &sysRec : m_systems)
-      fn(sysRec.displayName.c_str(), sysRec.lastUpdateMs);
-  }
-
-  void destroyAll(SystemState &state) {
-    if (!m_executionOrderBuilt) {
-      buildExecutionOrder();
-    }
-    for (auto const &sysRec : m_systems) {
-      LOG_INFO("Destroying system: %s", sysRec.typeName);
-      auto const &system = sysRec.system;
-      system->onDestroy(state);
-    }
-  }
-};
-
-/**
- * @brief Scheduler that registers, groups, and executes ECS systems.
- *
- * Systems are organized into three fixed groups (Initialization, Simulation,
- * Presentation) and run sequentially each frame in that order.
- * Duplicate registration of the same system type is prevented at runtime.
- */
-class SystemManager {
-private:
-  std::array<SystemGroupManager, NUM_GROUPS> m_systemGroups;
-
-public:
-  template <typename T>
-  std::shared_ptr<T> registerSystem(SystemGroup groupType) {
-    size_t groupIndex = static_cast<size_t>(groupType);
-    if (groupIndex >= NUM_GROUPS) {
-      throw std::runtime_error("Invalid SystemGroupType.");
-    }
-    return m_systemGroups[groupIndex].addSystem<T>();
-  }
-
-  template <typename T, typename... Ts> void addSystemDependencies() {
-    for (SystemGroupManager &group : m_systemGroups) {
-      if (group.isRegistered<T>()) {
-        group.addSystemDependencies<T, Ts...>();
-        return;
-      }
-    }
-  }
-
-  void createAll(World *world) {
-    SystemState state{world, 0.0f};
-    for (SystemGroupManager &group : m_systemGroups) {
-      group.buildExecutionOrder();
-      group.createAll(state);
-    }
-  }
-
-  void updateAll(World *world, float deltaTime) {
-    SystemState state{world, deltaTime};
-    for (SystemGroupManager &group : m_systemGroups) {
-      group.updateAll(state);
-    }
-  }
-
+  /** Last created is first destroyed, so a system can rely on the ones it
+   *  ran after. */
   void destroyAll(World *world) {
     SystemState state{world, 0.0f};
-    for (SystemGroupManager &group : m_systemGroups) {
-      group.destroyAll(state);
+    buildExecutionOrder();
+    for (auto it = m_systems.rbegin(); it != m_systems.rend(); ++it) {
+      LOG_INFO("Destroying system: %s", it->displayName.c_str());
+      it->system->onDestroy(state);
     }
   }
 
-  /**
-   * Calls fn(name, ms) for every system with how long its onUpdate took in the
-   * most recent updateAll(), groups in order and systems in execution order
-   * within each. The order is stable once systems are created, so a caller can
-   * keep per-system state indexed by position.
-   */
+  /** Calls fn(name, lastUpdateMs) for each system, in execution order. */
   template <typename Fn> void forEachSystemTiming(Fn &&fn) const {
-    for (const SystemGroupManager &group : m_systemGroups)
-      group.forEachTiming(fn);
+    for (const auto &record : m_systems)
+      fn(record.displayName.c_str(), record.lastUpdateMs);
   }
+
+private:
+  static constexpr size_t kNone = static_cast<size_t>(-1);
+
+  struct Constraint {
+    std::type_index first;  // runs first
+    std::type_index second; // runs after it
+  };
+
+  static std::string nameOf(const std::type_index &type) {
+    return detail::readableSystemName(type.name());
+  }
+
+  size_t indexOf(const std::type_index &type) const {
+    for (size_t i = 0; i < m_systems.size(); ++i) {
+      if (m_systems[i].type == type) {
+        return i;
+      }
+    }
+    return kNone;
+  }
+
+  std::vector<SystemRecord> m_systems;
+  std::vector<Constraint> m_constraints;
+  bool m_built = false;
 };
 
 } // namespace componeng::ecs

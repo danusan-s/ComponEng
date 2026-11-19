@@ -183,7 +183,6 @@ namespace {
 
 std::unique_ptr<World> makeWorld() {
   auto world = std::make_unique<World>();
-  world->init();
   world->registerComponents<TransformComponent, ColorComponent>();
   return world;
 }

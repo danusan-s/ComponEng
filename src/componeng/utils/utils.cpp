@@ -75,6 +75,13 @@ std::string Utils::getAssetPath(const std::string &relativePath) {
     }
   }
 
+  // A packaged build has assets/ next to the executable.
+  std::filesystem::path beside =
+      std::filesystem::path(getExecutableDir()) / relativePath;
+  if (std::filesystem::exists(beside)) {
+    return std::filesystem::weakly_canonical(beside).string();
+  }
+
   std::filesystem::path assetPath = root / relativePath;
 
   return std::filesystem::weakly_canonical(assetPath).string();

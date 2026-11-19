@@ -43,12 +43,27 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
 # COMPONENG_DEBUG_UI: the debug panels (camera info, anything a game adds
 #   through DebugUI). OFF turns those calls into empty inlines and leaves only
 #   the FPS window.
-# COMPONENG_PROFILING: measurement. GPU timer queries (frame, render pass,
+# COMPONENG_PROFILING (default OFF): measurement. GPU timer queries (frame, render pass,
 #   shader), per-pass and per-system CPU timings, and the timing panes that
 #   show them. OFF compiles all of that out, for a benchmark or a profile that
 #   should not pay for its own measurement.
 option(COMPONENG_DEBUG_UI "Show the ImGui debug panels (off: only the FPS window)" ON)
-option(COMPONENG_PROFILING "Measure GPU/CPU timings and show the timing panes" ON)
+option(COMPONENG_PROFILING "Measure GPU/CPU timings and show the timing panes" OFF)
+# COMPONENG_NETWORKING: build the ComponEngNet library (peer-to-peer networking).
+#   The engine does not depend on it: a game links ComponEngNet and calls
+#   net::installNetworking(world). OFF skips building it and its tests.
+# COMPONENG_MARCH: CPU target for Release builds. "native" is fastest on the
+#   build machine but the binary may crash elsewhere; use x86-64-v3 for a binary
+#   you hand to someone else (any x86-64 CPU from about 2015 on).
+set(COMPONENG_MARCH "native" CACHE STRING "-march value for Release builds")
+# COMPONENG_WERROR: treat warnings in engine code as errors.
+option(COMPONENG_WERROR "Treat engine warnings as errors" ON)
+if(COMPONENG_WERROR)
+    set(COMPONENG_WARNING_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror)
+else()
+    set(COMPONENG_WARNING_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual)
+endif()
+option(COMPONENG_NETWORKING "Build the optional networking library (ComponEngNet)" ON)
 
 file(GLOB ENGINE_THIRD_PARTY_SOURCES
     "src/third_party/glad/*.c"
@@ -97,7 +112,7 @@ target_compile_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-fsanitize=address>
     $<$<CONFIG:Release>:-ffast-math>
     $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Release>:-march=native>
+    $<$<CONFIG:Release>:-march=${COMPONENG_MARCH}>
 )
 target_link_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-fsanitize=address>
@@ -106,7 +121,7 @@ target_link_options(ComponEng PUBLIC
 # PRIVATE: don't force these diagnostics onto example/ and tests
 # -Werror: the engine builds warning-clean, so keep it that way
 target_compile_options(ComponEng PRIVATE
-    -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror
+    ${COMPONENG_WARNING_FLAGS}
 )
 # Vendored code isn't ours to fix; silence it so it can't drown out our warnings
 set_source_files_properties(${ENGINE_THIRD_PARTY_SOURCES} PROPERTIES
@@ -123,6 +138,12 @@ target_link_libraries(ComponEng
 # GLFW must not pull in the system GL header: glad provides the GL API, and only
 # the OpenGL backend includes it. Public so games that include GLFW agree.
 target_compile_definitions(ComponEng PUBLIC GLFW_INCLUDE_NONE)
+
+# windows.h (pulled in by miniaudio) defines min/max macros that break std::min
+# and std::max.
+if(WIN32)
+    target_compile_definitions(ComponEng PUBLIC NOMINMAX)
+endif()
 
 # Vulkan backend (-DRENDERER_BACKEND=vulkan). Needs the Vulkan loader and
 # glslang: GLSL is compiled to SPIR-V at load time, so there is no offline
@@ -151,6 +172,35 @@ if(RENDERER_BACKEND STREQUAL "vulkan")
     message(STATUS "Renderer backend: Vulkan")
 else()
     message(STATUS "Renderer backend: OpenGL")
+endif()
+
+# Networking is a library of its own; the engine does not link it. A game opts
+# in with target_link_libraries(Game ComponEngNet), which brings ComponEng along
+# (the ECS glue needs the World). Internet play (STUN, invite codes) is a second
+# opt-in on top: ComponEngNetNat.
+if(COMPONENG_NETWORKING)
+    file(GLOB NET_SOURCES "src/componeng/net/*.cpp")
+    add_library(ComponEngNet STATIC ${NET_SOURCES})
+    target_link_libraries(ComponEngNet PUBLIC ComponEng)
+    target_compile_options(ComponEngNet PRIVATE
+        ${COMPONENG_WARNING_FLAGS}
+    )
+    # Winsock is a separate library on Windows; POSIX sockets are part of libc.
+    if(WIN32)
+        target_link_libraries(ComponEngNet PUBLIC ws2_32)
+    endif()
+
+    # STUN, NAT detection and invite codes: a game that only plays on a LAN
+    # leaves this one out.
+    file(GLOB NAT_SOURCES "src/componeng/net/nat/*.cpp")
+    add_library(ComponEngNetNat STATIC ${NAT_SOURCES})
+    target_link_libraries(ComponEngNetNat PUBLIC ComponEngNet)
+    target_compile_options(ComponEngNetNat PRIVATE
+        ${COMPONENG_WARNING_FLAGS}
+    )
+    message(STATUS "Networking: ComponEngNet and ComponEngNetNat enabled")
+else()
+    message(STATUS "Networking disabled (COMPONENG_NETWORKING=OFF)")
 endif()
 
 if (EXCLUDE_EXAMPLE)
@@ -195,6 +245,23 @@ set(TEST_SOURCES
     tests/test_utils.cpp
     tests/test_world.cpp
     tests/test_audio.cpp
+    tests/test_plugins.cpp
+)
+
+set(NET_TEST_SOURCES
+    tests/test_net.cpp
+    tests/test_transport.cpp
+    tests/test_net_archive.cpp
+    tests/test_network.cpp
+    tests/test_lan_discovery.cpp
+    tests/test_session.cpp
+    tests/test_object_sync.cpp
+)
+
+set(NAT_TEST_SOURCES
+    tests/test_stun.cpp
+    tests/test_nat_traversal.cpp
+    tests/test_nat_plugin.cpp
 )
 
 foreach(TEST_SRC ${TEST_SOURCES})
@@ -203,3 +270,19 @@ foreach(TEST_SRC ${TEST_SOURCES})
     target_link_libraries(${TEST_NAME} PRIVATE ComponEng gtest_main)
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()
+
+if(COMPONENG_NETWORKING)
+    foreach(TEST_SRC ${NET_TEST_SOURCES})
+        get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
+        add_executable(${TEST_NAME} ${TEST_SRC})
+        target_link_libraries(${TEST_NAME} PRIVATE ComponEngNet gtest_main)
+        add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    endforeach()
+
+    foreach(TEST_SRC ${NAT_TEST_SOURCES})
+        get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
+        add_executable(${TEST_NAME} ${TEST_SRC})
+        target_link_libraries(${TEST_NAME} PRIVATE ComponEngNetNat gtest_main)
+        add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    endforeach()
+endif()

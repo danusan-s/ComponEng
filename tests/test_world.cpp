@@ -17,7 +17,6 @@ namespace {
 // so it is heap-allocated rather than placed on the test stack.
 std::unique_ptr<World> makeWorld() {
   auto world = std::make_unique<World>();
-  world->init();
   world->registerComponents<TransformComponent, MeshComponent>();
   return world;
 }

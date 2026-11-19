@@ -10,8 +10,6 @@
 #include "componeng/ecs/system_manager.hpp"
 #include "componeng/ecs/thread_pool.hpp"
 #include "componeng/events/event_bus.hpp"
-#include "componeng/input/action_state.hpp"
-#include "componeng/input/input_state.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/utils/logger.hpp"
 
@@ -40,9 +38,6 @@ private:
   ThreadPool m_threadPool;
   events::EventBus m_eventBus;
   ResourceManager m_resourceManager;
-
-  void *m_windowHandle = nullptr;
-  renderer::api::IRenderDevice *m_renderDevice = nullptr;
 
   /** @return the entity's archetype, or nullptr if it has no components. */
   Archetype *archetypeOf(const EntityRecord &record) {
@@ -83,7 +78,6 @@ private:
 public:
   double time = 0.0f;
 
-  void init();
   EntityID createEntity();
   void destroyEntity(EntityID entity);
   void createSystems();
@@ -97,16 +91,7 @@ public:
     m_systemManager.forEachSystemTiming(std::forward<Fn>(fn));
   }
   renderer::api::IRenderDevice &getRenderDevice();
-  void setWindowHandle(void *handle);
-  void *getWindowHandle() const;
   double getTime() const;
-
-  void swapInputBuffers() {
-    auto &inputState = getResource<input::InputState>();
-    auto &actionState = getResource<input::ActionState>();
-    inputState.previous_state = inputState.current_state;
-    actionState.swapBuffers();
-  }
 
   template <typename T> void registerComponent() {
     m_componentRegistry.registerComponent<T>();
@@ -342,8 +327,15 @@ public:
     return m_systemManager.registerSystem<T>(group);
   }
 
+  /** T runs after each of Ts. They may be registered later, and in an earlier
+   *  group. The order is resolved when the systems are created. */
   template <typename T, typename... Ts> void addSystemDependencies() {
     m_systemManager.addSystemDependencies<T, Ts...>();
+  }
+
+  /** T runs before each of Ts. */
+  template <typename T, typename... Ts> void addSystemBefore() {
+    m_systemManager.addSystemBefore<T, Ts...>();
   }
 };
 

@@ -5,6 +5,10 @@
 
 #include <string>
 
+namespace componeng::ecs {
+class World;
+}
+
 namespace componeng::core {
 
 #ifdef COMPONENG_DISABLE_DEBUG_UI
@@ -20,8 +24,8 @@ void addText(const std::string &label, const std::string &value);
 void addValue(const std::string &label, float v);
 void addVec3(const std::string &label, const Vec3 &v);
 bool addSection(const std::string &label);
-bool beginPane(const std::string &label);
-void endPane();
+bool beginTab(const std::string &label);
+void endTab();
 void addSlider(const std::string &label, float *v, float min, float max);
 } // namespace detail
 
@@ -30,10 +34,12 @@ void addSlider(const std::string &label, float *v, float min, float max);
  * an empty inline, so call sites cost nothing (no string is built, no call is
  * made) and nothing is drawn.
  *
- * Everything lands in the default "Debug Info" window unless a pane is open:
- * beginPane()/endPane() wrap a group of add* calls in a window of its own, so
- * panels sit beside each other instead of stacking in one tall list. Panes are
- * ordinary movable windows; ImGui remembers where you left them.
+ * Everything lands in the default "Debug Info" window, above its tab bar.
+ * beginTab()/endTab() wrap a group of add* calls in a tab of that window's tab
+ * bar, so the timing views sit side by side instead of stacking in one tall
+ * list. (With the debug panels off there is no "Debug Info"; the first tab
+ * opens a "Profiling" window to hold the bar.) Add the plain lines before the
+ * first tab: anything added while a tab is open belongs to it.
  */
 template <bool Active> struct PanelApi {
   static void addText(const std::string &label, const std::string &value) {
@@ -63,22 +69,23 @@ template <bool Active> struct PanelApi {
     return false;
   }
 
-  /** Opens (or reopens, within the frame) the window called `label`; the add*
-   *  calls until endPane() go into it. Returns false while it is collapsed,
-   *  but endPane() must be called either way:
+  /** Adds a tab called `label`; the add* calls until endTab() go into it.
+   *  Returns false while another tab is selected (or the window is
+   *  collapsed), so the caller can skip building its contents. endTab() is
+   *  safe to call either way:
    *
-   *      if (DebugUI::beginPane("Render passes")) { ...add*... }
-   *      DebugUI::endPane();
+   *      if (DebugUI::beginTab("Render passes")) { ...add*... }
+   *      DebugUI::endTab();
    *
    *  Only valid between beginFrame() and endFrame(). */
-  static bool beginPane(const std::string &label) {
+  static bool beginTab(const std::string &label) {
     if constexpr (Active)
-      return detail::beginPane(label);
+      return detail::beginTab(label);
     return false;
   }
-  static void endPane() {
+  static void endTab() {
     if constexpr (Active)
-      detail::endPane();
+      detail::endTab();
   }
 };
 
@@ -90,7 +97,7 @@ template <bool Active> struct PanelApi {
  *  - COMPONENG_DEBUG_UI (default ON): the debug panels, i.e. everything a game
  *    or system adds through DebugUI. OFF turns those calls into empty inlines
  *    and leaves only the small FPS window.
- *  - COMPONENG_PROFILING (default ON, see Profiling): the timing panes, drawn
+ *  - COMPONENG_PROFILING (default OFF, see Profiling): the timing panes, drawn
  *    through ProfilerUI.
  * ImGui itself is always built, for the FPS window.
  *
@@ -104,13 +111,14 @@ public:
    *  The FPS window is shown either way. */
   static constexpr bool kEnabled = kDebugPanelsEnabled;
 
-  // Setup and teardown of ImGui context and OpenGL bindings
-  static void init();
-  static void shutdown();
+  // Setup and teardown of ImGui context and the render device's bindings. The
+  // world holds the device; the window is the one ImGui draws into.
+  static void init(ecs::World &world, void *windowHandle);
+  static void shutdown(ecs::World &world);
 
   // Convenience functions to wrap ImGui frame calls
-  static void beginFrame();
-  static void endFrame();
+  static void beginFrame(ecs::World &world);
+  static void endFrame(ecs::World &world);
 
   /** Shows the frame rate: two lines in "Debug Info" when the debug panels are
    *  on, otherwise a small window of its own in the top-left corner. */
@@ -118,7 +126,7 @@ public:
 };
 
 /**
- * @brief The same calls as DebugUI, for the measurement panes (frame, pass and
+ * @brief The same calls as DebugUI, for the measurement tabs (frame, pass and
  * shader timings). Live exactly when Profiling::kEnabled, whatever
  * COMPONENG_DEBUG_UI says.
  */
