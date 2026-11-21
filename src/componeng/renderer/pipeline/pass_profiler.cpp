@@ -19,16 +19,17 @@ double msSince(std::chrono::steady_clock::time_point t) {
 
 PassProfiler::PassProfiler(api::IRenderDevice &device,
                            resources::RenderStats &stats)
-    : m_device(device), m_stats(stats) {}
+    : m_device(device), m_stats(stats) {
+}
 
-void PassProfiler::beginPass(api::RenderPass pass) {
+void PassProfiler::beginPass(api::PassId pass) {
   if constexpr (core::Profiling::kEnabled) {
     m_device.beginGpuPass(pass);
     m_passStart = Clock::now();
   }
 }
 
-void PassProfiler::endPass(api::RenderPass pass) {
+void PassProfiler::endPass(api::PassId pass) {
   if constexpr (core::Profiling::kEnabled) {
     m_stats.of(pass).cpuMs = msSince(m_passStart);
     m_device.endGpuPass(pass);

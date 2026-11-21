@@ -1,7 +1,7 @@
 #include "componeng/renderer/backend/api/irender_device.hpp"
-#include "componeng/renderer/backend/api/render_pass.hpp"
+#include "componeng/renderer/backend/api/pass_id.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
-#include "componeng/renderer/pipeline/render_state_policy.hpp"
+#include "componeng/renderer/draw/render_state_policy.hpp"
 
 #include <gtest/gtest.h>
 
@@ -9,7 +9,7 @@ using namespace componeng::renderer;
 using api::BlendMode;
 using api::CullMode;
 using api::DepthFunc;
-using api::RenderPass;
+using api::PassId;
 
 namespace {
 
@@ -25,7 +25,7 @@ api::RenderState materialState(CullMode cull) {
 
 TEST(RenderStatePolicy, PrepassWritesOnlyDepthAndKeepsMaterialCulling) {
   const auto s =
-      renderStateFor(RenderPass::DepthPrepass, materialState(CullMode::Front),
+      renderStateFor(PassId::DepthPrepass, materialState(CullMode::Front),
                      /*depthPrepassed=*/true);
   EXPECT_EQ(s.cull, CullMode::Front);
   EXPECT_TRUE(s.depthTest);
@@ -36,7 +36,7 @@ TEST(RenderStatePolicy, PrepassWritesOnlyDepthAndKeepsMaterialCulling) {
 }
 
 TEST(RenderStatePolicy, OpaqueWithoutPrepassWritesDepth) {
-  const auto s = renderStateFor(RenderPass::Opaque, materialState(CullMode::Back),
+  const auto s = renderStateFor(PassId::Opaque, materialState(CullMode::Back),
                                 /*depthPrepassed=*/false);
   EXPECT_EQ(s.depthFunc, DepthFunc::Less);
   EXPECT_TRUE(s.depthWrite);
@@ -45,7 +45,7 @@ TEST(RenderStatePolicy, OpaqueWithoutPrepassWritesDepth) {
 }
 
 TEST(RenderStatePolicy, OpaqueAfterPrepassTestsEqualAndLeavesDepthAlone) {
-  const auto s = renderStateFor(RenderPass::Opaque, materialState(CullMode::None),
+  const auto s = renderStateFor(PassId::Opaque, materialState(CullMode::None),
                                 /*depthPrepassed=*/true);
   EXPECT_EQ(s.cull, CullMode::None);
   EXPECT_EQ(s.depthFunc, DepthFunc::Equal);
@@ -53,7 +53,7 @@ TEST(RenderStatePolicy, OpaqueAfterPrepassTestsEqualAndLeavesDepthAlone) {
 }
 
 TEST(RenderStatePolicy, SkyIgnoresMaterialAndDoesNotCullOrWriteDepth) {
-  const auto s = renderStateFor(RenderPass::Sky, materialState(CullMode::Back),
+  const auto s = renderStateFor(PassId::Sky, materialState(CullMode::Back),
                                 /*depthPrepassed=*/true);
   EXPECT_EQ(s.cull, CullMode::None);
   EXPECT_EQ(s.depthFunc, DepthFunc::LessEqual);
@@ -62,7 +62,7 @@ TEST(RenderStatePolicy, SkyIgnoresMaterialAndDoesNotCullOrWriteDepth) {
 
 TEST(RenderStatePolicy, TransparentUsesTheMaterialsStateUnchanged) {
   const api::RenderState m = materialState(CullMode::None);
-  EXPECT_EQ(renderStateFor(RenderPass::Transparent, m, true), m);
+  EXPECT_EQ(renderStateFor(PassId::Transparent, m, true), m);
 }
 
 TEST(RenderQueueOpaqueCount, SplitsSortedBatchesAtTheFirstTransparentOne) {

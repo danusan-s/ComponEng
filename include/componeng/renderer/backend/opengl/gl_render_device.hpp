@@ -47,9 +47,9 @@ public:
   double lastGpuTimeMs() const override {
     return m_gpuTimeMs;
   }
-  void beginGpuPass(api::RenderPass pass) override;
-  void endGpuPass(api::RenderPass pass) override;
-  double lastGpuPassTimeMs(api::RenderPass pass) const override {
+  void beginGpuPass(api::PassId pass) override;
+  void endGpuPass(api::PassId pass) override;
+  double lastGpuPassTimeMs(api::PassId pass) const override {
     return m_gpuPasses[static_cast<std::size_t>(pass)].ms;
   }
 
@@ -101,7 +101,7 @@ private:
     bool created = false;
     double ms = -1.0;
   };
-  GpuPassTimer m_gpuPasses[api::kRenderPassCount];
+  GpuPassTimer m_gpuPasses[api::kPassCount];
 
   void collectGpuPasses();
 };

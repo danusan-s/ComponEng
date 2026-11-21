@@ -407,17 +407,18 @@ TEST(DepthPrepass, FrameDataIsStillBoundForTheDepthVariantOfAShaderUsingIt) {
   EXPECT_FALSE(hasUniformIn(*s, 3, "viewProj"));
 }
 
-// --- Alpha-tested (Cutout) materials ------------------------------------------
+// --- Alpha-tested (Cutout) materials
+// ------------------------------------------
 
 namespace {
 void makeCutout(Scene &s, const char *material) {
-  s.assets().getMaterial(s.assets().getMaterialID(material))
+  s.assets()
+      .getMaterial(s.assets().getMaterialID(material))
       .setType(MaterialType::Cutout);
 }
 
 bool hasMacro(const std::string &source) {
-  return source.find("#define COMPONENG_DEPTH_PREPASS 1") !=
-         std::string::npos;
+  return source.find("#define COMPONENG_DEPTH_PREPASS 1") != std::string::npos;
 }
 } // namespace
 
@@ -896,19 +897,19 @@ TEST(RenderStats, CountDrawsInstancesTrianglesAndShaderBindsPerPass) {
   s->frame();
 
   const auto &st = statsOf(*s);
-  for (auto pass : {api::RenderPass::DepthPrepass, api::RenderPass::Opaque}) {
-    EXPECT_EQ(st.of(pass).drawCalls, 2) << api::renderPassName(pass);
-    EXPECT_EQ(st.of(pass).instances, 3u) << api::renderPassName(pass);
+  for (auto pass : {api::PassId::DepthPrepass, api::PassId::Opaque}) {
+    EXPECT_EQ(st.of(pass).drawCalls, 2) << api::passName(pass);
+    EXPECT_EQ(st.of(pass).instances, 3u) << api::passName(pass);
     EXPECT_EQ(st.of(pass).triangles, 4u) << "2 x tri + 1 x quad";
     EXPECT_EQ(st.of(pass).shaderBinds, 1) << "both batches use shader a";
   }
-  const auto &blended = st.of(api::RenderPass::Transparent);
+  const auto &blended = st.of(api::PassId::Transparent);
   EXPECT_EQ(blended.drawCalls, 1);
   EXPECT_EQ(blended.instances, 1u);
   EXPECT_EQ(blended.triangles, 1u);
   EXPECT_EQ(blended.shaderBinds, 1);
 
-  const auto &sky = st.of(api::RenderPass::Sky);
+  const auto &sky = st.of(api::PassId::Sky);
   EXPECT_EQ(sky.drawCalls, 0);
 
   const auto total = st.total();
@@ -923,7 +924,7 @@ TEST(RenderStats, SkyIsOneFullscreenTriangle) {
   s->spawn("tri", "matA");
   s->frame();
 
-  const auto &sky = statsOf(*s).of(api::RenderPass::Sky);
+  const auto &sky = statsOf(*s).of(api::PassId::Sky);
   EXPECT_EQ(sky.drawCalls, 1);
   EXPECT_EQ(sky.instances, 1u);
   EXPECT_EQ(sky.triangles, 1u);
@@ -937,8 +938,8 @@ TEST(RenderStats, ResetEveryFrameRatherThanAccumulating) {
   s->frame();
   s->frame();
 
-  EXPECT_EQ(statsOf(*s).of(api::RenderPass::Opaque).drawCalls, 1);
-  EXPECT_EQ(statsOf(*s).of(api::RenderPass::Opaque).instances, 1u);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::Opaque).drawCalls, 1);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::Opaque).instances, 1u);
 }
 
 TEST(RenderStats, PrepassCountersStayZeroWhenThePrepassIsOff) {
@@ -946,8 +947,8 @@ TEST(RenderStats, PrepassCountersStayZeroWhenThePrepassIsOff) {
   s->spawn("tri", "matA");
   s->frame();
 
-  EXPECT_EQ(statsOf(*s).of(api::RenderPass::DepthPrepass).drawCalls, 0);
-  EXPECT_EQ(statsOf(*s).of(api::RenderPass::Opaque).drawCalls, 1);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::DepthPrepass).drawCalls, 0);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::Opaque).drawCalls, 1);
 }
 
 TEST(RenderStats, UploadBytesCoverEveryBatchsInstanceData) {

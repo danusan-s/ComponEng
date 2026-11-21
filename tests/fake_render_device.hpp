@@ -346,13 +346,11 @@ public:
     // data, unless it binds its own.
     rec.pendingInstanceFloats.clear();
   }
-  void beginGpuPass(api::RenderPass pass) override {
-    rec.gpuPassEvents.push_back(std::string("begin ") +
-                                api::renderPassName(pass));
+  void beginGpuPass(api::PassId pass) override {
+    rec.gpuPassEvents.push_back(std::string("begin ") + api::passName(pass));
   }
-  void endGpuPass(api::RenderPass pass) override {
-    rec.gpuPassEvents.push_back(std::string("end ") +
-                                api::renderPassName(pass));
+  void endGpuPass(api::PassId pass) override {
+    rec.gpuPassEvents.push_back(std::string("end ") + api::passName(pass));
   }
   void drawFullscreenTriangle() override {
     Draw d;

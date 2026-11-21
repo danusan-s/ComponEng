@@ -1,4 +1,4 @@
-#include "componeng/renderer/pipeline/material_binder.hpp"
+#include "componeng/renderer/draw/material_binder.hpp"
 
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset/pbr.hpp"

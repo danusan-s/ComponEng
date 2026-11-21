@@ -1,13 +1,13 @@
-#include "componeng/renderer/pipeline/render_state_policy.hpp"
+#include "componeng/renderer/draw/render_state_policy.hpp"
 
 namespace componeng::renderer {
 
-api::RenderState renderStateFor(api::RenderPass pass,
+api::RenderState renderStateFor(api::PassId pass,
                                 const api::RenderState &material,
                                 bool depthPrepassed) {
   api::RenderState s;
   switch (pass) {
-    case api::RenderPass::DepthPrepass:
+    case api::PassId::DepthPrepass:
       s.cull = material.cull;
       s.depthTest = true;
       s.depthWrite = true;
@@ -16,16 +16,16 @@ api::RenderState renderStateFor(api::RenderPass pass,
       s.colorWrite = false;
       return s;
 
-    case api::RenderPass::Opaque:
+    case api::PassId::Opaque:
       s.cull = material.cull;
       s.depthTest = true;
       s.depthWrite = !depthPrepassed;
-      s.depthFunc = depthPrepassed ? api::DepthFunc::Equal
-                                   : api::DepthFunc::Less;
+      s.depthFunc =
+          depthPrepassed ? api::DepthFunc::Equal : api::DepthFunc::Less;
       s.blend = api::BlendMode::None;
       return s;
 
-    case api::RenderPass::Sky:
+    case api::PassId::Sky:
       // A full-screen triangle has no winding worth culling. The shader pins
       // depth to exactly 1.0, so the test must accept equal depth, and there
       // is nothing behind the sky to protect, so it does not write depth.
@@ -34,7 +34,7 @@ api::RenderState renderStateFor(api::RenderPass pass,
       s.depthWrite = false;
       return s;
 
-    case api::RenderPass::Transparent:
+    case api::PassId::Transparent:
       return material;
   }
   return s;

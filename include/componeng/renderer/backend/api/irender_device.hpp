@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/renderer/backend/api/render_pass.hpp"
+#include "componeng/renderer/backend/api/pass_id.hpp"
 
 #include "componeng/core/types.hpp"
 
@@ -458,11 +458,11 @@ public:
    * negative if none has finished (or timing is unsupported). Optional, like
    * the frame timer.
    */
-  virtual void beginGpuPass(RenderPass) {
+  virtual void beginGpuPass(PassId) {
   }
-  virtual void endGpuPass(RenderPass) {
+  virtual void endGpuPass(PassId) {
   }
-  virtual double lastGpuPassTimeMs(RenderPass) const {
+  virtual double lastGpuPassTimeMs(PassId) const {
     return -1.0;
   }
 

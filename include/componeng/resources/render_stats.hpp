@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/renderer/backend/api/render_pass.hpp"
+#include "componeng/renderer/backend/api/pass_id.hpp"
 
 #include <array>
 #include <cstddef>
@@ -26,16 +26,16 @@ struct PassStats {
  * timings depend on the debug UI.
  */
 struct RenderStats {
-  std::array<PassStats, renderer::api::kRenderPassCount> pass{};
+  std::array<PassStats, renderer::api::kPassCount> pass{};
 
   // Uploading every batch's instance data to the GPU, ahead of the passes.
   std::size_t uploadBytes = 0;
   double uploadCpuMs = 0.0;
 
-  PassStats &of(renderer::api::RenderPass p) {
+  PassStats &of(renderer::api::PassId p) {
     return pass[static_cast<std::size_t>(p)];
   }
-  const PassStats &of(renderer::api::RenderPass p) const {
+  const PassStats &of(renderer::api::PassId p) const {
     return pass[static_cast<std::size_t>(p)];
   }
 

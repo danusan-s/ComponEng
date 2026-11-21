@@ -28,7 +28,7 @@ void GLRenderDevice::beginGpuTimer() {
   m_gpuSpanOpen = true;
 }
 
-void GLRenderDevice::beginGpuPass(api::RenderPass pass) {
+void GLRenderDevice::beginGpuPass(api::PassId pass) {
   GpuPassTimer &t = m_gpuPasses[static_cast<std::size_t>(pass)];
   if (!t.created) {
     glGenQueries(kGpuQueryCount * 2, &t.queries[0][0]);
@@ -44,7 +44,7 @@ void GLRenderDevice::beginGpuPass(api::RenderPass pass) {
   t.open = true;
 }
 
-void GLRenderDevice::endGpuPass(api::RenderPass pass) {
+void GLRenderDevice::endGpuPass(api::PassId pass) {
   GpuPassTimer &t = m_gpuPasses[static_cast<std::size_t>(pass)];
   if (!t.open)
     return;

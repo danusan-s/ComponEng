@@ -1,14 +1,14 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/renderer/backend/api/render_pass.hpp"
+#include "componeng/renderer/backend/api/pass_id.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
 #include "componeng/renderer/pipeline/pass_context.hpp"
 
+#include <cstddef>
+
 namespace componeng::renderer {
 
-class InstanceBufferCache;
-class MaterialBinder;
 class Shader;
 
 /**
@@ -19,28 +19,22 @@ class Shader;
  * The queue is sorted by shader, then texture, so consecutive batches often
  * share GPU state. The drawer remembers what it left bound and skips the
  * redundant work. That memory is only trusted while the drawer is the only
- * thing touching GL: anything else that binds a shader (the sky pass, ImGui)
- * makes it stale, so call forgetBoundState() after one.
+ * thing touching GL, so use one drawer per pass: anything else that binds a
+ * shader (the sky pass, ImGui) between passes can't make it stale.
  */
 class BatchDrawer {
 public:
-  /** `depthPrepassed`: a depth pre-pass already ran, so opaque batches are
-   *  shaded only where they are the nearest surface (see renderStateFor). */
-  BatchDrawer(const PassContext &ctx, const InstanceBufferCache &instances,
-              MaterialBinder &binder, bool depthPrepassed);
+  /** Reads the cache, binder and `depthPrepassed` (shaded only where the
+   *  batch is the nearest surface, see renderStateFor) from `ctx`. */
+  explicit BatchDrawer(const PassContext &ctx);
 
   /** `pass` is DepthPrepass, Opaque or Transparent. The pre-pass runs the
    *  shader's depth-only variant, or for a Cutout material its alpha-tested
    *  one (Shader::alphaTestedDepthVariant). */
-  void draw(const RenderBatch &batch, api::RenderPass pass);
-
-  void forgetBoundState();
+  void draw(const RenderBatch &batch, api::PassId pass);
 
 private:
   PassContext m_ctx;
-  const InstanceBufferCache &m_instances;
-  MaterialBinder &m_binder;
-  const bool m_depthPrepassed;
 
   // The program itself, not its shader id: in the pre-pass an opaque and a
   // cutout material of one shader use different programs.
@@ -51,5 +45,11 @@ private:
   // frame-wide uniforms must be sent again even on the same shader.
   bool m_materialOverrodeUniforms = false;
 };
+
+/** Draws the queue's sorted batches [first, last) in `pass` with a fresh
+ *  BatchDrawer. The queue is sorted opaque first, transparent last, so a pass
+ *  picks its range from RenderQueue::opaqueCount(). */
+void drawBatches(const PassContext &ctx, api::PassId pass, std::size_t first,
+                 std::size_t last);
 
 } // namespace componeng::renderer

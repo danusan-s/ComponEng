@@ -1,4 +1,4 @@
-#include "componeng/renderer/pipeline/instance_buffer_cache.hpp"
+#include "componeng/renderer/draw/instance_buffer_cache.hpp"
 
 namespace componeng::renderer {
 

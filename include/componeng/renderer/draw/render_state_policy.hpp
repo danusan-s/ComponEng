@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/renderer/backend/api/irender_device.hpp"
-#include "componeng/renderer/backend/api/render_pass.hpp"
+#include "componeng/renderer/backend/api/pass_id.hpp"
 
 namespace componeng::renderer {
 
@@ -22,7 +22,7 @@ namespace componeng::renderer {
  *
  * `depthPrepassed` says the depth buffer already holds the opaque surfaces.
  */
-api::RenderState renderStateFor(api::RenderPass pass,
+api::RenderState renderStateFor(api::PassId pass,
                                 const api::RenderState &material,
                                 bool depthPrepassed);
 

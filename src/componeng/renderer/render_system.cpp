@@ -4,12 +4,13 @@
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
-#include "componeng/renderer/backend/api/render_pass.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
-#include "componeng/renderer/pipeline/batch_drawer.hpp"
+#include "componeng/renderer/pass/depth_prepass.hpp"
+#include "componeng/renderer/pass/opaque_pass.hpp"
+#include "componeng/renderer/pass/sky_pass.hpp"
+#include "componeng/renderer/pass/transparent_pass.hpp"
 #include "componeng/renderer/pipeline/pass_context.hpp"
 #include "componeng/renderer/pipeline/pass_profiler.hpp"
-#include "componeng/renderer/pipeline/sky_pass.hpp"
 #include "componeng/resources/render_settings.hpp"
 #include "componeng/resources/render_stats.hpp"
 
@@ -26,6 +27,14 @@ bool depthPrepassEnabled(ecs::World &world) {
 
 void RenderSystem::onCreate(const ecs::SystemState &state) {
   state.world->setResource(resources::RenderStats());
+
+  // The order is the draw order. The sky goes after the opaque geometry and
+  // before the transparent one: anything blended or drawn without depth
+  // testing must land on top of it.
+  m_pipeline.add(std::make_unique<DepthPrepass>())
+      .add(std::make_unique<OpaquePass>())
+      .add(std::make_unique<SkyPass>())
+      .add(std::make_unique<TransparentPass>());
 }
 
 void RenderSystem::onUpdate(const ecs::SystemState &state) {
@@ -43,8 +52,6 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   m_frame.update(world, camera);
 
   PassProfiler profiler(device, stats);
-  const PassContext ctx{device, world.getResource<AssetManager>(), m_frame,
-                        profiler, stats};
 
   // The queue is cleared by BatchingSystem at the start of next frame, which
   // lets its batch storage be reused instead of freed.
@@ -54,39 +61,14 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   stats.uploadBytes = m_instances.upload(device, queue);
   profiler.endUpload();
 
-  // The queue is sorted opaque first, transparent last.
-  const std::size_t opaqueEnd = queue.opaqueCount();
-  const bool prepassed = depthPrepassEnabled(world) && opaqueEnd > 0;
+  // A pre-pass only pays off when there is opaque geometry to prepass.
+  const bool prepassed = depthPrepassEnabled(world) && queue.opaqueCount() > 0;
 
-  BatchDrawer drawer(ctx, m_instances, m_binder, prepassed);
-
-  // Runs `drawer` over queue[first, last) in `pass`, with the pass bracketed
-  // for timing and the drawer's bound state forgotten afterwards.
-  auto runBatches = [&](api::RenderPass pass, std::size_t first,
-                        std::size_t last) {
-    profiler.beginPass(pass);
-    for (std::size_t i = first; i < last; ++i) {
-      drawer.draw(queue.sorted(i), pass);
-    }
-    profiler.timeShader(nullptr);
-    profiler.endPass(pass);
-    drawer.forgetBoundState();
-  };
-
-  // Depth pre-pass: the opaque batches again, depth only. The opaque pass then
-  // shades just the pixel's nearest surface.
-  runBatches(api::RenderPass::DepthPrepass, 0, prepassed ? opaqueEnd : 0);
-
-  runBatches(api::RenderPass::Opaque, 0, opaqueEnd);
-
-  // After the opaque batches and before the transparent ones: anything blended
-  // or drawn without depth testing must land on top of the sky.
-  profiler.beginPass(api::RenderPass::Sky);
-  drawSkyPass(ctx, world, camera);
-  profiler.endPass(api::RenderPass::Sky);
-  drawer.forgetBoundState();
-
-  runBatches(api::RenderPass::Transparent, opaqueEnd, queue.size());
+  const PassContext ctx{
+      world,       camera,   device,   world.getResource<AssetManager>(),
+      m_frame,     profiler, stats,    queue,
+      m_instances, m_binder, prepassed};
+  m_pipeline.execute(ctx);
 }
 
 } // namespace componeng::renderer

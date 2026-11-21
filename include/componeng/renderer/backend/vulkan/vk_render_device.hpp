@@ -53,14 +53,14 @@ public:
   double lastGpuTimeMs() const override {
     return m_timer.frameMs();
   }
-  void beginGpuPass(api::RenderPass pass) override {
+  void beginGpuPass(api::PassId pass) override {
     if (m_timer.supported() && ensureFrame())
       m_timer.beginPass(pass);
   }
-  void endGpuPass(api::RenderPass pass) override {
+  void endGpuPass(api::PassId pass) override {
     m_timer.endPass(pass);
   }
-  double lastGpuPassTimeMs(api::RenderPass pass) const override {
+  double lastGpuPassTimeMs(api::PassId pass) const override {
     return m_timer.passMs(pass);
   }
   // Per-shader spans, forwarded from VulkanShader.

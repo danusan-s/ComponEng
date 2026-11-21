@@ -5,7 +5,7 @@
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
-#include "componeng/renderer/backend/api/render_pass.hpp"
+#include "componeng/renderer/backend/api/pass_id.hpp"
 #include "componeng/resources/render_stats.hpp"
 
 #include <algorithm>
@@ -82,8 +82,8 @@ public:
     m_gpu.add(gpuMs);
 
     if (stats) {
-      for (std::size_t i = 0; i < renderer::api::kRenderPassCount; ++i) {
-        const auto pass = static_cast<renderer::api::RenderPass>(i);
+      for (std::size_t i = 0; i < renderer::api::kPassCount; ++i) {
+        const auto pass = static_cast<renderer::api::PassId>(i);
         const resources::PassStats &p = stats->of(pass);
         PassTimes &t = m_passes[i];
         t.gpu.add(device.lastGpuPassTimeMs(pass));
@@ -212,7 +212,7 @@ private:
     double gpuSum = 0.0, cpuSum = 0.0, draws = 0.0, instances = 0.0,
            triangles = 0.0, binds = 0.0;
     bool gpuKnown = true, any = false;
-    for (std::size_t i = 0; i < renderer::api::kRenderPassCount; ++i) {
+    for (std::size_t i = 0; i < renderer::api::kPassCount; ++i) {
       const PassTimes &t = m_passes[i];
       if (t.draws.value < 0.0) // no window has completed yet
         continue;
@@ -227,8 +227,7 @@ private:
       triangles += t.triangles.value;
       binds += t.shaderBinds.value;
       ProfilerUI::addText(
-          renderer::api::renderPassName(
-              static_cast<renderer::api::RenderPass>(i)),
+          renderer::api::passName(static_cast<renderer::api::PassId>(i)),
           "GPU " + ms(t.gpu.value) + " | CPU " + ms(t.cpu.value) + " | " +
               count(t.draws.value) + " draws | " + count(t.instances.value) +
               " inst | " + count(t.triangles.value) + " tris | " +
@@ -268,7 +267,7 @@ private:
   Smoothed m_cpu;
   Smoothed m_swap;
   Smoothed m_gpu;
-  PassTimes m_passes[renderer::api::kRenderPassCount];
+  PassTimes m_passes[renderer::api::kPassCount];
   Smoothed m_uploadMs;
   Smoothed m_uploadBytes;
   std::vector<SystemTime> m_systems;
