@@ -219,11 +219,11 @@ TEST(MathVsGlm, LookAt) {
 
 TEST(MathVsGlm, Perspective) {
   const float fov = 1.0471976f; // 60 degrees in radians
-  const glm::mat4 ref = glm::perspective(fov, 16.0f / 9.0f, 0.1f, 1000.0f);
+  const glm::mat4 ref = glm::perspectiveRH_ZO(fov, 16.0f / 9.0f, 0.1f, 1000.0f);
   EXPECT_TRUE(SameMat4(perspective(fov, 16.0f / 9.0f, 0.1f, 1000.0f), ref));
 
   // fov in radians (consistent with GLM); NaN cases left untested on purpose.
-  const glm::mat4 ref2 = glm::perspective(0.5f, 1.0f, 0.01f, 100.0f);
+  const glm::mat4 ref2 = glm::perspectiveRH_ZO(0.5f, 1.0f, 0.01f, 100.0f);
   EXPECT_TRUE(SameMat4(perspective(0.5f, 1.0f, 0.01f, 100.0f), ref2));
 }
 
@@ -239,7 +239,7 @@ TEST(MathVsGlm, ViewProjectionPipeline) {
 
   const glm::mat4 gView =
       glm::lookAt(ToGlmVec3(eye), ToGlmVec3(center), ToGlmVec3(up));
-  const glm::mat4 gProj = glm::perspective(fov, aspect, 0.1f, 1000.0f);
+  const glm::mat4 gProj = glm::perspectiveRH_ZO(fov, aspect, 0.1f, 1000.0f);
 
   EXPECT_TRUE(SameMat4(proj * view, gProj * gView));
 }
@@ -317,7 +317,7 @@ TEST(MathVsGlm, TransformPointMatchesClipSpace) {
   model = rotate(model, 0.9f, Vec3(1, 0, 0));
   model = scale(model, Vec3(1.5f, 1.5f, 1.5f));
 
-  glm::mat4 gProj = glm::perspective(fov, 16.0f / 9.0f, 0.1f, 1000.0f);
+  glm::mat4 gProj = glm::perspectiveRH_ZO(fov, 16.0f / 9.0f, 0.1f, 1000.0f);
   glm::mat4 gView = glm::lookAt(glm::vec3(0.0f, 2.0f, 8.0f), glm::vec3(0, 0, 0),
                                 glm::vec3(0, 1, 0));
   glm::mat4 gModel(1.0f);
@@ -383,6 +383,11 @@ std::array<FrustumPlane, 6> ExtractGlm(const glm::mat4 &m) {
       pl.distance = m[3][3] + s * m[3][c];
     }
   }
+  // Clip depth is [0, w]: the near plane is row 2 alone.
+  p[4].normal.x = m[0][2];
+  p[4].normal.y = m[1][2];
+  p[4].normal.z = m[2][2];
+  p[4].distance = m[3][2];
   for (auto &pl : p) {
     const float len =
         glm::length(glm::vec3(pl.normal.x, pl.normal.y, pl.normal.z));
@@ -412,7 +417,8 @@ void ExpectPlanes(const std::array<FrustumPlane, 6> &a,
 
 TEST(MathVsGlm, FrustumPlaneExtraction) {
   const float fov = 1.0471976f;
-  const glm::mat4 gProj = glm::perspective(fov, 16.0f / 9.0f, 0.1f, 1000.0f);
+  const glm::mat4 gProj =
+      glm::perspectiveRH_ZO(fov, 16.0f / 9.0f, 0.1f, 1000.0f);
   const glm::mat4 gView =
       glm::lookAt(glm::vec3(0, 2, 8), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
   const glm::mat4 gVP = gProj * gView;
@@ -435,7 +441,7 @@ TEST(MathVsGlm, FrustumPlaneExtraction) {
 
 TEST(MathVsGlm, TransposeMatchesGlm) {
   const glm::mat4 g =
-      glm::perspective(1.0f, 1.7f, 0.1f, 100.0f) *
+      glm::perspectiveRH_ZO(1.0f, 1.7f, 0.1f, 100.0f) *
       glm::lookAt(glm::vec3(1, 2, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
   EXPECT_TRUE(SameMat4(transpose(FromGlm(g)), glm::transpose(g)));
 }
@@ -446,8 +452,8 @@ TEST(MathVsGlm, InverseMatchesGlmOnEngineMatrices) {
       glm::translate(glm::mat4(1.0f), glm::vec3(3, -4, 5)),
       glm::scale(glm::mat4(1.0f), glm::vec3(2, 0.5f, 4)),
       glm::rotate(glm::mat4(1.0f), 0.7f, glm::vec3(0, 1, 0)),
-      glm::perspective(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 1000.0f),
-      glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 10000.0f) *
+      glm::perspectiveRH_ZO(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 1000.0f),
+      glm::perspectiveRH_ZO(glm::radians(45.0f), 1.0f, 0.1f, 10000.0f) *
           glm::lookAt(glm::vec3(5, 3, 2), glm::vec3(0, 1, 0),
                       glm::vec3(0, 1, 0)),
   };

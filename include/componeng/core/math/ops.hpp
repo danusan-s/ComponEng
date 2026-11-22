@@ -54,15 +54,17 @@ inline Mat4 lookAt(const Vec3 &eye, const Vec3 &center, const Vec3 &up) {
   return result;
 }
 
+/** Right-handed perspective projection with clip depth in [0, 1], as both
+ *  graphics backends use. */
 inline Mat4 perspective(float fov, float aspect, float nearPlane,
                         float farPlane) {
   float invTan = 1.0f / std::tan(fov / 2.0f);
   Mat4 result(0.0f);
   result[0][0] = invTan / aspect;
   result[1][1] = invTan;
-  result[2][2] = -(farPlane + nearPlane) / (farPlane - nearPlane);
+  result[2][2] = farPlane / (nearPlane - farPlane);
   result[2][3] = -1.0f;
-  result[3][2] = -(2.0f * farPlane * nearPlane) / (farPlane - nearPlane);
+  result[3][2] = -(farPlane * nearPlane) / (farPlane - nearPlane);
   return result;
 }
 

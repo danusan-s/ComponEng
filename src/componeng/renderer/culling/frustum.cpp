@@ -40,10 +40,12 @@ Frustum::Frustum(const core::Mat4 &m) {
   m_planes[3].normal.z = m[2][3] - m[2][1];
   m_planes[3].distance = m[3][3] - m[3][1];
 
-  m_planes[4].normal.x = m[0][3] + m[0][2];
-  m_planes[4].normal.y = m[1][3] + m[1][2];
-  m_planes[4].normal.z = m[2][3] + m[2][2];
-  m_planes[4].distance = m[3][3] + m[3][2];
+  // Clip depth runs from 0 at the near plane to w at the far one, so the near
+  // plane is row 2 alone.
+  m_planes[4].normal.x = m[0][2];
+  m_planes[4].normal.y = m[1][2];
+  m_planes[4].normal.z = m[2][2];
+  m_planes[4].distance = m[3][2];
 
   m_planes[5].normal.x = m[0][3] - m[0][2];
   m_planes[5].normal.y = m[1][3] - m[1][2];

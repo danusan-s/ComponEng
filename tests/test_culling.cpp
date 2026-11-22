@@ -1,6 +1,7 @@
 #include "render_scene_fixture.hpp"
 
 #include "componeng/renderer/culling/bounds.hpp"
+#include "componeng/renderer/culling/frustum.hpp"
 #include "gtest/gtest.h"
 
 #include <cmath>
@@ -265,4 +266,27 @@ TEST(Culling, MaterialPaddingKeepsShaderMovedGeometryAlive) {
   };
   EXPECT_EQ(edge(0.0f), 0u);
   EXPECT_EQ(edge(2.0f), 1u);
+}
+
+// --- Near plane with clip depth in [0, w] ------------------------------------
+
+TEST(FrustumNearPlane, BoxesCloserThanTheNearPlaneAreCulled) {
+  Frustum frustum(lookDownMinusZ());
+  // The near plane is 0.1 m ahead. A box wholly between the camera and it is
+  // outside the frustum; one just past it is inside.
+  EXPECT_FALSE(frustum.isBoxInFrustum(Vec3(-0.01f, -0.01f, -0.09f),
+                                      Vec3(0.01f, 0.01f, -0.05f)));
+  EXPECT_TRUE(frustum.isBoxInFrustum(Vec3(-0.01f, -0.01f, -0.2f),
+                                     Vec3(0.01f, 0.01f, -0.12f)));
+}
+
+TEST(FrustumNearPlane, BoxesStraddlingTheNearPlaneAreKept) {
+  Frustum frustum(lookDownMinusZ());
+  EXPECT_TRUE(frustum.isBoxInFrustum(Vec3(-0.01f, -0.01f, -0.2f),
+                                     Vec3(0.01f, 0.01f, -0.05f)));
+}
+
+TEST(FrustumNearPlane, BoxesBehindTheCameraAreCulled) {
+  Frustum frustum(lookDownMinusZ());
+  EXPECT_FALSE(frustum.isBoxInFrustum(Vec3(-1, -1, 1), Vec3(1, 1, 2)));
 }
