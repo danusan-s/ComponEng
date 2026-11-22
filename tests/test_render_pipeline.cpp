@@ -144,39 +144,24 @@ TEST(RenderPipeline, FrameDataIsUploadedAndBoundOncePerFrame) {
   EXPECT_EQ(fd.fogEnd, fog.end);
 }
 
-TEST(RenderPipeline, ShaderWithFrameBlockIsNotSentLooseFrameUniforms) {
-  // Shader "a" (id 1) declares the FrameData block; shader "b" (id 2) is a
-  // legacy shader with loose uniforms.
-  auto s = makeScene([](fake::Recorder &rec) {
-    rec.shaderDeclaresFrameBlock[1] = true;
-    rec.shaderDeclaresFrameBlock[2] = false;
-  });
-  spawnMixed(*s);
-  s->frame();
+TEST(RenderPipeline, FrameValuesAreNeverSentAsLooseUniforms) {
+  // The per-frame values only go out through the FrameData block, whether or
+  // not a shader declares it.
+  for (bool declares : {false, true}) {
+    auto s = makeScene([declares](fake::Recorder &rec) {
+      rec.defaultShaderDeclaresFrameBlock = declares;
+    });
+    spawnMixed(*s);
+    s->frame();
 
-  auto has = [&](int shader, const char *name) {
-    const auto &v = s->rec().looseUniforms[shader];
-    return std::find(v.begin(), v.end(), name) != v.end();
-  };
-
-  for (const char *name :
-       {"viewProj", "lightDir", "lightColor", "cameraPos", "time", "fogColor",
-        "fogStart", "fogEnd", "ambientColor"}) {
-    EXPECT_FALSE(has(1, name)) << name << " must come from the block";
-    EXPECT_TRUE(has(2, name)) << name << " must still reach a legacy shader";
-  }
-}
-
-TEST(RenderPipeline, LegacyShaderGetsTheSameValuesAsLooseUniforms) {
-  // Neither shader declares the block (the default): everything is loose.
-  auto s = makeScene();
-  spawnMixed(*s);
-  s->frame();
-
-  for (int shader : {1, 2}) {
-    const auto &v = s->rec().looseUniforms[shader];
-    EXPECT_NE(std::find(v.begin(), v.end(), "viewProj"), v.end()) << shader;
-    EXPECT_NE(std::find(v.begin(), v.end(), "lightDir"), v.end()) << shader;
+    for (int shader : {1, 2}) {
+      for (const char *name :
+           {"viewProj", "lightDir", "lightColor", "cameraPos", "time",
+            "fogColor", "fogStart", "fogEnd", "ambientColor"}) {
+        EXPECT_FALSE(hasUniformIn(*s, shader, name))
+            << name << " shader " << shader << " declares=" << declares;
+      }
+    }
   }
 }
 
@@ -386,38 +371,32 @@ TEST(DepthPrepass, DisabledByTheSettingOpaqueDrawsDepthWritingWithLess) {
   EXPECT_EQ(s->rec().shadersCreated, 2);
 }
 
-TEST(DepthPrepass, DepthVariantGetsLooseFrameUniformsWhenTheShaderHasNoBlock) {
-  auto s = makeScene();
-  enablePrepass(*s);
-  s->spawn("tri", "matA");
-  s->frame();
+TEST(DepthPrepass, DepthVariantIsNeverSentLooseFrameUniforms) {
+  for (bool declares : {false, true}) {
+    auto s = makeScene([declares](fake::Recorder &r) {
+      r.defaultShaderDeclaresFrameBlock = declares;
+    });
+    enablePrepass(*s);
+    s->spawn("tri", "matA");
+    s->frame();
 
-  EXPECT_TRUE(hasUniformIn(*s, 3, "viewProj")) << "variant of shader a";
+    // Shader id 3 is the depth variant of shader a.
+    EXPECT_FALSE(hasUniformIn(*s, 3, "viewProj")) << "declares=" << declares;
+  }
 }
 
-TEST(DepthPrepass, FrameDataIsStillBoundForTheDepthVariantOfAShaderUsingIt) {
-  auto s = makeScene(
-      [](fake::Recorder &r) { r.defaultShaderDeclaresFrameBlock = true; });
-  enablePrepass(*s);
-  s->spawn("tri", "matA");
-  s->frame();
-
-  // Declaring the block means no loose frame uniforms for any program,
-  // including the variant (shader id 3).
-  EXPECT_FALSE(hasUniformIn(*s, 3, "viewProj"));
-}
-
-// --- Alpha-tested (Cutout) materials ------------------------------------------
+// --- Alpha-tested (Cutout) materials
+// ------------------------------------------
 
 namespace {
 void makeCutout(Scene &s, const char *material) {
-  s.assets().getMaterial(s.assets().getMaterialID(material))
+  s.assets()
+      .getMaterial(s.assets().getMaterialID(material))
       .setType(MaterialType::Cutout);
 }
 
 bool hasMacro(const std::string &source) {
-  return source.find("#define COMPONENG_DEPTH_PREPASS 1") !=
-         std::string::npos;
+  return source.find("#define COMPONENG_DEPTH_PREPASS 1") != std::string::npos;
 }
 } // namespace
 
@@ -745,32 +724,17 @@ TEST(RenderPipeline, SkyUsesTheShaderNamedByTheComponent) {
   EXPECT_EQ(s->rec().fullscreenDraws[0].shaderId, 4);
 }
 
-TEST(RenderPipeline,
-     SkyGetsItsOwnUniformsAndLooseFrameValuesOnlyWithoutTheBlock) {
-  // Sky shader is id 3. In the first scene it has no FrameData block.
-  {
-    auto s = makeScene();
-    s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
-    s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
-    s->frame();
-    for (const char *n : {"invSkyViewProj", "skyColor", "horizonColor",
-                          "lightDir", "lightColor", "fogColor"}) {
-      EXPECT_TRUE(hasUniform(*s, 3, n)) << n;
-    }
+TEST(RenderPipeline, SkyGetsItsOwnUniformsAndNoLooseFrameValues) {
+  // Sky shader is id 3.
+  auto s = makeScene();
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  s->frame();
+  for (const char *n : {"invSkyViewProj", "skyColor", "horizonColor"}) {
+    EXPECT_TRUE(hasUniform(*s, 3, n)) << n;
   }
-  // In the second it does: the per-frame values come from the buffer.
-  {
-    auto s = makeScene(
-        [](fake::Recorder &rec) { rec.shaderDeclaresFrameBlock[3] = true; });
-    s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
-    s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
-    s->frame();
-    for (const char *n : {"invSkyViewProj", "skyColor", "horizonColor"}) {
-      EXPECT_TRUE(hasUniform(*s, 3, n)) << n;
-    }
-    for (const char *n : {"lightDir", "lightColor", "fogColor", "viewProj"}) {
-      EXPECT_FALSE(hasUniform(*s, 3, n)) << n;
-    }
+  for (const char *n : {"lightDir", "lightColor", "fogColor", "viewProj"}) {
+    EXPECT_FALSE(hasUniform(*s, 3, n)) << n;
   }
 }
 
@@ -896,19 +860,19 @@ TEST(RenderStats, CountDrawsInstancesTrianglesAndShaderBindsPerPass) {
   s->frame();
 
   const auto &st = statsOf(*s);
-  for (auto pass : {api::RenderPass::DepthPrepass, api::RenderPass::Opaque}) {
-    EXPECT_EQ(st.of(pass).drawCalls, 2) << api::renderPassName(pass);
-    EXPECT_EQ(st.of(pass).instances, 3u) << api::renderPassName(pass);
+  for (auto pass : {api::PassId::DepthPrepass, api::PassId::Opaque}) {
+    EXPECT_EQ(st.of(pass).drawCalls, 2) << api::passName(pass);
+    EXPECT_EQ(st.of(pass).instances, 3u) << api::passName(pass);
     EXPECT_EQ(st.of(pass).triangles, 4u) << "2 x tri + 1 x quad";
     EXPECT_EQ(st.of(pass).shaderBinds, 1) << "both batches use shader a";
   }
-  const auto &blended = st.of(api::RenderPass::Transparent);
+  const auto &blended = st.of(api::PassId::Transparent);
   EXPECT_EQ(blended.drawCalls, 1);
   EXPECT_EQ(blended.instances, 1u);
   EXPECT_EQ(blended.triangles, 1u);
   EXPECT_EQ(blended.shaderBinds, 1);
 
-  const auto &sky = st.of(api::RenderPass::Sky);
+  const auto &sky = st.of(api::PassId::Sky);
   EXPECT_EQ(sky.drawCalls, 0);
 
   const auto total = st.total();
@@ -923,7 +887,7 @@ TEST(RenderStats, SkyIsOneFullscreenTriangle) {
   s->spawn("tri", "matA");
   s->frame();
 
-  const auto &sky = statsOf(*s).of(api::RenderPass::Sky);
+  const auto &sky = statsOf(*s).of(api::PassId::Sky);
   EXPECT_EQ(sky.drawCalls, 1);
   EXPECT_EQ(sky.instances, 1u);
   EXPECT_EQ(sky.triangles, 1u);
@@ -937,8 +901,8 @@ TEST(RenderStats, ResetEveryFrameRatherThanAccumulating) {
   s->frame();
   s->frame();
 
-  EXPECT_EQ(statsOf(*s).of(api::RenderPass::Opaque).drawCalls, 1);
-  EXPECT_EQ(statsOf(*s).of(api::RenderPass::Opaque).instances, 1u);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::Opaque).drawCalls, 1);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::Opaque).instances, 1u);
 }
 
 TEST(RenderStats, PrepassCountersStayZeroWhenThePrepassIsOff) {
@@ -946,8 +910,8 @@ TEST(RenderStats, PrepassCountersStayZeroWhenThePrepassIsOff) {
   s->spawn("tri", "matA");
   s->frame();
 
-  EXPECT_EQ(statsOf(*s).of(api::RenderPass::DepthPrepass).drawCalls, 0);
-  EXPECT_EQ(statsOf(*s).of(api::RenderPass::Opaque).drawCalls, 1);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::DepthPrepass).drawCalls, 0);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::Opaque).drawCalls, 1);
 }
 
 TEST(RenderStats, UploadBytesCoverEveryBatchsInstanceData) {
@@ -976,9 +940,10 @@ TEST(GpuPassTimers, EachPassIsBracketedAroundItsOwnDraws) {
   EXPECT_EQ(s->rec().gpuPassEvents,
             (std::vector<std::string>{
                 "begin Depth pre-pass", "indexed", "end Depth pre-pass",
-                "begin Opaque", "indexed", "end Opaque", //
-                "begin Sky", "fullscreen", "end Sky",    //
-                "begin Transparent", "indexed", "end Transparent"}));
+                "begin Opaque", "indexed", "end Opaque",           //
+                "begin Sky", "fullscreen", "end Sky",              //
+                "begin Transparent", "indexed", "end Transparent", //
+                "begin Post-process", "end Post-process"}));
 }
 
 TEST(GpuPassTimers, EmptyPassesAreStillBracketed) {
@@ -990,10 +955,10 @@ TEST(GpuPassTimers, EmptyPassesAreStillBracketed) {
 
   // So a pass that did nothing reads ~0 instead of keeping an old value.
   EXPECT_EQ(s->rec().gpuPassEvents,
-            (std::vector<std::string>{"begin Depth pre-pass",
-                                      "end Depth pre-pass", "begin Opaque",
-                                      "end Opaque", "begin Sky", "end Sky",
-                                      "begin Transparent", "end Transparent"}));
+            (std::vector<std::string>{
+                "begin Depth pre-pass", "end Depth pre-pass", "begin Opaque",
+                "end Opaque", "begin Sky", "end Sky", "begin Transparent",
+                "end Transparent", "begin Post-process", "end Post-process"}));
 }
 
 // LOD cross-fade
@@ -1146,4 +1111,233 @@ TEST(LodFadeBatching, ABatchWithNoFadingInstanceKeepsTheEmptyPrepassShader) {
   const auto &draws = s->rec().draws;
   ASSERT_EQ(draws.size(), 2u);
   EXPECT_FALSE(hasMacro(s->rec().fragmentSources.at(draws[0].shaderId)));
+}
+
+// Anti-aliasing
+
+namespace {
+// The "post_process" shader is shader id 3 in these scenes.
+constexpr int kPostProcessShader = 3;
+
+std::unique_ptr<Scene> makePostProcessScene(resources::AntiAliasing mode) {
+  auto s = makeScene();
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "post_process");
+  s->world->getResource<resources::RenderSettings>().antiAliasing = mode;
+  return s;
+}
+
+int postProcessDrawsOnWindow(Scene &s) {
+  int n = 0;
+  for (const auto &d : s.rec().fullscreenDraws) {
+    n += d.shaderId == kPostProcessShader && d.targetId == 0;
+  }
+  return n;
+}
+} // namespace
+
+TEST(AntiAliasing, NoTargetAndNoPassWhenOff) {
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_TRUE(s->rec().createdTargets.empty());
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  EXPECT_EQ(s->rec().draws[0].targetId, 0);
+  EXPECT_TRUE(s->rec().fullscreenDraws.empty());
+  EXPECT_EQ(statsOf(*s).of(api::PassId::PostProcess).drawCalls, 0);
+}
+
+TEST(AntiAliasing, IsOffWithoutAPostProcessShader) {
+  auto s = makeScene();
+  s->world->getResource<resources::RenderSettings>().antiAliasing =
+      resources::AntiAliasing::Fxaa;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_TRUE(s->rec().createdTargets.empty());
+  EXPECT_EQ(s->rec().draws[0].targetId, 0);
+}
+
+TEST(AntiAliasing, SceneGoesToATargetTheSizeOfTheViewport) {
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
+  s->rec().viewport = {1000, 500};
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().createdTargets.size(), 1u);
+  const auto &target = s->rec().createdTargets[0];
+  EXPECT_EQ(target.width, 1000u);
+  EXPECT_EQ(target.height, 500u);
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  EXPECT_EQ(s->rec().draws[0].targetId, target.id);
+  // Cleared where it is drawn: the target, not the window.
+  ASSERT_FALSE(s->rec().clearTargetIds.empty());
+  EXPECT_EQ(s->rec().clearTargetIds[0], target.id);
+}
+
+TEST(AntiAliasing, PostProcessCopiesTheTargetOntoTheWindowLast) {
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().createdTargets.size(), 1u);
+  const auto &target = s->rec().createdTargets[0];
+
+  // The sky is part of the scene; FXAA is the one full-screen draw on the
+  // window, after everything.
+  ASSERT_EQ(s->rec().fullscreenDraws.size(), 2u);
+  EXPECT_EQ(s->rec().fullscreenDraws[0].targetId, target.id);
+  const auto &fxaa = s->rec().fullscreenDraws[1];
+  EXPECT_EQ(fxaa.shaderId, kPostProcessShader);
+  EXPECT_EQ(fxaa.targetId, 0);
+  EXPECT_EQ(s->rec().drawSequence.back(), "fullscreen");
+
+  // It reads the target's colour on unit 0 and draws with no depth or blend.
+  EXPECT_EQ(fxaa.textureUnits.at(0), target.colorTextureId);
+  EXPECT_FALSE(fxaa.state.depthTest);
+  EXPECT_FALSE(fxaa.state.depthWrite);
+  EXPECT_EQ(fxaa.state.blend, api::BlendMode::None);
+  EXPECT_EQ(fxaa.state.cull, api::CullMode::None);
+
+  EXPECT_EQ(s->rec().targetBinds.back(), 0);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::PostProcess).drawCalls, 1);
+}
+
+TEST(AntiAliasing, TargetIsKeptAcrossFramesAndRemadeWhenTheViewportChanges) {
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
+  s->spawn("tri", "matA");
+  s->frame();
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.size(), 1u);
+
+  s->rec().viewport = {640, 360};
+  s->frame();
+  ASSERT_EQ(s->rec().createdTargets.size(), 2u);
+  EXPECT_EQ(s->rec().createdTargets[1].width, 640u);
+  EXPECT_EQ(s->rec().createdTargets[1].height, 360u);
+}
+
+TEST(AntiAliasing, TurningItOffDrawsStraightToTheWindowAgain) {
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
+  s->spawn("tri", "matA");
+  s->frame();
+  EXPECT_EQ(postProcessDrawsOnWindow(*s), 1);
+
+  s->world->getResource<resources::RenderSettings>().antiAliasing =
+      resources::AntiAliasing::None;
+  s->frame();
+
+  EXPECT_EQ(postProcessDrawsOnWindow(*s), 1) << "no second FXAA draw";
+  EXPECT_EQ(s->rec().draws.back().targetId, 0);
+  EXPECT_EQ(s->rec().targetBinds.back(), 0);
+}
+
+TEST(AntiAliasing, EveryFrameEndsOnTheWindow) {
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
+  s->spawn("tri", "matA");
+  for (int i = 0; i < 3; ++i) {
+    s->frame();
+    EXPECT_EQ(s->rec().currentTarget, 0) << "frame " << i;
+  }
+}
+
+TEST(AntiAliasing, PostProcessPassTellsTheShaderWhetherToSmooth) {
+  auto on = makePostProcessScene(resources::AntiAliasing::Fxaa);
+  on->spawn("tri", "matA");
+  on->frame();
+  EXPECT_EQ(on->rec().floatUniforms[kPostProcessShader].at("fxaaOn"), 1.0f);
+
+  auto scaled = makePostProcessScene(resources::AntiAliasing::None);
+  scaled->world->getResource<resources::RenderSettings>().renderScale = 0.5f;
+  scaled->spawn("tri", "matA");
+  scaled->frame();
+  EXPECT_EQ(scaled->rec().floatUniforms[kPostProcessShader].at("fxaaOn"), 0.0f);
+}
+
+// Render scale
+
+TEST(RenderScale, OneWithoutFxaaDrawsStraightToTheWindow) {
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
+  s->world->getResource<resources::RenderSettings>().renderScale = 1.0f;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_TRUE(s->rec().createdTargets.empty());
+  EXPECT_EQ(s->rec().draws[0].targetId, 0);
+}
+
+TEST(RenderScale, ScalesTheSceneTargetEvenWithFxaaOff) {
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
+  s->rec().viewport = {1000, 500};
+  s->world->getResource<resources::RenderSettings>().renderScale = 0.5f;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().createdTargets.size(), 1u);
+  EXPECT_EQ(s->rec().createdTargets[0].width, 500u);
+  EXPECT_EQ(s->rec().createdTargets[0].height, 250u);
+  EXPECT_EQ(s->rec().draws[0].targetId, s->rec().createdTargets[0].id);
+  // The copy to the window still runs.
+  EXPECT_EQ(postProcessDrawsOnWindow(*s), 1);
+}
+
+TEST(RenderScale, ScalesUpForSupersampling) {
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
+  s->rec().viewport = {1000, 500};
+  s->world->getResource<resources::RenderSettings>().renderScale = 2.0f;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().createdTargets.size(), 1u);
+  EXPECT_EQ(s->rec().createdTargets[0].width, 2000u);
+  EXPECT_EQ(s->rec().createdTargets[0].height, 1000u);
+}
+
+TEST(RenderScale, IsClampedToWhatTheUiOffers) {
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
+  s->rec().viewport = {1000, 500};
+  auto &settings = s->world->getResource<resources::RenderSettings>();
+  settings.renderScale = 100.0f;
+  s->spawn("tri", "matA");
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.back().width, 2000u);
+
+  settings.renderScale = 0.0f;
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.back().width, 250u);
+}
+
+TEST(RenderScale, ChangingItRemakesTheTargetAndOneGoesBackToTheWindow) {
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
+  s->rec().viewport = {1000, 500};
+  auto &settings = s->world->getResource<resources::RenderSettings>();
+  settings.renderScale = 0.5f;
+  s->spawn("tri", "matA");
+  s->frame();
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.size(), 1u) << "kept while unchanged";
+
+  settings.renderScale = 0.75f;
+  s->frame();
+  ASSERT_EQ(s->rec().createdTargets.size(), 2u);
+  EXPECT_EQ(s->rec().createdTargets[1].width, 750u);
+
+  settings.renderScale = 1.0f;
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.size(), 2u);
+  EXPECT_EQ(s->rec().draws.back().targetId, 0);
+}
+
+TEST(RenderScale, IsIgnoredWithoutTheFxaaShader) {
+  auto s = makeScene();
+  s->world->getResource<resources::RenderSettings>().renderScale = 0.5f;
+  s->world->getResource<resources::RenderSettings>().antiAliasing =
+      resources::AntiAliasing::None;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_TRUE(s->rec().createdTargets.empty());
+  EXPECT_EQ(s->rec().draws[0].targetId, 0);
 }

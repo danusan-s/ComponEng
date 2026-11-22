@@ -1,34 +1,25 @@
-#include "componeng/renderer/pipeline/batch_drawer.hpp"
+#include "componeng/renderer/draw/batch_drawer.hpp"
 
 #include "componeng/renderer/asset/material.hpp"
 #include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/draw/instance_buffer_cache.hpp"
+#include "componeng/renderer/draw/material_binder.hpp"
+#include "componeng/renderer/draw/render_state_policy.hpp"
 #include "componeng/renderer/pipeline/frame_uniforms.hpp"
-#include "componeng/renderer/pipeline/instance_buffer_cache.hpp"
-#include "componeng/renderer/pipeline/material_binder.hpp"
 #include "componeng/renderer/pipeline/pass_profiler.hpp"
-#include "componeng/renderer/pipeline/render_state_policy.hpp"
 #include "componeng/resources/render_stats.hpp"
 
 namespace componeng::renderer {
 
-BatchDrawer::BatchDrawer(const PassContext &ctx,
-                         const InstanceBufferCache &instances,
-                         MaterialBinder &binder, bool depthPrepassed)
-    : m_ctx(ctx), m_instances(instances), m_binder(binder),
-      m_depthPrepassed(depthPrepassed) {}
-
-void BatchDrawer::forgetBoundState() {
-  m_boundProgram = nullptr;
-  m_boundAlbedo = core::INVALID_HANDLE;
-  m_materialOverrodeUniforms = false;
+BatchDrawer::BatchDrawer(const PassContext &ctx) : m_ctx(ctx) {
 }
 
-void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
+void BatchDrawer::draw(const RenderBatch &batch, api::PassId pass) {
   api::IRenderDevice &device = m_ctx.device;
   const AssetManager &assets = m_ctx.assets;
-  const bool depthOnly = pass == api::RenderPass::DepthPrepass;
+  const bool depthOnly = pass == api::PassId::DepthPrepass;
 
   IMaterial &material = assets.getMaterial(batch.materialID);
   const Mesh &mesh = assets.getMesh(batch.meshID);
@@ -42,10 +33,10 @@ void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
   const bool alphaTestedDepth =
       depthOnly && (material.isAlphaTested() || batch.fading);
   const bool readsAlbedo = !depthOnly || alphaTestedDepth;
-  const Shader &shader =
-      !depthOnly         ? colorShader
-      : alphaTestedDepth ? colorShader.alphaTestedDepthVariant()
-                         : colorShader.depthVariant();
+  const Shader &shader = !depthOnly ? colorShader
+                         : alphaTestedDepth
+                             ? colorShader.alphaTestedDepthVariant()
+                             : colorShader.depthVariant();
 
   resources::PassStats &ps = m_ctx.stats.of(pass);
 
@@ -60,15 +51,10 @@ void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
   }
 
   device.setRenderState(
-      renderStateFor(pass, material.getRenderState(), m_depthPrepassed));
+      renderStateFor(pass, material.getRenderState(), m_ctx.depthPrepassed));
 
-  if (shaderChanged || m_materialOverrodeUniforms) {
-    if (!shader.usesFrameData()) {
-      m_ctx.frame.applyLoose(shader);
-    }
-    if (readsAlbedo) {
-      shader.setInteger("albedoMap", 0);
-    }
+  if (shaderChanged && readsAlbedo) {
+    shader.setInteger("albedoMap", 0);
   }
 
   if (readsAlbedo) {
@@ -86,9 +72,8 @@ void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
     }
   }
 
-  m_binder.bindResources(device, assets, shader, material, depthOnly);
+  m_ctx.binder.bindResources(device, assets, shader, material, depthOnly);
   MaterialBinder::setUniforms(shader, material);
-  m_materialOverrodeUniforms = !material.getUniforms().empty();
 
   mesh.getImpl().bind();
 
@@ -98,7 +83,7 @@ void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
     // reads gl_InstanceID.
     device.drawIndexedInstanced(mesh.indexCount(), batch.instanceCount);
   } else {
-    device.setupInstanceAttributes(m_instances.bufferFor(batch), layout);
+    device.setupInstanceAttributes(m_ctx.instances.bufferFor(batch), layout);
     device.drawIndexedInstanced(mesh.indexCount(), batch.instanceCount);
     device.unbindInstanceAttributes(layout);
   }
@@ -107,6 +92,14 @@ void BatchDrawer::draw(const RenderBatch &batch, api::RenderPass pass) {
   ps.instances += batch.instanceCount;
   ps.triangles +=
       static_cast<uint64_t>(mesh.indexCount() / 3) * batch.instanceCount;
+}
+
+void drawBatches(const PassContext &ctx, api::PassId pass, std::size_t first,
+                 std::size_t last) {
+  BatchDrawer drawer(ctx);
+  for (std::size_t i = first; i < last; ++i) {
+    drawer.draw(ctx.queue.sorted(i), pass);
+  }
 }
 
 } // namespace componeng::renderer

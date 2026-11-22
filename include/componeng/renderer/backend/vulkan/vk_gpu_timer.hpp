@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/renderer/backend/api/render_pass.hpp"
+#include "componeng/renderer/backend/api/pass_id.hpp"
 #include "componeng/renderer/backend/vulkan/vk_core.hpp"
 
 #include <array>
@@ -34,8 +34,8 @@ public:
    *  ahead of the first system); the start is stamped once recording begins. */
   void beginFrameSpan();
   void endFrameSpan();
-  void beginPass(api::RenderPass pass);
-  void endPass(api::RenderPass pass);
+  void beginPass(api::PassId pass);
+  void endPass(api::PassId pass);
   void beginShader(uint64_t shaderId);
   void endShader(uint64_t shaderId);
 
@@ -49,7 +49,7 @@ public:
   double frameMs() const {
     return m_frameMs;
   }
-  double passMs(api::RenderPass pass) const {
+  double passMs(api::PassId pass) const {
     return m_passMs[static_cast<std::size_t>(pass)];
   }
   /** 0 if the shader did not run in the last completed frame, negative if no
@@ -87,11 +87,11 @@ private:
 
   bool m_framePending = false;
   uint32_t m_openFrame = kNone;
-  std::array<uint32_t, api::kRenderPassCount> m_openPass;
+  std::array<uint32_t, api::kPassCount> m_openPass;
   std::unordered_map<uint64_t, uint32_t> m_openShader;
 
   double m_frameMs = -1.0;
-  std::array<double, api::kRenderPassCount> m_passMs;
+  std::array<double, api::kPassCount> m_passMs;
   std::unordered_map<uint64_t, double> m_shaderMs;
   bool m_haveResult = false;
 

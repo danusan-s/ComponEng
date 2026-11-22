@@ -39,6 +39,7 @@ public:
                   const char *gShaderFile, core::Name name);
   const Shader &getShader(core::HandleID id) const;
   core::HandleID getShaderID(core::Name name) const;
+  bool shaderExists(core::Name name) const;
 
   /** Calls `fn(name, shader)` for every loaded shader, in no fixed order. */
   template <typename Fn> void forEachShader(Fn &&fn) const {

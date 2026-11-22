@@ -88,6 +88,16 @@ public:
     return m_sampler;
   }
 
+  /** Makes this texture a view of an image someone else owns (a render
+   *  target's): the view and sampler are borrowed and never destroyed here. */
+  void alias(VkImageView view, VkSampler sampler, uint32_t width,
+             uint32_t height) {
+    m_view = view;
+    m_sampler = sampler;
+    m_width = width;
+    m_height = height;
+  }
+
 private:
   /** Copies `pixels` (m_format layout, w x h at x, y) into the image and
    *  rebuilds the mip chain; `fromUndefined` for the very first fill. Recorded

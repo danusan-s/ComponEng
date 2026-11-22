@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/renderer/backend/api/render_pass.hpp"
+#include "componeng/renderer/backend/api/pass_id.hpp"
 
 #include <chrono>
 
@@ -33,8 +33,8 @@ class PassProfiler {
 public:
   PassProfiler(api::IRenderDevice &device, resources::RenderStats &stats);
 
-  void beginPass(api::RenderPass pass);
-  void endPass(api::RenderPass pass);
+  void beginPass(api::PassId pass);
+  void endPass(api::PassId pass);
 
   /** Time the work issued from here on against `next` (nullptr: against no
    *  shader). A span runs until the next call, so a shader that is bound

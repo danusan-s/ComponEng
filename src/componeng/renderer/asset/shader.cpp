@@ -1,5 +1,10 @@
 #include "componeng/renderer/asset/shader.hpp"
 
+#include "componeng/utils/logger.hpp"
+
+#include <algorithm>
+#include <vector>
+
 namespace componeng::renderer {
 
 // What the depth pre-pass runs for every fragment: nothing. The depth buffer
@@ -61,8 +66,28 @@ void Shader::compile(const char *vertexSource, const char *fragmentSource,
   m_depthVariant.reset();
   m_alphaTestedDepthVariant.reset();
   m_impl->loadGLSL(vertexSource, fragmentSource, geometrySource);
-  m_usesFrameData = m_impl->bindUniformBlock(
-      kFrameDataBlockName, kFrameDataBinding, sizeof(FrameData));
+  if (!m_impl->bindUniformBlock(kFrameDataBlockName, kFrameDataBinding,
+                                sizeof(FrameData))) {
+    warnIfLooseFrameUniforms();
+  }
+}
+
+void Shader::warnIfLooseFrameUniforms() const {
+  // A shader may skip the block when it needs no per-frame values. One that
+  // reads them as plain uniforms would get zeros, since the engine only
+  // uploads the block.
+  static const char *const kFrameNames[] = {
+      "viewProj", "cameraPos",  "lightDir", "lightColor", "ambientColor",
+      "fogColor", "fogDensity", "fogStart", "fogEnd",     "time"};
+  const std::vector<core::Name> active = m_impl->reflectActiveUniformNames();
+  for (const char *name : kFrameNames) {
+    const core::Name n(name);
+    if (std::find(active.begin(), active.end(), n) != active.end()) {
+      LOG_ERROR("Shader reads '%s' as a loose uniform, but the engine only "
+                "uploads per-frame values in the %s block; declare it",
+                name, kFrameDataBlockName);
+    }
+  }
 }
 
 void Shader::setFloat(const char *name, float value) const {

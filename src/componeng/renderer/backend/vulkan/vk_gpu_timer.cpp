@@ -87,19 +87,20 @@ void VulkanGpuTimer::endFrameSpan() {
   m_openFrame = kNone;
 }
 
-void VulkanGpuTimer::beginPass(api::RenderPass pass) {
+void VulkanGpuTimer::beginPass(api::PassId pass) {
   if (!m_cmd)
     return;
   m_openPass[static_cast<std::size_t>(pass)] = stamp();
 }
 
-void VulkanGpuTimer::endPass(api::RenderPass pass) {
+void VulkanGpuTimer::endPass(api::PassId pass) {
   uint32_t &open = m_openPass[static_cast<std::size_t>(pass)];
   if (open == kNone)
     return;
   const uint32_t end = stamp();
   if (end != kNone)
-    m_slots[m_slot].spans.push_back({Kind::Pass, static_cast<uint32_t>(pass), 0, open, end});
+    m_slots[m_slot].spans.push_back(
+        {Kind::Pass, static_cast<uint32_t>(pass), 0, open, end});
   open = kNone;
 }
 
@@ -117,7 +118,8 @@ void VulkanGpuTimer::endShader(uint64_t shaderId) {
     return;
   const uint32_t end = stamp();
   if (end != kNone)
-    m_slots[m_slot].spans.push_back({Kind::Shader, 0, shaderId, it->second, end});
+    m_slots[m_slot].spans.push_back(
+        {Kind::Shader, 0, shaderId, it->second, end});
   m_openShader.erase(it);
 }
 
@@ -131,8 +133,8 @@ void VulkanGpuTimer::collect(uint32_t slotIndex) {
   // The frame has finished, so written queries are available; one never
   // written (an unclosed span) is in no closed span, so NOT_READY is harmless.
   vkGetQueryPoolResults(m_core->device, m_pool, slotIndex * kMaxQueries,
-                        slot.used, ticks.size() * sizeof(uint64_t), ticks.data(),
-                        sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
+                        slot.used, ticks.size() * sizeof(uint64_t),
+                        ticks.data(), sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
 
   auto ms = [&](const Span &s) {
     const uint64_t delta = (ticks[s.end] - ticks[s.begin]) & m_validMask;
@@ -142,7 +144,7 @@ void VulkanGpuTimer::collect(uint32_t slotIndex) {
   for (auto &entry : m_shaderMs)
     entry.second = 0.0; // shaders that did not run this frame read as 0
 
-  std::array<bool, api::kRenderPassCount> passSeen{};
+  std::array<bool, api::kPassCount> passSeen{};
   double frame = 0.0;
   bool frameSeen = false;
   for (const Span &s : slot.spans) {

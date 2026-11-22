@@ -3,6 +3,7 @@
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/backend/opengl/gl_buffer.hpp"
 #include "componeng/renderer/backend/opengl/gl_mesh.hpp"
+#include "componeng/renderer/backend/opengl/gl_render_target.hpp"
 #include "componeng/renderer/backend/opengl/gl_shader.hpp"
 #include "componeng/renderer/backend/opengl/gl_texture.hpp"
 #include "glad/glad.h"
@@ -28,6 +29,7 @@ public:
   void init(void *windowHandle) override;
   void setViewport(int x, int y, int w, int h) override;
   void setScissor(int x, int y, int w, int h) override;
+  api::Extent viewportExtent() const override;
   void setActiveTextureUnit(uint32_t unit) override;
   void bindBufferTexture(uint32_t unit, api::IBuffer &buffer,
                          api::BufferTextureFormat format) override;
@@ -47,9 +49,9 @@ public:
   double lastGpuTimeMs() const override {
     return m_gpuTimeMs;
   }
-  void beginGpuPass(api::RenderPass pass) override;
-  void endGpuPass(api::RenderPass pass) override;
-  double lastGpuPassTimeMs(api::RenderPass pass) const override {
+  void beginGpuPass(api::PassId pass) override;
+  void endGpuPass(api::PassId pass) override;
+  double lastGpuPassTimeMs(api::PassId pass) const override {
     return m_gpuPasses[static_cast<std::size_t>(pass)].ms;
   }
 
@@ -57,6 +59,9 @@ public:
   std::unique_ptr<api::ITexture> createTexture() override;
   std::unique_ptr<api::IMesh> createMesh() override;
   std::unique_ptr<api::IBuffer> createBuffer() override;
+  std::unique_ptr<api::IRenderTarget>
+  createRenderTarget(const api::RenderTargetDesc &desc) override;
+  void setRenderTarget(api::IRenderTarget *target) override;
 
   void setupInstanceAttributes(api::IBuffer &instanceBuffer,
                                const api::VertexLayout &layout) override;
@@ -71,6 +76,12 @@ private:
   void applyRenderState(const api::RenderState &state, bool force);
 
   api::RenderState m_state;
+
+  // What setViewport / setScissor last gave for the window. They are not sent
+  // to GL while a render target is bound, which uses its own full size.
+  int m_viewport[4] = {0, 0, 0, 0};
+  int m_scissor[4] = {0, 0, 0, 0};
+  const GLRenderTarget *m_target = nullptr;
 
   // Core-profile GL refuses to draw without a VAO bound, even one with no
   // attributes. Created once in init() and kept for the life of the context.
@@ -101,7 +112,7 @@ private:
     bool created = false;
     double ms = -1.0;
   };
-  GpuPassTimer m_gpuPasses[api::kRenderPassCount];
+  GpuPassTimer m_gpuPasses[api::kPassCount];
 
   void collectGpuPasses();
 };

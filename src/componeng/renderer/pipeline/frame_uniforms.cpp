@@ -25,7 +25,7 @@ constexpr float kAmbientStrength = 0.4f;
 void FrameUniforms::update(ecs::World &world, ecs::EntityID camera) {
   const core::Vec3 cameraPos =
       world.readComponent<core::TransformComponent>(camera).position;
-  m_viewProj =
+  const core::Mat4 &viewProj =
       world.readComponent<camera::CameraComponent>(camera).viewProjectionMatrix;
   const auto &fog = world.getResource<resources::Fog>();
 
@@ -39,7 +39,7 @@ void FrameUniforms::update(ecs::World &world, ecs::EntityID camera) {
 
   FrameData &f = m_data;
   f = FrameData{};
-  std::copy_n(core::value_ptr(m_viewProj), 16, f.viewProj);
+  std::copy_n(core::value_ptr(viewProj), 16, f.viewProj);
   std::copy_n(core::value_ptr(cameraPos), 3, f.cameraPos);
   f.time = static_cast<float>(world.time);
   std::copy_n(core::value_ptr(lightDir), 3, f.lightDir);
@@ -56,33 +56,11 @@ void FrameUniforms::update(ecs::World &world, ecs::EntityID camera) {
     m_buffer = device.createBuffer();
   }
   if (m_buffer->size() < sizeof(FrameData)) {
-    m_buffer->setData(&m_data, sizeof(FrameData),
-                      api::IBuffer::Usage::Dynamic);
+    m_buffer->setData(&m_data, sizeof(FrameData), api::IBuffer::Usage::Dynamic);
   } else {
     m_buffer->setSubData(0, &m_data, sizeof(FrameData));
   }
   device.bindUniformBuffer(kFrameDataBinding, *m_buffer);
-}
-
-void FrameUniforms::applyLoose(const Shader &shader) const {
-  const FrameData &f = m_data;
-  shader.setMatrix4("viewProj", m_viewProj);
-  shader.setVector3f("lightDir", f.lightDir[0], f.lightDir[1], f.lightDir[2]);
-  shader.setVector3f("lightColor", f.lightColor[0], f.lightColor[1],
-                     f.lightColor[2]);
-  shader.setVector3f("cameraPos", f.cameraPos[0], f.cameraPos[1],
-                     f.cameraPos[2]);
-  shader.setFloat("time", f.time);
-
-  shader.setVector4f("fogColor", f.fogColor[0], f.fogColor[1], f.fogColor[2],
-                     f.fogColor[3]);
-  shader.setFloat("fogDensity", f.fogDensity);
-  shader.setFloat("fogStart", f.fogStart);
-  shader.setFloat("fogEnd", f.fogEnd);
-
-  shader.setVector3f("ambientColor", f.ambientColor[0], f.ambientColor[1],
-                     f.ambientColor[2]);
-  shader.setFloat("ambientStrength", f.ambientStrength);
 }
 
 } // namespace componeng::renderer

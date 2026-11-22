@@ -371,7 +371,7 @@ const auto& events = world.get_events<CollisionEvent>();
 |-----------|--------|--------|
 | `TransformComponent` | `components/transform_component.hpp` | `position`, `rotation`, `scale` (Vec3 each) |
 | `MeshComponent` | `components/mesh_component.hpp` | `meshID`, `visible` |
-| `MaterialComponent` | `components/material_component.hpp` | `color`, `textureID`, `shaderID` |
+| `MaterialComponent` | `components/material_component.hpp` | `materialName`, `materialID` |
 | `CameraComponent` | `components/camera_component.hpp` | `fov`, `aspectRatio`, `nearPlane`, `farPlane`, `viewProjectionMatrix` |
 | `RigidBodyComponent` | `components/rigidbody_component.hpp` | `type` (Static/Dynamic/Kinematic), `velocity`, `mass`, `restitution` |
 | `ColliderComponent` | `components/collider_component.hpp` | `type` (Box/Sphere), `transform` |
@@ -487,7 +487,13 @@ const auto& events = world.get_events<CollisionEvent>();
    test `Equal` and depth writes off, so only the nearest surface at each pixel
    runs the fragment shader. Then the sky
 9. **Transparent pass**: Draw `Transparent` batches with their own `RenderState`
-10. **Draw** (both passes): Bind the material's extra textures, texture buffers and uniform
+10. **Post-process** (`RenderSettings::antiAliasing`, `renderScale`): With FXAA
+   on, or a render scale other than 1, steps 7 to 9 are drawn into an off-screen
+   `IRenderTarget` (the window's viewport size times the scale), and
+   `PostProcessPass` copies it onto the window through the `post_process`
+   shader, smoothing the edges when FXAA is on. Otherwise, or without a
+   `post_process` shader, the scene is drawn straight to the window
+11. **Draw** (both passes): Bind the material's extra textures, texture buffers and uniform
    blocks (`IMaterial::setTexture` / `setBufferTexture` / `setUniformBuffer`),
    and use glDrawElementsInstanced for
    single-draw-call rendering, skipping shader/texture rebinds that did not change

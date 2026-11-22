@@ -1,11 +1,6 @@
 #pragma once
 
-#include "componeng/ecs/entity.hpp"
-#include "componeng/renderer/pipeline/pass_context.hpp"
-
-namespace componeng::ecs {
-class World;
-}
+#include "componeng/renderer/pass/render_pass.hpp"
 
 namespace componeng::renderer {
 
@@ -17,11 +12,13 @@ namespace componeng::renderer {
  * and with the depth test on, the pixels the opaque geometry already covers
  * are rejected before it runs. It must still come before anything blended or
  * drawn without a depth test, which has to land on top of it.
- *
- * It binds its own shader, so a BatchDrawer's bound-state memory is stale
- * afterwards.
  */
-void drawSkyPass(const PassContext &ctx, ecs::World &world,
-                 ecs::EntityID camera);
+class SkyPass final : public RenderPass {
+public:
+  api::PassId id() const override {
+    return api::PassId::Sky;
+  }
+  void execute(const PassContext &ctx) override;
+};
 
 } // namespace componeng::renderer

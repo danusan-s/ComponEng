@@ -247,7 +247,7 @@ TEST(MathVsGlm, ViewProjectionPipeline) {
 // --- Full model matrix pipeline ----------------------------------------------
 
 TEST(MathVsGlm, ModelMatrixPipelineOrderXYZS) {
-  // Mirrors DiffuseMaterial::buildInstanceData: T * Rx * Ry * Rz * S
+  // Mirrors DiffuseMaterial::writeInstanceData: T * Rx * Ry * Rz * S
   const Vec3 pos(1.0f, 2.0f, 3.0f);
   const Vec3 rotX(1.5707963f, 0.7853981f, 0.5235988f); // radians
   const Vec3 scaleV(2.0f, 0.5f, 3.0f);
