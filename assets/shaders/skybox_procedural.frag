@@ -1,23 +1,16 @@
-#version 330 core
+#version 460
 
-in vec3 fragDir;
+#include "frame_data.glsl"
 
-out vec4 FragColor;
+layout(location = 0) in vec3 fragDir;
 
-// Per-frame values, from the shared uniform buffer. Must match
-// renderer/frame_data.hpp exactly.
-layout(std140) uniform FrameData {
-    mat4 viewProj;
-    vec3 cameraPos;      float time;
-    vec3 lightDir;       float fogDensity;
-    vec3 lightColor;     float fogStart;
-    vec3 ambientColor;   float ambientStrength;
-    vec4 fogColor;
-    float fogEnd;
+layout(location = 0) out vec4 FragColor;
+
+layout(std140, BIND(1, 0)) uniform Material {
+    mat4 invSkyViewProj;
+    vec3 skyColor;     // colour straight overhead
+    vec3 horizonColor; // colour at the horizon
 };
-
-uniform vec3 skyColor;     // colour straight overhead
-uniform vec3 horizonColor; // colour at the horizon
 
 void main()
 {

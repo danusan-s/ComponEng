@@ -242,6 +242,7 @@ set(TEST_SOURCES
     tests/test_render_pipeline.cpp
     tests/test_render_state_policy.cpp
     tests/test_shader_compiler.cpp
+    tests/test_bundled_shaders.cpp
     tests/test_fake_device.cpp
     tests/test_culling.cpp
     tests/test_mesh.cpp

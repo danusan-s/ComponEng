@@ -1,4 +1,4 @@
-#version 330 core
+#version 460
 
 // The last pass: copies the scene texture onto the window. With fxaaOn it smooths
 // edges on the way, otherwise it only copies (and, when the scene was drawn at
@@ -9,12 +9,15 @@
 // samples along it. The result is kept only if it stays inside the local luma
 // range, which stops it blurring fine detail that is not an edge.
 
-in vec2 vUV;
-out vec4 FragColor;
+layout(location = 0) in vec2 vUV;
+layout(location = 0) out vec4 FragColor;
 
-uniform sampler2D sceneColor;
-uniform vec2 invResolution; // 1 / scene size in pixels
-uniform float fxaaOn;       // 0: only copy (and scale) the scene
+layout(std140, BIND(1, 0)) uniform Material {
+    vec2 invResolution; // 1 / scene size in pixels
+    float fxaaOn;       // 0: only copy (and scale) the scene
+};
+
+layout(BIND(1, 1)) uniform sampler2D sceneColor;
 
 const float REDUCE_MIN = 1.0 / 128.0;
 const float REDUCE_MUL = 1.0 / 8.0;
