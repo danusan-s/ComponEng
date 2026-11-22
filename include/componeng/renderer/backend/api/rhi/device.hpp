@@ -71,6 +71,16 @@ public:
   virtual void shutdown() {
   }
 
+  virtual Backend backend() const = 0;
+
+  /** The colour format of the window's backbuffer. A pipeline drawn into the
+   *  backbuffer is created with it. */
+  virtual Format backbufferFormat() const = 0;
+
+  /** True between a beginFrame that returned true and present(). A system that
+   *  draws checks it, so a skipped frame (minimised window) costs nothing. */
+  virtual bool frameOpen() const = 0;
+
   /** Waits for the frame slot and acquires the backbuffer. False means skip
    *  this frame (minimised window, swapchain rebuilding). Resource creation
    *  and uploads are allowed outside a frame. */

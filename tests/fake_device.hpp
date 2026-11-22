@@ -27,6 +27,7 @@ inline uint32_t bytesPerPixel(rhi::Format f) {
       return 2;
     case rhi::Format::RGBA8:
     case rhi::Format::RGBA8Srgb:
+    case rhi::Format::BGRA8:
     case rhi::Format::RG16F:
     case rhi::Format::R32F:
     case rhi::Format::D32F:
@@ -119,6 +120,7 @@ struct Recorder {
   int clears = 0; // beginRendering calls that cleared the colour attachment
   bool frameOpen = false;
   bool beginFrameResult = true;
+  rhi::Backend backend = rhi::Backend::Vulkan;
   // What windowViewportExtent() reports; tests change it to resize the window.
   rhi::Extent2D viewport{1280, 720};
 
@@ -361,6 +363,16 @@ public:
   Recorder rec;
 
   void init(void *) override {
+  }
+
+  rhi::Backend backend() const override {
+    return rec.backend;
+  }
+  rhi::Format backbufferFormat() const override {
+    return rhi::Format::BGRA8;
+  }
+  bool frameOpen() const override {
+    return rec.frameOpen;
   }
 
   bool beginFrame() override {

@@ -25,6 +25,9 @@ struct Rect {
   uint32_t height = 0;
 };
 
+/** Which graphics API a device drives; decides which SPIR-V a shader needs. */
+enum class Backend : uint8_t { Vulkan, OpenGL };
+
 /** GPU formats only. Three-channel 8-bit data is expanded to RGBA8 on the CPU
  *  before upload. RGB32F is for vertex attributes only. */
 enum class Format : uint8_t {
@@ -33,6 +36,7 @@ enum class Format : uint8_t {
   RG8,
   RGBA8,
   RGBA8Srgb,
+  BGRA8, // a swapchain's format; see IDevice::backbufferFormat
   R16F,
   RG16F,
   RGBA16F,
