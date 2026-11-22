@@ -73,10 +73,10 @@ void RenderPlugin::ready(ecs::World &world) {
   assetManager.registerMaterial<renderer::DiffuseMaterial>(
       "transparent_diffuse", "default", "white");
   {
-    renderer::api::RenderState state;
-    state.cull = renderer::api::CullMode::Back;
+    rhi::RenderState state;
+    state.cull = rhi::CullMode::Back;
     state.depthWrite = false;
-    state.blend = renderer::api::BlendMode::Alpha;
+    state.blend = rhi::BlendMode::Alpha;
     auto &transparent = assetManager.getMaterial(
         assetManager.getMaterialID("transparent_diffuse"));
     transparent.setType(renderer::MaterialType::Transparent);

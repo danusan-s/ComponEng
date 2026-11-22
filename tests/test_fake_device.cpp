@@ -212,9 +212,10 @@ TEST(FakeDevice, FullscreenDrawNeedsNoVertexBuffers) {
   device.present(nullptr);
 
   EXPECT_TRUE(device.rec.errors.empty());
-  ASSERT_EQ(device.rec.draws.size(), 1u);
-  EXPECT_FALSE(device.rec.draws[0].indexed);
-  EXPECT_EQ(device.rec.draws[0].vertexCount, 3u);
+  EXPECT_TRUE(device.rec.draws.empty());
+  ASSERT_EQ(device.rec.fullscreenDraws.size(), 1u);
+  EXPECT_FALSE(device.rec.fullscreenDraws[0].indexed);
+  EXPECT_EQ(device.rec.fullscreenDraws[0].vertexCount, 3u);
   EXPECT_EQ(device.rec.drawSequence, std::vector<std::string>{"fullscreen"});
 }
 

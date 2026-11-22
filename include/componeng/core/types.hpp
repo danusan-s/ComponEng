@@ -82,7 +82,8 @@ namespace componeng::core {
 using HandleID = uint32_t;
 constexpr HandleID INVALID_HANDLE = UINT32_MAX;
 
-using UniformMap = std::unordered_map<
-    Name, std::variant<float, core::Vec2, core::Vec3, core::Vec4, core::Mat4>>;
+using UniformMap =
+    std::unordered_map<Name, std::variant<float, int, core::Vec2, core::Vec3,
+                                          core::Vec4, core::Mat4>>;
 
 } // namespace componeng::core

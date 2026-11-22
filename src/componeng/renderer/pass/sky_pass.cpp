@@ -3,7 +3,6 @@
 #include "componeng/camera/camera_component.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/component/skybox_component.hpp"
 #include "componeng/renderer/draw/render_state_policy.hpp"
 #include "componeng/renderer/pipeline/frame_uniforms.hpp"
@@ -31,31 +30,30 @@ void SkyPass::execute(const PassContext &ctx) {
   const auto &fog = world.getResource<resources::Fog>();
 
   ctx.profiler.timeShader(&shader);
-  shader.use();
 
   // Projection x rotation-only view, inverted: turns a pixel back into the
   // direction the camera sees through it. No camera translation, so the sky
   // stays fixed relative to the camera's orientation.
-  shader.setMatrix4("invSkyViewProj",
-                    core::inverse(cam.projectionMatrix * cam.viewMatrix));
-  shader.setVector3f("skyColor", sky->color);
+  ParameterBlock &params = m_draw.params(ctx.device, shader);
+  params.set("invSkyViewProj",
+             core::inverse(cam.projectionMatrix * cam.viewMatrix));
+  params.set("skyColor", sky->color);
   // The fog colour as horizon lets fogged ground fade into the sky.
-  shader.setVector3f("horizonColor",
-                     sky->horizonFromFog
-                         ? core::Vec3(fog.color.x, fog.color.y, fog.color.z)
-                         : sky->horizonColor);
+  params.set("horizonColor",
+             sky->horizonFromFog
+                 ? core::Vec3(fog.color.x, fog.color.y, fog.color.z)
+                 : sky->horizonColor);
 
-  ctx.device.setRenderState(renderStateFor(api::PassId::Sky, api::RenderState{},
-                                           /*depthPrepassed=*/false));
-  ctx.device.drawFullscreenTriangle();
+  m_draw.draw(ctx, shader,
+              renderStateFor(api::PassId::Sky, rhi::RenderState{},
+                             /*depthPrepassed=*/false),
+              ctx.colorFormat, ctx.depthFormat);
 
   resources::PassStats &ps = ctx.stats.of(api::PassId::Sky);
   ++ps.drawCalls;
   ++ps.instances;
   ++ps.triangles;
   ++ps.shaderBinds;
-
-  ctx.device.setRenderState(api::RenderState{});
 }
 
 } // namespace componeng::renderer

@@ -183,15 +183,13 @@ void Window::setViewport(int w, int h) {
   if (currentAspectRatio > targetAspectRatio) {
     int newWidth = static_cast<int>(h * targetAspectRatio);
     int xOffset = (w - newWidth) / 2;
-    m_renderDevice->setScissor(xOffset, 0, newWidth, h);
-    m_renderDevice->setViewport(xOffset, 0, newWidth, h);
+    m_renderDevice->setWindowViewport(xOffset, 0, newWidth, h);
     return;
   }
 
   int newHeight = static_cast<int>(w / targetAspectRatio);
   int yOffset = (h - newHeight) / 2;
-  m_renderDevice->setScissor(0, yOffset, w, newHeight);
-  m_renderDevice->setViewport(0, yOffset, w, newHeight);
+  m_renderDevice->setWindowViewport(0, yOffset, w, newHeight);
 }
 
 void Window::shutdown() {

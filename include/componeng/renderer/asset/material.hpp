@@ -1,6 +1,8 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
+#include "componeng/renderer/asset/parameter_block.hpp"
+#include "componeng/renderer/asset/shader.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/instance_data.hpp"
 #include "componeng/utils/logger.hpp"
@@ -67,14 +69,12 @@ public:
     return 0;
   }
 
-  void setUniform(const char *name, core::UniformMap::mapped_type value) {
-    if (!m_knownUniforms.empty() &&
-        m_knownUniforms.find(core::Name(name)) == m_knownUniforms.end()) {
-      LOG_ERROR("setUniform: '%s' is not an active uniform in this "
-                "material's shader",
-                name);
-    }
+  /** Sets the parameter `name` of the shader's material block (the uniform
+   *  block at set 1, binding 0) to `value`. The type must match the member
+   *  exactly. An unknown name or a wrong type is logged (once) and ignored. */
+  void setUniform(const char *name, UniformValue value) {
     m_uniforms[name] = value;
+    applyUniform(name, value);
   }
 
   const core::UniformMap &getUniforms() const {
@@ -85,82 +85,95 @@ public:
   //
   // Beyond its albedo (and a PbrMaterial's maps), a material can hand its
   // shader any number of textures and buffers, by the names the shader
-  // declares. The RenderSystem binds them before each of the material's draws:
-  // textures and buffer textures take units from api::kFirstMaterialTextureUnit
-  // up, uniform blocks take binding points from
-  // api::kFirstMaterialUniformBinding up.
+  // declares. They are bound together with the material's parameters as set 1.
 
   struct TextureBinding {
     std::string sampler; // `uniform sampler2D <sampler>`
     core::HandleID texture = 0;
   };
-  struct BufferTextureBinding {
-    std::string sampler; // `uniform samplerBuffer <sampler>`
-    core::HandleID buffer = 0;
-    api::BufferTextureFormat format = api::BufferTextureFormat::R32F;
-  };
-  struct UniformBlockBinding {
-    std::string block; // `layout(std140) uniform <block> { ... }`
+  struct BufferBinding {
+    std::string block; // `uniform <block> { ... }` or `buffer <block> { ... }`
     core::HandleID buffer = 0;
   };
 
   /** Binds a texture (AssetManager::getTextureID) to the shader's sampler2D
    *  `sampler`. Setting the same sampler again replaces the texture. */
   void setTexture(const char *sampler, core::HandleID texture) {
-    warnIfNotUniform(sampler, "setTexture");
+    warnIfUnknown(sampler, shader::ResourceKind::Sampler2D, "setTexture");
     for (TextureBinding &b : m_textureBindings) {
       if (b.sampler == sampler) {
         b.texture = texture;
+        touch();
         return;
       }
     }
     m_textureBindings.push_back({sampler, texture});
+    touch();
   }
 
-  /** Binds a buffer (AssetManager::getBufferID) to the shader's samplerBuffer
-   *  `sampler`, read with texelFetch. Unlike a uniform block there is no small
-   *  size limit, so this is how to give a shader a long list of values. */
-  void setBufferTexture(const char *sampler, core::HandleID buffer,
-                        api::BufferTextureFormat format) {
-    warnIfNotUniform(sampler, "setBufferTexture");
-    for (BufferTextureBinding &b : m_bufferTextureBindings) {
-      if (b.sampler == sampler) {
-        b.buffer = buffer;
-        b.format = format;
-        return;
-      }
-    }
-    m_bufferTextureBindings.push_back({sampler, buffer, format});
-  }
-
-  /** Binds a buffer to the shader's std140 uniform block `block`. */
+  /** Binds a buffer to the shader's std140 uniform block `block`. The block
+   *  must not be the material's own parameter block (binding 0). */
   void setUniformBuffer(const char *block, core::HandleID buffer) {
-    for (UniformBlockBinding &b : m_uniformBlockBindings) {
-      if (b.block == block) {
-        b.buffer = buffer;
-        return;
-      }
-    }
-    m_uniformBlockBindings.push_back({block, buffer});
+    warnIfUnknown(block, shader::ResourceKind::UniformBlock,
+                  "setUniformBuffer");
+    setBufferBinding(m_uniformBlockBindings, block, buffer);
+  }
+
+  /** Binds a buffer to the shader's std430 storage block `block`, which a
+   *  shader reads like `readonly buffer Positions { vec4 positions[]; };`.
+   *  There is no small size limit, so this is how to give a shader a long
+   *  list of values. */
+  void setStorageBuffer(const char *block, core::HandleID buffer) {
+    warnIfUnknown(block, shader::ResourceKind::StorageBlock,
+                  "setStorageBuffer");
+    setBufferBinding(m_storageBlockBindings, block, buffer);
   }
 
   const std::vector<TextureBinding> &getTextureBindings() const {
     return m_textureBindings;
   }
-  const std::vector<BufferTextureBinding> &getBufferTextureBindings() const {
-    return m_bufferTextureBindings;
-  }
-  const std::vector<UniformBlockBinding> &getUniformBlockBindings() const {
+  const std::vector<BufferBinding> &getUniformBlockBindings() const {
     return m_uniformBlockBindings;
   }
+  const std::vector<BufferBinding> &getStorageBlockBindings() const {
+    return m_storageBlockBindings;
+  }
 
-  /** Called by AssetManager::registerMaterial right after construction, from
-   *  the shader's reflected active uniforms; makes setUniform() typo-safe. */
-  void setKnownUniforms(const std::vector<core::Name> &names) {
-    m_knownUniforms.clear();
-    for (const auto &n : names) {
-      m_knownUniforms.insert(n);
+  /** Called by AssetManager::registerMaterial right after construction: sizes
+   *  the parameter block from the shader's reflection, applies any uniforms
+   *  already set, and takes the shader's instance layout. */
+  void bindShader(const Shader &shader, rhi::IDevice &device) {
+    m_resources.clear();
+    for (const shader::ReflectedResource &r : shader.reflection().resources) {
+      if (r.set == 1) {
+        m_resources.push_back({r.name, r.kind, r.binding});
+      }
     }
+    m_params = ParameterBlock();
+    if (const shader::ReflectedResource *block = shader.materialBlock()) {
+      m_params.init(device, *block);
+      for (const auto &[name, value] : m_optionalUniforms) {
+        m_params.set(name.c_str(), value);
+      }
+      for (const auto &[name, value] : m_uniforms) {
+        applyUniform(name.c_str(), value);
+      }
+    }
+    setVertexLayout(shader.instanceLayout());
+    touch();
+  }
+
+  ParameterBlock &params() {
+    return m_params;
+  }
+  const ParameterBlock &params() const {
+    return m_params;
+  }
+
+  /** Changes whenever something a bind group is built from (a texture, a
+   *  buffer, the shader) changes; the renderer rebuilds the group then. */
+  uint64_t bindingsVersion() const {
+    return m_bindingsVersion;
   }
 
   /** Which pass this material is drawn in; see MaterialType. Default Opaque. */
@@ -250,13 +263,69 @@ public:
   virtual void writeInstanceData(const InstanceContext &ctx,
                                  InstanceWriter &out) const = 0;
 
-private:
-  void warnIfNotUniform(const char *name, const char *caller) const {
-    if (!m_knownUniforms.empty() &&
-        m_knownUniforms.find(core::Name(name)) == m_knownUniforms.end()) {
-      LOG_ERROR("%s: '%s' is not an active uniform in this material's shader",
-                caller, name);
+protected:
+  /** For subclasses whose own setters change what gets bound. */
+  void touch() {
+    ++m_bindingsVersion;
+  }
+
+  /** Like setUniform, for a value the engine offers whether or not a shader
+   *  declares it: an unknown name or type is silently ignored. */
+  void setOptionalUniform(const char *name, UniformValue value) {
+    m_optionalUniforms[name] = value;
+    if (m_params.valid()) {
+      m_params.set(name, value);
     }
+  }
+
+private:
+  struct ShaderResource {
+    std::string name;
+    shader::ResourceKind kind;
+    uint32_t binding;
+  };
+
+  void applyUniform(const char *name, const UniformValue &value) {
+    if (!m_params.valid()) {
+      return; // applied when bindShader gives the block
+    }
+    const ParameterBlock::Result r = m_params.set(name, value);
+    if (r == ParameterBlock::Result::UnknownName) {
+      LOG_ERROR("setUniform: '%s' is not a member of this material's shader "
+                "parameter block",
+                name);
+    } else if (r == ParameterBlock::Result::TypeMismatch) {
+      LOG_ERROR("setUniform: '%s' has a different type in the shader", name);
+    }
+  }
+
+  // Resources only exist once a shader is bound; before that every name is
+  // accepted and checked later by the binder.
+  void warnIfUnknown(const char *name, shader::ResourceKind kind,
+                     const char *caller) const {
+    if (m_resources.empty()) {
+      return;
+    }
+    for (const ShaderResource &r : m_resources) {
+      if (r.name == name && r.kind == kind) {
+        return;
+      }
+    }
+    LOG_ERROR("%s: '%s' is not a matching resource of this material's shader",
+              caller, name);
+  }
+
+  void setBufferBinding(std::vector<BufferBinding> &list, const char *block,
+                        core::HandleID buffer) {
+    for (BufferBinding &b : list) {
+      if (b.block == block) {
+        b.buffer = buffer;
+        touch();
+        return;
+      }
+    }
+    list.push_back({block, buffer});
+    touch();
   }
 
   core::HandleID m_shaderID = 0;
@@ -267,10 +336,13 @@ private:
   api::RenderState m_renderState;
   float m_boundsPadding = 0.0f;
   core::UniformMap m_uniforms;
+  core::UniformMap m_optionalUniforms;
+  ParameterBlock m_params;
+  std::vector<ShaderResource> m_resources;
+  uint64_t m_bindingsVersion = 0;
   std::vector<TextureBinding> m_textureBindings;
-  std::vector<BufferTextureBinding> m_bufferTextureBindings;
-  std::vector<UniformBlockBinding> m_uniformBlockBindings;
-  std::unordered_set<core::Name> m_knownUniforms;
+  std::vector<BufferBinding> m_uniformBlockBindings;
+  std::vector<BufferBinding> m_storageBlockBindings;
 };
 
 } // namespace componeng::renderer

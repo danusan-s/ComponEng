@@ -2,7 +2,6 @@
 
 #include "componeng/core/profiling.hpp"
 #include "componeng/renderer/asset/shader.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/resources/render_stats.hpp"
 
 namespace componeng::renderer {
@@ -17,8 +16,7 @@ double msSince(std::chrono::steady_clock::time_point t) {
 
 } // namespace
 
-PassProfiler::PassProfiler(api::IRenderDevice &device,
-                           resources::RenderStats &stats)
+PassProfiler::PassProfiler(rhi::IDevice &device, resources::RenderStats &stats)
     : m_device(device), m_stats(stats) {
 }
 

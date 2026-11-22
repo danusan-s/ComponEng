@@ -59,6 +59,12 @@ struct Draw {
   int pipelineId = 0;
   int vertexModuleId = 0;
   int fragmentModuleId = 0;
+  // Which shader the draw's vertex module belongs to, counting vertex modules
+  // from 1 in creation order (a Shader makes exactly one, and its depth
+  // variants reuse it). A variant differs only by fragmentModuleId.
+  int shaderId = 0;
+  // The image at set 1, binding 1: where the shaders name their albedoMap.
+  int albedoTextureId = 0;
   int targetId = 0;                 // colour image drawn into (0: the window)
   std::map<uint32_t, int> groupIds; // set -> group
   std::map<uint64_t, int> imageAt;  // bindingKey
@@ -94,6 +100,12 @@ struct Command {
   int id = 0; // the object the command names, where there is one
 };
 
+struct CreatedTarget {
+  int id = 0;
+  uint32_t width = 0, height = 0;
+  int colorTextureId = 0; // the image the target's colour is sampled as
+};
+
 struct ImageUpload {
   int imageId = 0;
   rhi::Rect region;
@@ -126,6 +138,16 @@ struct Recorder {
 
   std::vector<Command> commands;
   std::vector<Draw> draws;
+  std::vector<Draw> fullscreenDraws; // draw() calls, which have no mesh
+  std::vector<int> pipelineBinds;    // pipeline id per BindPipeline
+  std::vector<int> groupBinds;       // group id per bindGroup, any set
+  // The colour attachments (render targets) created, in creation order, and
+  // the target each clearing beginRendering hit (0: the window).
+  std::vector<CreatedTarget> createdTargets;
+  std::vector<int> clearTargetIds;
+  int currentTarget = 0;
+  std::vector<rhi::SamplerDesc> createdSamplers;
+  std::map<int, int> vertexOrdinal;      // vertex module id -> shader id
   std::vector<std::string> drawSequence; // "indexed" / "fullscreen"
   // beginGpuPass / endGpuPass as "begin <name>" / "end <name>", with each draw
   // between them.
@@ -413,15 +435,24 @@ public:
   std::unique_ptr<rhi::IImage> createImage(const rhi::ImageDesc &d) override {
     const int id = ++rec.imagesCreated;
     rec.createdImages.push_back({id, d});
+    if (hasFlag(d.usage, rhi::ImageUsage::ColorAttachment)) {
+      rec.createdTargets.push_back({id, d.extent.width, d.extent.height, id});
+    }
     return std::make_unique<FakeImage>(id, d);
   }
   std::unique_ptr<rhi::ISampler>
   createSampler(const rhi::SamplerDesc &d) override {
+    rec.createdSamplers.push_back(d);
     return std::make_unique<FakeSampler>(++rec.samplersCreated, d);
   }
   std::unique_ptr<rhi::IShaderModule>
   createShaderModule(const rhi::ShaderModuleDesc &d) override {
-    return std::make_unique<FakeShaderModule>(++rec.modulesCreated, d);
+    const int id = ++rec.modulesCreated;
+    if (d.stage == rhi::ShaderStage::Vertex) {
+      const int ordinal = static_cast<int>(rec.vertexOrdinal.size()) + 1;
+      rec.vertexOrdinal[id] = ordinal;
+    }
+    return std::make_unique<FakeShaderModule>(id, d);
   }
   std::unique_ptr<rhi::IBindGroupLayout>
   createBindGroupLayout(const rhi::BindGroupLayoutDesc &d) override {
@@ -531,7 +562,9 @@ public:
     }
     if (d.color.load == rhi::LoadOp::Clear) {
       ++rec.clears;
+      rec.clearTargetIds.push_back(m_target);
     }
+    rec.currentTarget = m_target;
     rec.targetBinds.push_back(m_target);
     resetBindings();
     record(Command::BeginRendering, m_target);
@@ -541,6 +574,7 @@ public:
       rec.error("endRendering outside a rendering");
     }
     m_rendering = false;
+    rec.currentTarget = 0;
     record(Command::EndRendering);
   }
   void setViewport(const rhi::Rect &) override {
@@ -555,6 +589,7 @@ public:
   void bindPipeline(rhi::IGraphicsPipeline &p) override {
     requireRendering("bindPipeline");
     m_pipeline = static_cast<FakeGraphicsPipeline *>(&p);
+    rec.pipelineBinds.push_back(m_pipeline->id());
     record(Command::BindPipeline, m_pipeline->id());
   }
   void bindGroup(uint32_t set, rhi::IBindGroup &g) override {
@@ -570,6 +605,7 @@ public:
       }
     }
     m_groups[set] = group;
+    rec.groupBinds.push_back(group->id());
     record(Command::BindGroup, group->id());
   }
   void bindVertexBuffer(uint32_t slot, rhi::IBuffer &b,
@@ -600,7 +636,7 @@ public:
     d.firstVertex = firstVertex;
     d.firstInstance = firstInstance;
     fillInstanceFloats(d);
-    rec.draws.push_back(std::move(d));
+    rec.fullscreenDraws.push_back(std::move(d));
     rec.drawSequence.push_back("fullscreen");
     rec.gpuPassEvents.push_back("fullscreen");
     record(Command::Draw);
@@ -703,6 +739,8 @@ private:
     d.pipelineId = m_pipeline->id();
     d.vertexModuleId = m_pipeline->vertexModuleId();
     d.fragmentModuleId = m_pipeline->fragmentModuleId();
+    auto ordinal = rec.vertexOrdinal.find(d.vertexModuleId);
+    d.shaderId = ordinal != rec.vertexOrdinal.end() ? ordinal->second : 0;
     for (size_t set = 0; set < m_pipeline->layoutIds().size(); ++set) {
       auto it = m_groups.find(static_cast<uint32_t>(set));
       if (it == m_groups.end()) {
@@ -731,6 +769,8 @@ private:
       }
       d.vertexBufferIds[b.binding] = it->second.buffer->id();
     }
+    auto albedo = d.imageAt.find(bindingKey(1, 1));
+    d.albedoTextureId = albedo != d.imageAt.end() ? albedo->second : 0;
     return d;
   }
 

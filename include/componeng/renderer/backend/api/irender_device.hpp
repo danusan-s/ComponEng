@@ -1,6 +1,7 @@
 #pragma once
 
 #include "componeng/renderer/backend/api/pass_id.hpp"
+#include "componeng/renderer/backend/api/rhi/types.hpp"
 
 #include "componeng/core/types.hpp"
 
@@ -23,6 +24,9 @@ struct VertexAttribute {
   // IShader::reflectInstanceLayout); componentCount is then that row's width
   // and `name` is the mat4 value's own name, shared across its 4 rows.
   int matrixRow = -1;
+  // The shader's vertex input location (for a matrix row, its own location);
+  // -1 for a layout that was not reflected from a shader.
+  int location = -1;
 };
 
 /**
@@ -394,45 +398,10 @@ public:
   virtual size_t indexCount() const = 0;
 };
 
-/** Which triangle faces are discarded (front faces are counter-clockwise). */
-enum class CullMode { None, Back, Front };
-
-/** Depth comparison used by the depth test. */
-enum class DepthFunc { Less, LessEqual, Equal };
-
-/** How a fragment's colour is combined with what is already in the target. */
-enum class BlendMode {
-  None,     // overwrite
-  Alpha,    // src * a + dst * (1 - a)
-  Additive, // src * a + dst
-};
-
-/**
- * @brief Fixed-function pipeline state for a draw.
- *
- * The defaults are the engine's baseline (back-face culling, depth test and
- * write with GL_LESS, alpha blending). A material carries one of these and
- * the RenderSystem applies it before drawing; the device only touches the
- * API for the parts that actually differ from what is currently set.
- */
-struct RenderState {
-  CullMode cull = CullMode::Back;
-  bool depthTest = true;
-  bool depthWrite = true;
-  DepthFunc depthFunc = DepthFunc::Less;
-  BlendMode blend = BlendMode::Alpha;
-  // False masks out every colour channel: the draw only touches depth.
-  bool colorWrite = true;
-
-  bool operator==(const RenderState &o) const {
-    return cull == o.cull && depthTest == o.depthTest &&
-           depthWrite == o.depthWrite && depthFunc == o.depthFunc &&
-           blend == o.blend && colorWrite == o.colorWrite;
-  }
-  bool operator!=(const RenderState &o) const {
-    return !(*this == o);
-  }
-};
+using CullMode = rhi::CullMode;
+using DepthFunc = rhi::DepthFunc;
+using BlendMode = rhi::BlendMode;
+using RenderState = rhi::RenderState;
 
 /**
  * @brief API-agnostic render device interface.

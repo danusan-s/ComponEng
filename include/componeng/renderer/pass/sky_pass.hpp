@@ -1,5 +1,6 @@
 #pragma once
 
+#include "componeng/renderer/draw/fullscreen_draw.hpp"
 #include "componeng/renderer/pass/render_pass.hpp"
 
 namespace componeng::renderer {
@@ -19,6 +20,9 @@ public:
     return api::PassId::Sky;
   }
   void execute(const PassContext &ctx) override;
+
+private:
+  FullscreenDraw m_draw;
 };
 
 } // namespace componeng::renderer

@@ -24,7 +24,7 @@ class AssetManager {
 public:
   /** Assets create their GPU resources through `device`, which must outlive
    *  the manager. */
-  explicit AssetManager(api::IRenderDevice &device) : m_device(&device) {
+  explicit AssetManager(rhi::IDevice &device) : m_device(&device) {
   }
   ~AssetManager() = default;
 
@@ -35,8 +35,17 @@ public:
   AssetManager(AssetManager &&) = default;
   AssetManager &operator=(AssetManager &&) = default;
 
+  /** Compiles the two shader files (`#version 460`, see Shader). Includes are
+   *  searched next to each file, then in the engine's assets/shaders. There
+   *  are no geometry shaders: a non-null `gShaderFile` is an error. A shader
+   *  that fails to compile is logged and registered invalid; materials using
+   *  it draw nothing. */
   void loadShader(const char *vShaderFile, const char *fShaderFile,
                   const char *gShaderFile, core::Name name);
+
+  /** The same from source text, for shaders built in code or in tests. */
+  void compileShader(core::Name name, const std::string &vertexSource,
+                     const std::string &fragmentSource);
   const Shader &getShader(core::HandleID id) const;
   core::HandleID getShaderID(core::Name name) const;
   bool shaderExists(core::Name name) const;
@@ -46,10 +55,6 @@ public:
     for (const auto &[name, id] : m_shaders)
       fn(name, *m_shaderResources[id - 1]);
   }
-
-  /** Ends the frame's GPU timing for every shader and reads finished results
-   *  (Shader::collectGpuTimer). Call once per frame. */
-  void collectShaderTimings() const;
 
   /** Loads an image file as a texture. `alpha` keeps the file's alpha channel
    *  (RGBA); otherwise it is loaded as RGB. `desc` sets wrapping, filtering,
@@ -78,16 +83,18 @@ public:
   bool updateTexture(core::HandleID id, uint32_t x, uint32_t y, uint32_t width,
                      uint32_t height, const void *pixels);
 
-  /** A GPU buffer registered under `name`, to be bound to a material as a
-   *  uniform block (IMaterial::setUniformBuffer) or a texture buffer
-   *  (IMaterial::setBufferTexture). `data` may be null to only size it. */
+  /** A GPU buffer of `sizeBytes` registered under `name`, to be bound to a
+   *  material as a uniform block (IMaterial::setUniformBuffer) or a storage
+   *  block (IMaterial::setStorageBuffer). `data` may be null to only size it.
+   *  The buffer cannot grow; the CPU rewrites it with updateBuffer. `usage`
+   *  is kept for source compatibility and ignored. */
   void createBuffer(core::Name name, const void *data, size_t sizeBytes,
                     api::IBuffer::Usage usage = api::IBuffer::Usage::Dynamic);
   /** Overwrites part of a buffer made with createBuffer; the range must lie
    *  inside it. Returns false (and logs) otherwise. */
   bool updateBuffer(core::HandleID id, size_t offset, const void *data,
                     size_t sizeBytes);
-  api::IBuffer &getBuffer(core::HandleID id) const;
+  rhi::IBuffer &getBuffer(core::HandleID id) const;
   core::HandleID getBufferID(core::Name name) const;
   bool bufferExists(core::Name name) const;
 
@@ -99,8 +106,7 @@ public:
     auto material = std::make_unique<T>(shaderID, textureID);
 
     const Shader &shader = getShader(shaderID);
-    material->setVertexLayout(shader.reflectInstanceLayout());
-    material->setKnownUniforms(shader.reflectActiveUniformNames());
+    material->bindShader(shader, *m_device);
 
     m_materialResources.push_back(std::move(material));
     core::HandleID id = m_materialResources.size();
@@ -121,8 +127,7 @@ public:
     auto material = std::make_unique<T>(shaderID, albedoID);
 
     const Shader &shader = getShader(shaderID);
-    material->setVertexLayout(shader.reflectInstanceLayout());
-    material->setKnownUniforms(shader.reflectActiveUniformNames());
+    material->bindShader(shader, *m_device);
 
     if (normalName && textureExists(normalName))
       static_cast<T *>(material.get())
@@ -152,7 +157,7 @@ public:
   void clear();
 
 private:
-  api::IRenderDevice *m_device;
+  rhi::IDevice *m_device;
 
   std::unordered_map<core::Name, core::HandleID> m_shaders;
   std::unordered_map<core::Name, core::HandleID> m_textures;
@@ -164,7 +169,7 @@ private:
   std::vector<std::unique_ptr<Texture2D>> m_textureResources;
   std::vector<std::unique_ptr<IMaterial>> m_materialResources;
   std::vector<std::unique_ptr<Mesh>> m_meshResources;
-  std::vector<std::unique_ptr<api::IBuffer>> m_bufferResources;
+  std::vector<std::unique_ptr<rhi::IBuffer>> m_bufferResources;
 
   std::unique_ptr<Shader> loadShaderFromFile(const char *vShaderFile,
                                              const char *fShaderFile,

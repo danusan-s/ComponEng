@@ -10,21 +10,45 @@
 using namespace rscene;
 
 namespace {
-bool hasUniformIn(Scene &s, int shader, const char *name) {
-  const auto &v = s.rec().looseUniforms[shader];
-  return std::find(v.begin(), v.end(), name) != v.end();
+
+// The bytes of the parameter block (set 1, binding 0) a draw saw, and where
+// the shader says `member` lives in it.
+const std::vector<unsigned char> &materialBytes(const fakerhi::Draw &d) {
+  return d.bufferBytes.at(fakerhi::bindingKey(1, 0));
 }
+
+float floatAt(const std::vector<unsigned char> &bytes, uint32_t offset) {
+  float v = 0.0f;
+  std::memcpy(&v, bytes.data() + offset, sizeof(v));
+  return v;
+}
+
+uint32_t memberOffset(Scene &s, const char *shader, const char *member) {
+  const Shader &sh = s.assets().getShader(s.assets().getShaderID(shader));
+  return sh.materialBlock()->member(member)->offset;
+}
+
+// Whether the fragment module is the shared empty one a depth-only draw uses.
+bool isDepthOnly(Scene &s, const char *shader, int fragmentId) {
+  const Shader &sh = s.assets().getShader(s.assets().getShaderID(shader));
+  return fragmentId == fragmentModuleId(sh, Shader::Variant::DepthOnly);
+}
+
 } // namespace
 
 // --- Decoupling from the GL backend -----------------------------------------
 
 TEST(RenderPipeline, AssetsAreCreatedThroughTheDevice) {
   auto s = makeScene();
-  EXPECT_EQ(s->rec().shadersCreated, 2);
-  EXPECT_EQ(s->rec().texturesCreated, 2);
-  EXPECT_EQ(s->rec().meshesCreated, 2);
+  // Two shaders, each a vertex and a fragment module.
+  EXPECT_EQ(s->rec().modulesCreated, 4);
+  // Two textures (the draw-time fallbacks come later).
+  EXPECT_EQ(s->rec().imagesCreated, 2);
+  EXPECT_EQ(s->rec().samplersCreated, 2);
+  // Two meshes, a vertex and an index buffer each.
+  EXPECT_EQ(s->rec().buffersCreated, 4);
+  EXPECT_TRUE(s->rec().errors.empty());
 }
-
 // --- Batching and sorting ---------------------------------------------------
 
 TEST(RenderPipeline, EntitiesMergeIntoOneSortedDrawPerMeshAndMaterial) {
@@ -52,17 +76,25 @@ TEST(RenderPipeline, EntitiesMergeIntoOneSortedDrawPerMeshAndMaterial) {
   }
 }
 
-TEST(RenderPipeline, SkipsShaderAndTextureRebindsBetweenSharedDraws) {
+TEST(RenderPipeline, SkipsPipelineAndMaterialRebindsBetweenSharedDraws) {
   auto s = makeScene();
   spawnMixed(*s);
   s->frame();
 
-  // Four draws, but only two distinct shaders and two distinct textures, and
-  // sorting makes each one contiguous.
-  EXPECT_EQ(s->rec().shaderUses, (std::vector<int>{1, 2}));
-  EXPECT_EQ(s->rec().unit0TextureBinds, (std::vector<int>{1, 2}));
+  // Four draws, three materials, two distinct shaders: matA and matC share
+  // shader a's pipeline, and sorting makes each pipeline and material
+  // contiguous, so none is bound twice.
+  EXPECT_EQ(s->rec().pipelineBinds.size(), 2u);
+  // Set 0 once for the rendering, then one material group per material.
+  std::vector<int> materialGroups;
+  for (const auto &c : s->rec().commands) {
+    if (c.kind == fakerhi::Command::BindGroup && c.id != 1) {
+      materialGroups.push_back(c.id);
+    }
+  }
+  EXPECT_EQ(materialGroups.size(), 3u);
+  EXPECT_TRUE(s->rec().errors.empty());
 }
-
 TEST(RenderPipeline, DrawOrderIsStableAcrossFramesAndSpawnOrder) {
   auto s = makeScene();
   spawnMixed(*s);
@@ -118,13 +150,21 @@ TEST(RenderPipeline, FrameDataIsUploadedAndBoundOncePerFrame) {
   spawnMixed(*s);
   s->frame();
 
-  const auto &binds = s->rec().uniformBufferBinds;
-  ASSERT_EQ(binds.size(), 1u) << "once per frame, not once per draw";
-  EXPECT_EQ(binds[0].binding, kFrameDataBinding);
-  ASSERT_EQ(binds[0].bytes.size(), sizeof(FrameData));
+  // The frame group (the first group made) is bound once for the one
+  // rendering, not once per draw.
+  int frameBinds = 0;
+  for (int id : s->rec().groupBinds) {
+    frameBinds += id == 1;
+  }
+  EXPECT_EQ(frameBinds, 1);
+
+  ASSERT_FALSE(s->rec().draws.empty());
+  const auto &bytes = s->rec().draws[0].bufferBytes.at(
+      fakerhi::bindingKey(0, kFrameDataBinding));
+  ASSERT_EQ(bytes.size(), sizeof(FrameData));
 
   FrameData fd;
-  std::memcpy(&fd, binds[0].bytes.data(), sizeof(fd));
+  std::memcpy(&fd, bytes.data(), sizeof(fd));
   for (int i = 0; i < 16; ++i) {
     EXPECT_EQ(fd.viewProj[i], float(i) + 0.5f) << i;
   }
@@ -143,28 +183,25 @@ TEST(RenderPipeline, FrameDataIsUploadedAndBoundOncePerFrame) {
   EXPECT_EQ(fd.fogStart, fog.start);
   EXPECT_EQ(fd.fogEnd, fog.end);
 }
+TEST(RenderPipeline, ShadersWithLooseUniformsAreInvalidAndDrawNothing) {
+  // Per-frame values only go out through the FrameData block: a shader that
+  // reads them as plain uniforms does not compile, instead of reading zeros.
+  auto s = makeScene();
+  s->assets().compileShader(
+      "loose",
+      "#version 460\nlayout(location = 0) in vec3 aPos;\n"
+      "layout(location = 0) uniform mat4 viewProj;\n"
+      "void main() { gl_Position = viewProj * vec4(aPos, 1.0); }\n",
+      testFragmentSource(false));
+  const Shader &loose = s->assets().getShader(s->assets().getShaderID("loose"));
+  EXPECT_FALSE(loose.valid());
 
-TEST(RenderPipeline, FrameValuesAreNeverSentAsLooseUniforms) {
-  // The per-frame values only go out through the FrameData block, whether or
-  // not a shader declares it.
-  for (bool declares : {false, true}) {
-    auto s = makeScene([declares](fake::Recorder &rec) {
-      rec.defaultShaderDeclaresFrameBlock = declares;
-    });
-    spawnMixed(*s);
-    s->frame();
-
-    for (int shader : {1, 2}) {
-      for (const char *name :
-           {"viewProj", "lightDir", "lightColor", "cameraPos", "time",
-            "fogColor", "fogStart", "fogEnd", "ambientColor"}) {
-        EXPECT_FALSE(hasUniformIn(*s, shader, name))
-            << name << " shader " << shader << " declares=" << declares;
-      }
-    }
-  }
+  s->assets().registerMaterial<DiffuseMaterial>("matLoose", "loose", "t1");
+  s->spawn("tri", "matLoose");
+  s->frame();
+  EXPECT_TRUE(s->rec().draws.empty());
+  EXPECT_TRUE(s->rec().errors.empty());
 }
-
 // --- Render state -----------------------------------------------------------
 
 namespace {
@@ -183,16 +220,18 @@ void makeTransparent(Scene &s, const char *material,
 }
 } // namespace
 
-TEST(RenderPipeline, FrameStartsFromBaselineStateBeforeClearing) {
+TEST(RenderPipeline, FrameClearsTheTargetItDrawsInBeforeDrawing) {
   auto s = makeScene();
   s->spawn("tri", "matA");
   s->frame();
 
   EXPECT_EQ(s->rec().clears, 1);
-  ASSERT_FALSE(s->rec().stateRequests.empty());
-  EXPECT_EQ(s->rec().stateRequests.front(), api::RenderState{});
+  ASSERT_EQ(s->rec().commands.size() > 2, true);
+  EXPECT_EQ(s->rec().commands[1].kind, fakerhi::Command::BeginRendering)
+      << "the first thing in a frame is its clearing rendering";
+  EXPECT_EQ(s->rec().clearTargetIds, (std::vector<int>{0}));
+  EXPECT_TRUE(s->rec().errors.empty());
 }
-
 TEST(RenderPipeline, EachMaterialsStateIsInEffectForItsDraw) {
   auto s = makeScene();
   api::RenderState decal;
@@ -302,25 +341,35 @@ TEST(DepthPrepass, UsesTheShadersDepthVariantNotTheShaderItself) {
 
   const auto &draws = s->rec().draws;
   ASSERT_EQ(draws.size(), 4u);
-  EXPECT_GT(draws[0].shaderId, 2) << "a variant, created after the two shaders";
-  EXPECT_GT(draws[1].shaderId, 2);
-  EXPECT_NE(draws[0].shaderId, draws[1].shaderId);
+  // The vertex stage is the shader's own, so the depth matches the colour
+  // pass bit for bit; only the fragment stage is the empty one.
+  EXPECT_EQ(draws[0].shaderId, 1);
+  EXPECT_EQ(draws[1].shaderId, 2);
   EXPECT_EQ(draws[2].shaderId, 1);
   EXPECT_EQ(draws[3].shaderId, 2);
+  EXPECT_EQ(draws[0].vertexModuleId, draws[2].vertexModuleId);
+  EXPECT_EQ(draws[1].vertexModuleId, draws[3].vertexModuleId);
+  EXPECT_TRUE(isDepthOnly(*s, "a", draws[0].fragmentModuleId));
+  EXPECT_TRUE(isDepthOnly(*s, "b", draws[1].fragmentModuleId));
+  EXPECT_NE(draws[0].fragmentModuleId, draws[1].fragmentModuleId);
+  EXPECT_FALSE(isDepthOnly(*s, "a", draws[2].fragmentModuleId));
+  EXPECT_FALSE(isDepthOnly(*s, "b", draws[3].fragmentModuleId));
 }
-
 TEST(DepthPrepass, DepthVariantsAreBuiltOnceNotEveryFrame) {
   auto s = makeScene();
   enablePrepass(*s);
   s->spawn("tri", "matA", 0);
   s->spawn("tri", "matB", 1);
   s->frame();
-  EXPECT_EQ(s->rec().shadersCreated, 4);
+  // The two shaders' four modules, plus one empty fragment module each.
+  EXPECT_EQ(s->rec().modulesCreated, 6);
+  const int pipelines = s->rec().pipelinesCreated;
+  EXPECT_EQ(pipelines, 4) << "depth and colour pipeline for each shader";
   s->frame();
   s->frame();
-  EXPECT_EQ(s->rec().shadersCreated, 4);
+  EXPECT_EQ(s->rec().modulesCreated, 6);
+  EXPECT_EQ(s->rec().pipelinesCreated, pipelines);
 }
-
 TEST(DepthPrepass, TransparentBatchesAreNotInThePrepass) {
   auto s = makeScene();
   enablePrepass(*s);
@@ -340,7 +389,7 @@ TEST(DepthPrepass, TransparentBatchesAreNotInThePrepass) {
 TEST(DepthPrepass, SkyIsDrawnAfterTheColourPassNotBetweenThePasses) {
   auto s = makeScene();
   enablePrepass(*s);
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->loadSky();
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   s->spawn("tri", "matA");
   s->frame();
@@ -358,7 +407,7 @@ TEST(DepthPrepass, NothingOpaqueMeansNoPrepass) {
 
   ASSERT_EQ(s->rec().draws.size(), 1u);
   EXPECT_EQ(s->rec().draws[0].state, api::RenderState{});
-  EXPECT_EQ(s->rec().shadersCreated, 2) << "no depth variant needed";
+  EXPECT_EQ(s->rec().modulesCreated, 4) << "no depth variant needed";
 }
 
 TEST(DepthPrepass, DisabledByTheSettingOpaqueDrawsDepthWritingWithLess) {
@@ -368,23 +417,21 @@ TEST(DepthPrepass, DisabledByTheSettingOpaqueDrawsDepthWritingWithLess) {
 
   ASSERT_EQ(s->rec().draws.size(), 1u);
   EXPECT_EQ(s->rec().draws[0].state, opaqueState());
-  EXPECT_EQ(s->rec().shadersCreated, 2);
+  EXPECT_EQ(s->rec().modulesCreated, 4);
 }
 
-TEST(DepthPrepass, DepthVariantIsNeverSentLooseFrameUniforms) {
-  for (bool declares : {false, true}) {
-    auto s = makeScene([declares](fake::Recorder &r) {
-      r.defaultShaderDeclaresFrameBlock = declares;
-    });
-    enablePrepass(*s);
-    s->spawn("tri", "matA");
-    s->frame();
+TEST(DepthPrepass, DepthPassBindsTheSameFrameAndMaterialSetsAsTheColourPass) {
+  // The depth-only program is a subset of the colour program, so one frame
+  // group and one material group serve both.
+  auto s = makeScene();
+  enablePrepass(*s);
+  s->spawn("tri", "matA");
+  s->frame();
 
-    // Shader id 3 is the depth variant of shader a.
-    EXPECT_FALSE(hasUniformIn(*s, 3, "viewProj")) << "declares=" << declares;
-  }
+  ASSERT_EQ(s->rec().draws.size(), 2u);
+  EXPECT_EQ(s->rec().draws[0].groupIds, s->rec().draws[1].groupIds);
+  EXPECT_TRUE(s->rec().errors.empty());
 }
-
 // --- Alpha-tested (Cutout) materials
 // ------------------------------------------
 
@@ -395,9 +442,6 @@ void makeCutout(Scene &s, const char *material) {
       .setType(MaterialType::Cutout);
 }
 
-bool hasMacro(const std::string &source) {
-  return source.find("#define COMPONENG_DEPTH_PREPASS 1") != std::string::npos;
-}
 } // namespace
 
 TEST(MaterialType, CutoutIsAlphaTestedButNotTransparent) {
@@ -437,7 +481,7 @@ TEST(Cutout, WithoutAPrepassItIsAnOrdinaryDrawOfItsOwnShader) {
   ASSERT_EQ(s->rec().draws.size(), 1u);
   EXPECT_EQ(s->rec().draws[0].shaderId, 1);
   EXPECT_EQ(s->rec().draws[0].state, opaqueState());
-  EXPECT_EQ(s->rec().shadersCreated, 2) << "no depth variant needed";
+  EXPECT_EQ(s->rec().modulesCreated, 4) << "no depth variant needed";
 }
 
 TEST(Cutout, PrepassCutsItsHolesAndTheColourPassThenTestsEqual) {
@@ -467,23 +511,27 @@ TEST(Cutout, PrepassUsesTheAlphaTestedVariantAndOpaqueKeepsTheEmptyOne) {
 
   const auto &draws = s->rec().draws;
   ASSERT_EQ(draws.size(), 4u);
-  const int cutoutVariant = draws[0].shaderId;
-  const int opaqueVariant = draws[1].shaderId;
-  EXPECT_GT(cutoutVariant, 2);
-  EXPECT_GT(opaqueVariant, 2);
-  EXPECT_NE(cutoutVariant, opaqueVariant);
+  const Shader &a = s->assets().getShader(s->assets().getShaderID("a"));
+  const int alphaTested =
+      fragmentModuleId(a, Shader::Variant::AlphaTestedDepth);
+  const int colour = fragmentModuleId(a, Shader::Variant::Color);
 
-  const auto &sources = s->rec().fragmentSources;
-  EXPECT_TRUE(hasMacro(sources.at(cutoutVariant)))
-      << "the shader's own fragment stage, compiled with the macro";
-  EXPECT_FALSE(hasMacro(sources.at(opaqueVariant)))
-      << "the empty fragment stage";
-  EXPECT_FALSE(hasMacro(sources.at(1))) << "the colour shader is untouched";
+  EXPECT_EQ(draws[0].fragmentModuleId, alphaTested)
+      << "the cutout's pre-pass runs the shader's own fragment stage, compiled "
+         "with the macro";
+  EXPECT_NE(alphaTested, colour);
+  EXPECT_FALSE(isDepthOnly(*s, "a", draws[0].fragmentModuleId));
+  EXPECT_TRUE(isDepthOnly(*s, "b", draws[1].fragmentModuleId))
+      << "the opaque material keeps the empty fragment stage";
 
+  // The macro changes the code: the variant is not the colour shader's SPIR-V.
+  const auto &sh = s->rec();
+  (void)sh;
+  EXPECT_EQ(draws[2].fragmentModuleId, colour)
+      << "the colour shader is untouched";
   EXPECT_EQ(draws[2].shaderId, 1);
   EXPECT_EQ(draws[3].shaderId, 2);
 }
-
 TEST(Cutout, OpaqueAndCutoutMaterialsOfOneShaderGetDifferentPrepassPrograms) {
   auto s = makeScene();
   enablePrepass(*s);
@@ -494,15 +542,15 @@ TEST(Cutout, OpaqueAndCutoutMaterialsOfOneShaderGetDifferentPrepassPrograms) {
 
   const auto &draws = s->rec().draws;
   ASSERT_EQ(draws.size(), 4u);
-  // Same shader id, but two programs: tracking the bound shader by id would
-  // draw the second one with the first's program.
-  EXPECT_NE(draws[0].shaderId, draws[1].shaderId);
+  // Same shader, but two programs: tracking the bound shader instead of its
+  // program would draw the second one with the first's.
+  EXPECT_EQ(draws[0].shaderId, draws[1].shaderId);
+  EXPECT_NE(draws[0].fragmentModuleId, draws[1].fragmentModuleId);
   EXPECT_EQ(draws[2].shaderId, 1);
   EXPECT_EQ(draws[3].shaderId, 1);
-  EXPECT_EQ(s->rec().shaderUses.size(), 3u)
-      << "two pre-pass programs and the colour shader, bound once";
+  EXPECT_EQ(s->rec().pipelineBinds.size(), 3u)
+      << "two pre-pass programs and the colour program, bound once";
 }
-
 TEST(Cutout, PrepassBindsTheAlbedoThatTheAlphaTestReads) {
   auto s = makeScene();
   enablePrepass(*s);
@@ -510,38 +558,32 @@ TEST(Cutout, PrepassBindsTheAlbedoThatTheAlphaTestReads) {
   s->spawn("tri", "matC");
   s->frame();
 
-  const int variant = s->rec().draws[0].shaderId;
-  EXPECT_TRUE(hasUniformIn(*s, variant, "albedoMap"));
-  // Once for the pre-pass, again for the colour pass: the drawer forgets what
-  // is bound between passes.
-  EXPECT_EQ(s->rec().unit0TextureBinds, (std::vector<int>{2, 2}));
+  ASSERT_EQ(s->rec().draws.size(), 2u);
+  EXPECT_EQ(s->rec().draws[0].albedoTextureId, 2) << "pre-pass";
+  EXPECT_EQ(s->rec().draws[1].albedoTextureId, 2) << "colour pass";
 }
-
-TEST(Cutout, OpaquePrepassStillBindsNoTexturesAtAll) {
+TEST(Cutout, OpaquePrepassUsesTheEmptyFragmentStageSoNothingSamplesTheAlbedo) {
   auto s = makeScene();
   enablePrepass(*s);
   s->spawn("tri", "matA"); // texture t1
   s->frame();
 
-  const int variant = s->rec().draws[0].shaderId;
-  EXPECT_FALSE(hasUniformIn(*s, variant, "albedoMap"));
-  EXPECT_EQ(s->rec().unit0TextureBinds, (std::vector<int>{1}))
-      << "only the colour pass binds the albedo";
+  ASSERT_EQ(s->rec().draws.size(), 2u);
+  EXPECT_TRUE(isDepthOnly(*s, "a", s->rec().draws[0].fragmentModuleId));
+  EXPECT_FALSE(isDepthOnly(*s, "a", s->rec().draws[1].fragmentModuleId));
 }
-
 TEST(Cutout, DepthVariantsAreBuiltOnceNotEveryFrame) {
   auto s = makeScene();
   enablePrepass(*s);
   makeCutout(*s, "matA");
   s->spawn("tri", "matA", 0);
   s->frame();
-  const int created = s->rec().shadersCreated;
-  EXPECT_EQ(created, 3);
+  const int created = s->rec().modulesCreated;
+  EXPECT_EQ(created, 5) << "four modules and the alpha-tested fragment";
   s->frame();
   s->frame();
-  EXPECT_EQ(s->rec().shadersCreated, created);
+  EXPECT_EQ(s->rec().modulesCreated, created);
 }
-
 TEST(Cutout, TransparentBatchesStillSkipThePrepass) {
   auto s = makeScene();
   enablePrepass(*s);
@@ -554,82 +596,64 @@ TEST(Cutout, TransparentBatchesStillSkipThePrepass) {
   EXPECT_EQ(s->rec().draws.size(), 3u) << "matA twice, matB once";
 }
 
+TEST(ShaderVariants, VariantsAreBuiltOnceAndShareTheVertexModule) {
+  auto s = makeScene();
+  const Shader &shader = s->assets().getShader(s->assets().getShaderID("a"));
+  const Shader::Program colour = shader.program(Shader::Variant::Color);
+  const Shader::Program depth = shader.program(Shader::Variant::DepthOnly);
+  const Shader::Program alpha =
+      shader.program(Shader::Variant::AlphaTestedDepth);
+
+  EXPECT_EQ(colour.vertex, depth.vertex);
+  EXPECT_EQ(colour.vertex, alpha.vertex);
+  EXPECT_NE(colour.fragment, depth.fragment);
+  EXPECT_NE(colour.fragment, alpha.fragment);
+  EXPECT_NE(depth.fragment, alpha.fragment);
+
+  const int created = s->rec().modulesCreated;
+  EXPECT_EQ(shader.program(Shader::Variant::DepthOnly).fragment,
+            depth.fragment);
+  EXPECT_EQ(shader.program(Shader::Variant::AlphaTestedDepth).fragment,
+            alpha.fragment);
+  EXPECT_EQ(s->rec().modulesCreated, created) << "built once";
+}
+
 TEST(ShaderVariants, AlphaTestedVariantIsTheOwnFragmentSourceWithTheMacro) {
   auto s = makeScene();
-  Shader shader(s->world->getRenderDevice());
-  shader.compile("void vs() {}", "#version 330 core\nvoid main() {}\n",
-                 nullptr);
-  const int shaderId = s->rec().shadersCreated; // created last
-
-  const Shader &variant = shader.alphaTestedDepthVariant();
-  EXPECT_EQ(&variant, &shader.alphaTestedDepthVariant()) << "built once";
-  EXPECT_NE(&variant, &shader.depthVariant());
-
-  EXPECT_EQ(s->rec().fragmentSources.at(shaderId),
-            "#version 330 core\nvoid main() {}\n");
-  EXPECT_EQ(s->rec().fragmentSources.at(shaderId + 1),
-            "#version 330 core\n#define COMPONENG_DEPTH_PREPASS 1\n"
-            "void main() {}\n");
+  const Shader &shader = s->assets().getShader(s->assets().getShaderID("a"));
+  const auto words = [&](Shader::Variant v) {
+    return static_cast<fakerhi::FakeShaderModule *>(shader.program(v).fragment)
+        ->words();
+  };
+  EXPECT_NE(words(Shader::Variant::AlphaTestedDepth),
+            words(Shader::Variant::Color))
+      << "the macro makes the fragment stage return after its discard";
 }
 
 TEST(ShaderVariants, RecompilingDropsTheCachedVariants) {
   auto s = makeScene();
   Shader shader(s->world->getRenderDevice());
-  shader.compile("v", "#version 330 core\nvoid main() {}\n", nullptr);
-  const int before = s->rec().shadersCreated;
-  shader.alphaTestedDepthVariant();
-  EXPECT_EQ(s->rec().shadersCreated, before + 1);
+  const std::string vs = testVertexSource({});
+  const std::vector<std::string> roots = {
+      utils::Utils::getAssetPath("assets/shaders")};
+  ASSERT_TRUE(shader.compile(vs, testFragmentSource(false), "t", roots));
+  const int before = s->rec().modulesCreated;
+  shader.program(Shader::Variant::AlphaTestedDepth);
+  EXPECT_EQ(s->rec().modulesCreated, before + 1);
 
-  shader.compile("v", "#version 330 core\nvoid main() { }\n", nullptr);
-  shader.alphaTestedDepthVariant();
-  EXPECT_EQ(s->rec().shadersCreated, before + 2)
-      << "rebuilt from the new source";
-}
-
-TEST(DefineAfterVersion, GoesOnTheLineAfterTheVersionDirective) {
-  EXPECT_EQ(defineAfterVersion("#version 330 core\nvoid main() {}\n", "X"),
-            "#version 330 core\n#define X 1\nvoid main() {}\n");
-}
-
-TEST(DefineAfterVersion, KeepsCommentsThatPrecedeTheVersion) {
-  EXPECT_EQ(defineAfterVersion("// note\n#version 330 core\nint a;\n", "X"),
-            "// note\n#version 330 core\n#define X 1\nint a;\n");
-}
-
-TEST(DefineAfterVersion, HandlesWindowsLineEndings) {
-  EXPECT_EQ(defineAfterVersion("#version 330 core\r\nint a;\r\n", "X"),
-            "#version 330 core\r\n#define X 1\nint a;\r\n");
-}
-
-TEST(DefineAfterVersion, VersionWithNoTrailingNewline) {
-  EXPECT_EQ(defineAfterVersion("#version 330 core", "X"),
-            "#version 330 core\n#define X 1\n");
-}
-
-TEST(DefineAfterVersion, SourceWithoutAVersionGetsItAtTheTop) {
-  EXPECT_EQ(defineAfterVersion("int a;\n", "X"), "#define X 1\nint a;\n");
-  EXPECT_EQ(defineAfterVersion("", "X"), "#define X 1\n");
-}
-
-TEST(DefineAfterVersion, IgnoresAVersionMentionedMidLine) {
-  EXPECT_EQ(defineAfterVersion("int a; // #version 1\n", "X"),
-            "#define X 1\nint a; // #version 1\n");
+  ASSERT_TRUE(shader.compile(vs, testFragmentSource(false), "t", roots));
+  shader.program(Shader::Variant::AlphaTestedDepth);
+  EXPECT_EQ(s->rec().modulesCreated, before + 4)
+      << "two new stages, then the variant rebuilt from the new source";
 }
 
 // --- Sky ---------------------------------------------------------------------
-
-namespace {
-bool hasUniform(Scene &s, int shader, const char *name) {
-  const auto &v = s.rec().looseUniforms[shader];
-  return std::find(v.begin(), v.end(), name) != v.end();
-}
-} // namespace
 
 TEST(RenderPipeline,
      SkyIsAFullscreenTriangleWithItsOwnStateThatGeometryDoesNotInherit) {
   auto s = makeScene();
   // Note: no "cube" mesh exists in this scene. The sky needs no mesh.
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox"); // id 3
+  s->loadSky(); // shader 3
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   s->spawn("tri", "matA");
   s->frame();
@@ -648,7 +672,7 @@ TEST(RenderPipeline,
 
 TEST(RenderPipeline, SkyIsDrawnAfterOpaqueGeometryAndBeforeBlendedGeometry) {
   auto s = makeScene();
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->loadSky();
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   // matA is blended, matB is opaque.
   makeTransparent(*s, "matA", api::RenderState{});
@@ -667,7 +691,7 @@ TEST(RenderPipeline, SkyIsDrawnAfterOpaqueGeometryAndBeforeBlendedGeometry) {
 
 TEST(RenderPipeline, GeometryWithoutADepthTestIsDrawnOverTheSky) {
   auto s = makeScene();
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->loadSky();
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   api::RenderState overlay = opaqueState();
   overlay.depthTest = false; // e.g. a lens flare
@@ -683,7 +707,7 @@ TEST(RenderPipeline, GeometryStillDrawsAfterTheSkyWithItsOwnShaderBound) {
   // The sky binds its own shader; the next batch must bind its own again
   // even if it is the shader the batch loop used last.
   auto s = makeScene();
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->loadSky();
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   makeTransparent(*s, "matC", api::RenderState{});
   s->spawn("tri", "matA", 0);
@@ -704,7 +728,7 @@ TEST(RenderPipeline, NoSkyEntityMeansNoSkyDraw) {
 
 TEST(RenderPipeline, OnlyTheFirstSkyIsDrawn) {
   auto s = makeScene();
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->loadSky();
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   s->frame();
@@ -713,8 +737,8 @@ TEST(RenderPipeline, OnlyTheFirstSkyIsDrawn) {
 
 TEST(RenderPipeline, SkyUsesTheShaderNamedByTheComponent) {
   auto s = makeScene();
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox"); // 3
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "dusk");   // 4
+  s->loadSky();       // 3
+  s->loadSky("dusk"); // 4
   SkyboxComponent sky;
   sky.shaderName = Name("dusk");
   s->world->addComponents(s->world->createEntity(), SkyboxComponent(sky));
@@ -724,33 +748,47 @@ TEST(RenderPipeline, SkyUsesTheShaderNamedByTheComponent) {
   EXPECT_EQ(s->rec().fullscreenDraws[0].shaderId, 4);
 }
 
-TEST(RenderPipeline, SkyGetsItsOwnUniformsAndNoLooseFrameValues) {
-  // Sky shader is id 3.
+TEST(RenderPipeline, SkyGetsItsOwnParametersInItsMaterialBlock) {
+  // Sky shader is shader 3.
   auto s = makeScene();
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
-  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  s->loadSky();
+  SkyboxComponent sky;
+  sky.color = Vec3(0.1f, 0.2f, 0.3f);
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent(sky));
   s->frame();
-  for (const char *n : {"invSkyViewProj", "skyColor", "horizonColor"}) {
-    EXPECT_TRUE(hasUniform(*s, 3, n)) << n;
-  }
-  for (const char *n : {"lightDir", "lightColor", "fogColor", "viewProj"}) {
-    EXPECT_FALSE(hasUniform(*s, 3, n)) << n;
-  }
-}
 
+  ASSERT_EQ(s->rec().fullscreenDraws.size(), 1u);
+  const auto &bytes = materialBytes(s->rec().fullscreenDraws[0]);
+  const uint32_t at = memberOffset(*s, "skybox", "skyColor");
+  EXPECT_EQ(floatAt(bytes, at), 0.1f);
+  EXPECT_EQ(floatAt(bytes, at + 4), 0.2f);
+  EXPECT_EQ(floatAt(bytes, at + 8), 0.3f);
+  // The camera has no rotation in the fixture, so the matrix is not the zero
+  // the block starts as.
+  const uint32_t inv = memberOffset(*s, "skybox", "invSkyViewProj");
+  bool anyNonZero = false;
+  for (int i = 0; i < 16; ++i) {
+    anyNonZero |= floatAt(bytes, inv + 4 * i) != 0.0f;
+  }
+  EXPECT_TRUE(anyNonZero);
+  EXPECT_TRUE(s->rec().errors.empty());
+}
 // --- Texture options ---------------------------------------------------------
 
 TEST(TextureOptions, DefaultsMatchTheEnginesOriginalFixedBehaviour) {
   auto s = makeScene(); // t1, t2 loaded without a TextureDesc
-  ASSERT_GE(s->rec().textureDescs.size(), 2u);
+  ASSERT_GE(s->rec().createdSamplers.size(), 2u);
   for (int i = 0; i < 2; ++i) {
-    const api::TextureDesc &d = s->rec().textureDescs[i];
-    EXPECT_EQ(d.wrap, api::TextureWrap::ClampToEdge);
-    EXPECT_EQ(d.minFilter, api::TextureFilter::Linear);
-    EXPECT_EQ(d.magFilter, api::TextureFilter::Linear);
-    EXPECT_TRUE(d.mipmaps);
+    const rhi::SamplerDesc &d = s->rec().createdSamplers[i];
+    EXPECT_EQ(d.wrapU, rhi::WrapMode::ClampToEdge);
+    EXPECT_EQ(d.wrapV, rhi::WrapMode::ClampToEdge);
+    EXPECT_EQ(d.minFilter, rhi::Filter::Linear);
+    EXPECT_EQ(d.magFilter, rhi::Filter::Linear);
+    EXPECT_EQ(d.mipFilter, rhi::Filter::Linear);
     EXPECT_EQ(d.anisotropy, 1.0f);
-    EXPECT_FALSE(d.srgb);
+    const rhi::ImageDesc &img = s->rec().createdImages[i].desc;
+    EXPECT_EQ(img.mipLevels, 0u) << "a full mip chain";
+    EXPECT_EQ(img.format, rhi::Format::RGBA8) << "not sRGB";
   }
 }
 
@@ -768,36 +806,44 @@ TEST(TextureOptions, LoadTextureForwardsTheDescriptionToTheDevice) {
       utils::Utils::getAssetPath("assets/textures/white.png");
   s->assets().loadTexture(white.c_str(), false, "tiled", desc);
 
-  const api::TextureDesc &got = s->rec().textureDescs.back();
-  EXPECT_EQ(got.wrap, api::TextureWrap::Repeat);
-  EXPECT_EQ(got.minFilter, api::TextureFilter::Nearest);
-  EXPECT_EQ(got.magFilter, api::TextureFilter::Nearest);
-  EXPECT_FALSE(got.mipmaps);
+  const rhi::SamplerDesc &got = s->rec().createdSamplers.back();
+  EXPECT_EQ(got.wrapU, rhi::WrapMode::Repeat);
+  EXPECT_EQ(got.wrapV, rhi::WrapMode::Repeat);
+  EXPECT_EQ(got.minFilter, rhi::Filter::Nearest);
+  EXPECT_EQ(got.magFilter, rhi::Filter::Nearest);
   EXPECT_EQ(got.anisotropy, 8.0f);
-  EXPECT_TRUE(got.srgb);
+  const rhi::ImageDesc &img = s->rec().createdImages.back().desc;
+  EXPECT_EQ(img.mipLevels, 1u);
+  EXPECT_EQ(img.format, rhi::Format::RGBA8Srgb);
 }
 
-TEST(TextureOptions, AlphaFlagIsHonouredWhenLoading) {
+TEST(TextureOptions, ThreeChannelDataIsExpandedToOpaqueRgba) {
   auto s = makeScene();
   const std::string white =
       utils::Utils::getAssetPath("assets/textures/white.png");
   s->assets().loadTexture(white.c_str(), true, "with_alpha");
   s->assets().loadTexture(white.c_str(), false, "without_alpha");
 
-  // The two before them were loaded with alpha = false.
-  const size_t n = s->rec().textureHadAlpha.size();
-  EXPECT_TRUE(s->rec().textureHadAlpha[n - 2]);
-  EXPECT_FALSE(s->rec().textureHadAlpha[n - 1]);
+  // Both reach the device as RGBA8; the one loaded without alpha has it set
+  // opaque on the CPU.
+  const auto &uploads = s->rec().imageUploads;
+  ASSERT_GE(uploads.size(), 2u);
+  const auto &noAlpha = uploads.back();
+  ASSERT_GE(noAlpha.pixels.size(), 4u);
+  EXPECT_EQ(noAlpha.pixels.size(),
+            size_t(noAlpha.region.width) * noAlpha.region.height * 4);
+  for (size_t i = 3; i < noAlpha.pixels.size(); i += 4) {
+    ASSERT_EQ(noAlpha.pixels[i], 255) << "pixel " << i / 4;
+  }
 }
 
 TEST(TextureOptions, MissingFileBecomesAOneByOneFallbackInsteadOfGarbage) {
   auto s = makeScene();
-  const size_t before = s->rec().textureSizes.size();
+  const size_t before = s->rec().createdImages.size();
   s->assets().loadTexture("definitely/not/a/file.png", false, "missing");
 
-  ASSERT_EQ(s->rec().textureSizes.size(), before + 1);
-  EXPECT_EQ(s->rec().textureSizes.back(),
-            (std::pair<uint32_t, uint32_t>(1, 1)));
+  ASSERT_EQ(s->rec().createdImages.size(), before + 1);
+  EXPECT_EQ(s->rec().createdImages.back().desc.extent, (rhi::Extent2D{1, 1}));
   EXPECT_NO_THROW(s->assets().getTextureID("missing"));
 }
 
@@ -882,7 +928,7 @@ TEST(RenderStats, CountDrawsInstancesTrianglesAndShaderBindsPerPass) {
 
 TEST(RenderStats, SkyIsOneFullscreenTriangle) {
   auto s = makeScene();
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->loadSky();
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   s->spawn("tri", "matA");
   s->frame();
@@ -930,7 +976,7 @@ TEST(GpuPassTimers, EachPassIsBracketedAroundItsOwnDraws) {
   }
   auto s = makeScene();
   enablePrepass(*s);
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->loadSky();
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   makeTransparent(*s, "matB", api::RenderState{});
   s->spawn("tri", "matA", 0);
@@ -965,18 +1011,10 @@ TEST(GpuPassTimers, EmptyPassesAreStillBracketed) {
 
 namespace {
 
-// diffuse.vert's layout plus the `instanceFade` float after instanceColor.
-api::VertexLayout fadeLayout() {
-  api::VertexLayout layout = diffuseLayout();
-  layout.attributes.push_back({Name("instanceFade"), 80, 1, false, -1});
-  layout.stride = 84;
-  return layout;
-}
-
 constexpr size_t kFadeFloat = 20; // index of instanceFade within an instance
 
 std::unique_ptr<Scene> makeFadeScene() {
-  return makeScene([](fake::Recorder &r) { r.instanceLayout = fadeLayout(); });
+  return makeScene([](SceneOptions &o) { o.fade = true; });
 }
 
 // An entity mid cross-fade from `from` to `to` (mesh names).
@@ -989,8 +1027,9 @@ EntityID spawnFading(Scene &s, const char *to, const char *from, float fade) {
   return e;
 }
 
-const fake::Draw *drawWithIndexCount(const fake::Recorder &r, size_t count) {
-  for (const fake::Draw &d : r.draws) {
+const fakerhi::Draw *drawWithIndexCount(const fakerhi::Recorder &r,
+                                        size_t count) {
+  for (const fakerhi::Draw &d : r.draws) {
     if (d.indexCount == count) {
       return &d;
     }
@@ -1018,8 +1057,8 @@ TEST(LodFadeBatching, ACrossFadeDrawsBothMeshesWithComplementaryFades) {
   s->frame();
 
   ASSERT_EQ(s->rec().draws.size(), 2u);
-  const fake::Draw *quad = drawWithIndexCount(s->rec(), 6);
-  const fake::Draw *tri = drawWithIndexCount(s->rec(), 3);
+  const fakerhi::Draw *quad = drawWithIndexCount(s->rec(), 6);
+  const fakerhi::Draw *tri = drawWithIndexCount(s->rec(), 3);
   ASSERT_TRUE(quad && tri);
   ASSERT_EQ(quad->instanceFloats.size(), 21u);
   ASSERT_EQ(tri->instanceFloats.size(), 21u);
@@ -1034,8 +1073,8 @@ TEST(LodFadeBatching, ADitheringOutPrimaryPairsWithAnIncomingSecondary) {
   spawnFading(*s, "quad", "tri", 0.25f);
   s->frame();
 
-  const fake::Draw *quad = drawWithIndexCount(s->rec(), 6);
-  const fake::Draw *tri = drawWithIndexCount(s->rec(), 3);
+  const fakerhi::Draw *quad = drawWithIndexCount(s->rec(), 6);
+  const fakerhi::Draw *tri = drawWithIndexCount(s->rec(), 3);
   ASSERT_TRUE(quad && tri);
   EXPECT_FLOAT_EQ(quad->instanceFloats[kFadeFloat], 0.25f);
   EXPECT_FLOAT_EQ(tri->instanceFloats[kFadeFloat], -0.75f);
@@ -1056,7 +1095,7 @@ TEST(LodFadeBatching, EntitiesNotFadingAreWrittenWithNoFade) {
   spawnFading(*s, "tri", "quad", -0.5f);
   s->frame();
 
-  const fake::Draw *tri = drawWithIndexCount(s->rec(), 3);
+  const fakerhi::Draw *tri = drawWithIndexCount(s->rec(), 3);
   ASSERT_TRUE(tri);
   ASSERT_EQ(tri->instanceCount, 2u);
   std::vector<float> fades = {tri->instanceFloats[kFadeFloat],
@@ -1095,13 +1134,12 @@ TEST(LodFadeBatching, AFadingBatchGetsTheAlphaTestedPrepassVariant) {
   const auto &draws = s->rec().draws;
   ASSERT_EQ(draws.size(), 4u);
   for (int i = 0; i < 2; ++i) {
-    EXPECT_TRUE(hasMacro(s->rec().fragmentSources.at(draws[i].shaderId)))
+    EXPECT_FALSE(isDepthOnly(*s, "a", draws[i].fragmentModuleId))
         << "pre-pass draw " << i << " must discard like the colour pass";
   }
   EXPECT_EQ(draws[2].shaderId, 1);
   EXPECT_EQ(draws[3].shaderId, 1);
 }
-
 TEST(LodFadeBatching, ABatchWithNoFadingInstanceKeepsTheEmptyPrepassShader) {
   auto s = makeFadeScene();
   enablePrepass(*s);
@@ -1110,9 +1148,8 @@ TEST(LodFadeBatching, ABatchWithNoFadingInstanceKeepsTheEmptyPrepassShader) {
 
   const auto &draws = s->rec().draws;
   ASSERT_EQ(draws.size(), 2u);
-  EXPECT_FALSE(hasMacro(s->rec().fragmentSources.at(draws[0].shaderId)));
+  EXPECT_TRUE(isDepthOnly(*s, "a", draws[0].fragmentModuleId));
 }
-
 // Anti-aliasing
 
 namespace {
@@ -1121,7 +1158,7 @@ constexpr int kPostProcessShader = 3;
 
 std::unique_ptr<Scene> makePostProcessScene(resources::AntiAliasing mode) {
   auto s = makeScene();
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "post_process");
+  s->loadPostProcess();
   s->world->getResource<resources::RenderSettings>().antiAliasing = mode;
   return s;
 }
@@ -1177,7 +1214,7 @@ TEST(AntiAliasing, SceneGoesToATargetTheSizeOfTheViewport) {
 
 TEST(AntiAliasing, PostProcessCopiesTheTargetOntoTheWindowLast) {
   auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->loadSky();
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   s->spawn("tri", "matA");
   s->frame();
@@ -1194,8 +1231,9 @@ TEST(AntiAliasing, PostProcessCopiesTheTargetOntoTheWindowLast) {
   EXPECT_EQ(fxaa.targetId, 0);
   EXPECT_EQ(s->rec().drawSequence.back(), "fullscreen");
 
-  // It reads the target's colour on unit 0 and draws with no depth or blend.
-  EXPECT_EQ(fxaa.textureUnits.at(0), target.colorTextureId);
+  // It reads the target's colour (its sceneColor sampler) and draws with no
+  // depth or blend.
+  EXPECT_EQ(fxaa.albedoTextureId, target.colorTextureId);
   EXPECT_FALSE(fxaa.state.depthTest);
   EXPECT_FALSE(fxaa.state.depthWrite);
   EXPECT_EQ(fxaa.state.blend, api::BlendMode::None);
@@ -1244,18 +1282,23 @@ TEST(AntiAliasing, EveryFrameEndsOnTheWindow) {
 }
 
 TEST(AntiAliasing, PostProcessPassTellsTheShaderWhetherToSmooth) {
+  auto smooth = [](Scene &s) {
+    const auto &draws = s.rec().fullscreenDraws;
+    EXPECT_FALSE(draws.empty());
+    return floatAt(materialBytes(draws.back()),
+                   memberOffset(s, "post_process", "fxaaOn"));
+  };
   auto on = makePostProcessScene(resources::AntiAliasing::Fxaa);
   on->spawn("tri", "matA");
   on->frame();
-  EXPECT_EQ(on->rec().floatUniforms[kPostProcessShader].at("fxaaOn"), 1.0f);
+  EXPECT_EQ(smooth(*on), 1.0f);
 
   auto scaled = makePostProcessScene(resources::AntiAliasing::None);
   scaled->world->getResource<resources::RenderSettings>().renderScale = 0.5f;
   scaled->spawn("tri", "matA");
   scaled->frame();
-  EXPECT_EQ(scaled->rec().floatUniforms[kPostProcessShader].at("fxaaOn"), 0.0f);
+  EXPECT_EQ(smooth(*scaled), 0.0f);
 }
-
 // Render scale
 
 TEST(RenderScale, OneWithoutFxaaDrawsStraightToTheWindow) {

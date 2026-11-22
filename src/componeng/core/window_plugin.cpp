@@ -6,9 +6,9 @@
 #include "componeng/core/window.hpp"
 #include "componeng/renderer/asset_manager.hpp"
 #ifdef COMPONENG_VULKAN
-#include "componeng/renderer/backend/vulkan/vk_render_device.hpp"
+#include "componeng/renderer/backend/vulkan/vk_device.hpp"
 #else
-#include "componeng/renderer/backend/opengl/gl_render_device.hpp"
+#include "componeng/renderer/backend/opengl/gl_stub_device.hpp"
 #endif
 #include "componeng/resources/render_settings.hpp"
 #include "componeng/resources/render_stats.hpp"
@@ -86,6 +86,9 @@ void windowedLoop(Engine &engine) {
             : nullptr;
     const auto cpuStart = Clock::now();
 
+    // False skips drawing this frame (a minimised window); the game still
+    // updates.
+    device.beginFrame();
     DebugUI::beginFrame(world);
     if constexpr (Profiling::kEnabled)
       device.beginGpuTimer();
@@ -98,10 +101,6 @@ void windowedLoop(Engine &engine) {
     DebugUI::endFrame(world);
     if constexpr (Profiling::kEnabled)
       device.endGpuTimer();
-    if constexpr (Profiling::kEnabled) {
-      if (assets)
-        assets->collectShaderTimings();
-    }
 
     const auto cpuEnd = Clock::now();
     window.swapBuffers();
@@ -124,13 +123,13 @@ void windowedLoop(Engine &engine) {
 
 void WindowPlugin::build(Engine &engine) {
   ecs::World &world = engine.world();
-  std::unique_ptr<renderer::api::IRenderDevice> renderDevice =
+  std::unique_ptr<renderer::rhi::IDevice> renderDevice =
 #ifdef COMPONENG_VULKAN
-      std::make_unique<renderer::vulkan::VulkanRenderDevice>();
+      std::make_unique<renderer::vulkan::VulkanDevice>();
 #else
-      std::make_unique<renderer::opengl::GLRenderDevice>();
+      std::make_unique<renderer::opengl::GLStubDevice>();
 #endif
-  world.setResource<std::unique_ptr<renderer::api::IRenderDevice>>(
+  world.setResource<std::unique_ptr<renderer::rhi::IDevice>>(
       std::move(renderDevice));
   world.setResource<Window>(Window());
   engine.setRunner(windowedLoop);
