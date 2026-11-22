@@ -14,7 +14,8 @@ namespace componeng::renderer {
 inline constexpr const char *kDepthPrepassDefine = "COMPONENG_DEPTH_PREPASS";
 
 /** `source` with `#define <name> 1` on the line after its `#version`
- *  directive (GLSL needs `#version` first), or at the very top if it has none. */
+ *  directive (GLSL needs `#version` first), or at the very top if it has none.
+ */
 std::string defineAfterVersion(const std::string &source, const char *name);
 
 class Shader {
@@ -39,13 +40,6 @@ public:
   /** Attaches the shader's uniform block `blockName` to uniform-buffer
    *  binding point `binding`. False if the shader declares no such block. */
   bool bindUniformBlock(const char *blockName, uint32_t binding) const;
-
-  /** True if the compiled shader declares the FrameData uniform block, in
-   *  which case it reads per-frame values from the shared buffer and the
-   *  RenderSystem does not send them as loose uniforms. */
-  bool usesFrameData() const {
-    return m_usesFrameData;
-  }
 
   /** Per-shader GPU timing (see IShader::beginGpuTimer). Time the work
    *  submitted between begin and end against this shader; call
@@ -84,9 +78,12 @@ public:
   std::vector<core::Name> reflectActiveUniformNames() const;
 
 private:
+  /** Logs an error for each per-frame value the shader reads as a loose
+   *  uniform; see FrameUniforms. */
+  void warnIfLooseFrameUniforms() const;
+
   api::IRenderDevice *m_device;
   std::unique_ptr<api::IShader> m_impl;
-  bool m_usesFrameData = false;
 
   // Kept so the depth variants can recompile these stages later.
   std::string m_vertexSource;

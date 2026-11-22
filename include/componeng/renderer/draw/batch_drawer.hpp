@@ -40,10 +40,6 @@ private:
   // cutout material of one shader use different programs.
   const Shader *m_boundProgram = nullptr;
   core::HandleID m_boundAlbedo = core::INVALID_HANDLE;
-  // A material's own uniforms can overwrite a frame-wide one (e.g. its own
-  // fogColor). The shader keeps that value, so after such a material the
-  // frame-wide uniforms must be sent again even on the same shader.
-  bool m_materialOverrodeUniforms = false;
 };
 
 /** Draws the queue's sorted batches [first, last) in `pass` with a fresh

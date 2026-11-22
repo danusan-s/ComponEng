@@ -51,10 +51,6 @@ void BatchingSystem::onUpdate(const ecs::SystemState &state) {
                                    : mat.materialName);
     }
     IMaterial &material = assetManager.getMaterial(mat.materialID);
-    if (mat.textureID == 0 || mat.shaderID == 0) {
-      mat.textureID = material.getTextureID();
-      mat.shaderID = material.getShaderID();
-    }
     if (m.meshID == 0) {
       m.meshID = assetManager.getMeshID(m.meshName.empty() ? core::Name("cube")
                                                            : m.meshName);

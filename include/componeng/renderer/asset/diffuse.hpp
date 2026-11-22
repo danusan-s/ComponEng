@@ -1,6 +1,7 @@
 #pragma once
 
 #include "componeng/core/transform_component.hpp"
+#include "componeng/ecs/world.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "material.hpp"
 

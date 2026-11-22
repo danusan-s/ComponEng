@@ -164,19 +164,6 @@ TEST(InstanceWriter, LeavesNarrowerValuesTailUntouched) {
   EXPECT_EQ(data[3], 7.0f);
 }
 
-TEST(InstanceWriter, VariantOverloadDispatchesByType) {
-  const api::VertexLayout layout = modelColorWindLayout();
-  std::vector<float> data(layout.stride / sizeof(float), 0.0f);
-  InstanceWriter w(layout, data.data());
-
-  w.set(Name("wind"), UniformMap::mapped_type(0.5f));
-  w.set(Name("instanceColor"), UniformMap::mapped_type(Vec4(1, 2, 3, 4)));
-
-  EXPECT_EQ(data[20], 0.5f);
-  EXPECT_EQ(data[16], 1.0f);
-  EXPECT_EQ(data[19], 4.0f);
-}
-
 // --- Materials --------------------------------------------------------------
 
 namespace {
@@ -187,39 +174,7 @@ std::unique_ptr<World> makeWorld() {
   return world;
 }
 
-// Written against the old map-based API only.
-class LegacyMaterial : public IMaterial {
-public:
-  using IMaterial::IMaterial;
-  void buildInstanceData(World &, EntityID, UniformMap &out) const override {
-    out["instanceColor"] = Vec4(0.5f, 0.25f, 0.125f, 1.0f);
-    out["wind"] = 3.0f;
-  }
-};
-
 } // namespace
-
-TEST(MaterialInstanceData, LegacyBuildInstanceDataStillWorks) {
-  auto world = makeWorld();
-  EntityID e = world->createEntity();
-  world->addComponents(e, TransformComponent{});
-
-  LegacyMaterial material(1, 1);
-  const api::VertexLayout layout = modelColorWindLayout();
-  material.setVertexLayout(layout);
-
-  std::vector<float> data(layout.stride / sizeof(float), 0.0f);
-  InstanceWriter writer(layout, data.data());
-  const Mat4 model = world->getComponent<TransformComponent>(e).toMatrix();
-  InstanceContext ctx(*world, e, world->getComponent<TransformComponent>(e),
-                      model);
-  material.writeInstanceData(ctx, writer);
-
-  EXPECT_EQ(data[16], 0.5f);
-  EXPECT_EQ(data[17], 0.25f);
-  EXPECT_EQ(data[18], 0.125f);
-  EXPECT_EQ(data[20], 3.0f);
-}
 
 TEST(MaterialInstanceData, DiffuseWritesModelAndColor) {
   auto world = makeWorld();

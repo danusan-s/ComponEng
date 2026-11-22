@@ -144,39 +144,24 @@ TEST(RenderPipeline, FrameDataIsUploadedAndBoundOncePerFrame) {
   EXPECT_EQ(fd.fogEnd, fog.end);
 }
 
-TEST(RenderPipeline, ShaderWithFrameBlockIsNotSentLooseFrameUniforms) {
-  // Shader "a" (id 1) declares the FrameData block; shader "b" (id 2) is a
-  // legacy shader with loose uniforms.
-  auto s = makeScene([](fake::Recorder &rec) {
-    rec.shaderDeclaresFrameBlock[1] = true;
-    rec.shaderDeclaresFrameBlock[2] = false;
-  });
-  spawnMixed(*s);
-  s->frame();
+TEST(RenderPipeline, FrameValuesAreNeverSentAsLooseUniforms) {
+  // The per-frame values only go out through the FrameData block, whether or
+  // not a shader declares it.
+  for (bool declares : {false, true}) {
+    auto s = makeScene([declares](fake::Recorder &rec) {
+      rec.defaultShaderDeclaresFrameBlock = declares;
+    });
+    spawnMixed(*s);
+    s->frame();
 
-  auto has = [&](int shader, const char *name) {
-    const auto &v = s->rec().looseUniforms[shader];
-    return std::find(v.begin(), v.end(), name) != v.end();
-  };
-
-  for (const char *name :
-       {"viewProj", "lightDir", "lightColor", "cameraPos", "time", "fogColor",
-        "fogStart", "fogEnd", "ambientColor"}) {
-    EXPECT_FALSE(has(1, name)) << name << " must come from the block";
-    EXPECT_TRUE(has(2, name)) << name << " must still reach a legacy shader";
-  }
-}
-
-TEST(RenderPipeline, LegacyShaderGetsTheSameValuesAsLooseUniforms) {
-  // Neither shader declares the block (the default): everything is loose.
-  auto s = makeScene();
-  spawnMixed(*s);
-  s->frame();
-
-  for (int shader : {1, 2}) {
-    const auto &v = s->rec().looseUniforms[shader];
-    EXPECT_NE(std::find(v.begin(), v.end(), "viewProj"), v.end()) << shader;
-    EXPECT_NE(std::find(v.begin(), v.end(), "lightDir"), v.end()) << shader;
+    for (int shader : {1, 2}) {
+      for (const char *name :
+           {"viewProj", "lightDir", "lightColor", "cameraPos", "time",
+            "fogColor", "fogStart", "fogEnd", "ambientColor"}) {
+        EXPECT_FALSE(hasUniformIn(*s, shader, name))
+            << name << " shader " << shader << " declares=" << declares;
+      }
+    }
   }
 }
 
@@ -386,25 +371,18 @@ TEST(DepthPrepass, DisabledByTheSettingOpaqueDrawsDepthWritingWithLess) {
   EXPECT_EQ(s->rec().shadersCreated, 2);
 }
 
-TEST(DepthPrepass, DepthVariantGetsLooseFrameUniformsWhenTheShaderHasNoBlock) {
-  auto s = makeScene();
-  enablePrepass(*s);
-  s->spawn("tri", "matA");
-  s->frame();
+TEST(DepthPrepass, DepthVariantIsNeverSentLooseFrameUniforms) {
+  for (bool declares : {false, true}) {
+    auto s = makeScene([declares](fake::Recorder &r) {
+      r.defaultShaderDeclaresFrameBlock = declares;
+    });
+    enablePrepass(*s);
+    s->spawn("tri", "matA");
+    s->frame();
 
-  EXPECT_TRUE(hasUniformIn(*s, 3, "viewProj")) << "variant of shader a";
-}
-
-TEST(DepthPrepass, FrameDataIsStillBoundForTheDepthVariantOfAShaderUsingIt) {
-  auto s = makeScene(
-      [](fake::Recorder &r) { r.defaultShaderDeclaresFrameBlock = true; });
-  enablePrepass(*s);
-  s->spawn("tri", "matA");
-  s->frame();
-
-  // Declaring the block means no loose frame uniforms for any program,
-  // including the variant (shader id 3).
-  EXPECT_FALSE(hasUniformIn(*s, 3, "viewProj"));
+    // Shader id 3 is the depth variant of shader a.
+    EXPECT_FALSE(hasUniformIn(*s, 3, "viewProj")) << "declares=" << declares;
+  }
 }
 
 // --- Alpha-tested (Cutout) materials
@@ -746,32 +724,17 @@ TEST(RenderPipeline, SkyUsesTheShaderNamedByTheComponent) {
   EXPECT_EQ(s->rec().fullscreenDraws[0].shaderId, 4);
 }
 
-TEST(RenderPipeline,
-     SkyGetsItsOwnUniformsAndLooseFrameValuesOnlyWithoutTheBlock) {
-  // Sky shader is id 3. In the first scene it has no FrameData block.
-  {
-    auto s = makeScene();
-    s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
-    s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
-    s->frame();
-    for (const char *n : {"invSkyViewProj", "skyColor", "horizonColor",
-                          "lightDir", "lightColor", "fogColor"}) {
-      EXPECT_TRUE(hasUniform(*s, 3, n)) << n;
-    }
+TEST(RenderPipeline, SkyGetsItsOwnUniformsAndNoLooseFrameValues) {
+  // Sky shader is id 3.
+  auto s = makeScene();
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  s->frame();
+  for (const char *n : {"invSkyViewProj", "skyColor", "horizonColor"}) {
+    EXPECT_TRUE(hasUniform(*s, 3, n)) << n;
   }
-  // In the second it does: the per-frame values come from the buffer.
-  {
-    auto s = makeScene(
-        [](fake::Recorder &rec) { rec.shaderDeclaresFrameBlock[3] = true; });
-    s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
-    s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
-    s->frame();
-    for (const char *n : {"invSkyViewProj", "skyColor", "horizonColor"}) {
-      EXPECT_TRUE(hasUniform(*s, 3, n)) << n;
-    }
-    for (const char *n : {"lightDir", "lightColor", "fogColor", "viewProj"}) {
-      EXPECT_FALSE(hasUniform(*s, 3, n)) << n;
-    }
+  for (const char *n : {"lightDir", "lightColor", "fogColor", "viewProj"}) {
+    EXPECT_FALSE(hasUniform(*s, 3, n)) << n;
   }
 }
 

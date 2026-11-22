@@ -421,9 +421,8 @@ the layout on every call, which adds up over thousands of entities.
 `InstanceContext` carries the world, the entity, its `TransformComponent` and a
 cached `modelMatrix()`. Attribute names must match the shader's instance
 attributes; an attribute the shader does not declare gives an invalid slot, and
-writing to one does nothing. The older
-`buildInstanceData(world, entity, UniformMap&)` override still works but
-allocates a map per entity; prefer `writeInstanceData`.
+writing to one does nothing. `writeInstanceData` is the only per-instance hook
+a material has, and every material must override it.
 
 #### Per-frame values in custom shaders
 
@@ -444,9 +443,10 @@ layout(std140) uniform FrameData {
 ```
 
 The layout must match `renderer/frame_data.hpp`; the engine logs an error at
-shader load if the sizes disagree. A shader that does not declare the block
-keeps working: it receives the same values as loose uniforms with the same
-names (`uniform mat4 viewProj;` and so on).
+shader load if the sizes disagree. The values are only ever uploaded through
+this block: a shader that reads `viewProj`, `time` and the rest as plain
+`uniform`s gets zeros, and the engine logs an error at load naming each one.
+A shader that needs no per-frame values can leave the block out.
 
 #### Material type and render state
 
@@ -579,8 +579,7 @@ A custom sky shader is loaded like any other (`loadShader`, then set
   times rotation-only view; unprojecting a pixel gives its view direction),
   `vec3 skyColor`, `vec3 horizonColor`.
 - Per-frame values (`lightDir`, `lightColor`, fog, camera, time) come from the
-  `FrameData` block if the shader declares it, otherwise as loose uniforms with
-  the same names.
+  `FrameData` block, which the shader declares.
 - Drawn with culling off, depth test `<=`, and depth writes off.
 
 ### Attaching assets to an entity
@@ -891,9 +890,9 @@ The engine has no terrain system. For a forest you need:
 
 ### E. Animation (wind)
 
-- Grass and leaves should sway. Add a `time` uniform to a custom material/vertex
-  shader and offset vertices by `sin(time + position)`. The water shader already
-  shows this pattern (`uniform float time`, wave math).
+- Grass and leaves should sway. Declare the `FrameData` block in a custom
+  vertex shader (see "Per-frame values in custom shaders") and offset vertices
+  by `sin(time + position)`, using the block's `time`.
 
 ### F. Performance considerations for a forest
 

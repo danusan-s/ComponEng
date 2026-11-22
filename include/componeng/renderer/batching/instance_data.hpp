@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <vector>
 
 namespace componeng::ecs {
 class World;
@@ -113,8 +112,7 @@ findInstanceMatrixSlot(const api::VertexLayout &layout, core::Name name) {
  *  - By InstanceSlot / InstanceMatrixSlot, resolved once per material. This is
  *    the fast path and what a material's writeInstanceData() should use: the
  *    per-entity cost is a copy, with no search.
- *  - By Name, which searches the layout on every call. Kept for the legacy
- *    UniformMap path and for one-off use.
+ *  - By Name, which searches the layout on every call. For one-off use.
  *
  * Either way, an attribute the shader does not declare is ignored (so a
  * material can offer more attributes than a given shader consumes), and a
@@ -178,11 +176,6 @@ public:
       std::memcpy(m_instance + slot.rowOffset[row], src + row * 4,
                   sizeof(float) * 4);
     }
-  }
-
-  /** Type-erased form, used by the legacy UniformMap material path. */
-  void set(core::Name name, const core::UniformMap::mapped_type &value) {
-    std::visit([&](const auto &v) { set(name, v); }, value);
   }
 
 private:

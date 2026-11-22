@@ -371,7 +371,7 @@ const auto& events = world.get_events<CollisionEvent>();
 |-----------|--------|--------|
 | `TransformComponent` | `components/transform_component.hpp` | `position`, `rotation`, `scale` (Vec3 each) |
 | `MeshComponent` | `components/mesh_component.hpp` | `meshID`, `visible` |
-| `MaterialComponent` | `components/material_component.hpp` | `color`, `textureID`, `shaderID` |
+| `MaterialComponent` | `components/material_component.hpp` | `materialName`, `materialID` |
 | `CameraComponent` | `components/camera_component.hpp` | `fov`, `aspectRatio`, `nearPlane`, `farPlane`, `viewProjectionMatrix` |
 | `RigidBodyComponent` | `components/rigidbody_component.hpp` | `type` (Static/Dynamic/Kinematic), `velocity`, `mass`, `restitution` |
 | `ColliderComponent` | `components/collider_component.hpp` | `type` (Box/Sphere), `transform` |

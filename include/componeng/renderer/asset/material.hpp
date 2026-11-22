@@ -1,8 +1,6 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/ecs/entity.hpp"
-#include "componeng/ecs/world.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/instance_data.hpp"
 #include "componeng/utils/logger.hpp"
@@ -177,7 +175,8 @@ public:
   /** Pipeline state (culling, depth, blending) this material draws with.
    *  Defaults to the engine baseline: back-face culling, depth test and
    *  write, alpha blending. An Opaque or Cutout material only contributes its
-   *  culling mode; the rest is decided by the RenderSystem (see MaterialType). */
+   *  culling mode; the rest is decided by the RenderSystem (see MaterialType).
+   */
   void setRenderState(const api::RenderState &state) {
     m_renderState = state;
   }
@@ -247,24 +246,9 @@ public:
    *  This is the hot path: it runs once per rendered entity per frame, writing
    *  straight into the batch's flat instance buffer. Override it, avoid heap
    *  allocation, and write through slots resolved in resolveInstanceSlots()
-   *  rather than by Name.
-   *
-   *  The default implementation adapts the legacy buildInstanceData() below so
-   *  existing materials keep working, at the cost of a map per entity. */
+   *  rather than by Name. */
   virtual void writeInstanceData(const InstanceContext &ctx,
-                                 InstanceWriter &out) const {
-    m_scratchInstanceData.clear();
-    buildInstanceData(ctx.world, ctx.entity, m_scratchInstanceData);
-    for (const auto &[name, value] : m_scratchInstanceData) {
-      out.set(name, value);
-    }
-  }
-
-  /** @deprecated Override writeInstanceData() instead. Kept so materials
-   *  written against the old map-based API still compile and run. */
-  virtual void buildInstanceData(ecs::World &, ecs::EntityID,
-                                 core::UniformMap &) const {
-  }
+                                 InstanceWriter &out) const = 0;
 
 private:
   void warnIfNotUniform(const char *name, const char *caller) const {
@@ -287,7 +271,6 @@ private:
   std::vector<BufferTextureBinding> m_bufferTextureBindings;
   std::vector<UniformBlockBinding> m_uniformBlockBindings;
   std::unordered_set<core::Name> m_knownUniforms;
-  mutable core::UniformMap m_scratchInstanceData;
 };
 
 } // namespace componeng::renderer

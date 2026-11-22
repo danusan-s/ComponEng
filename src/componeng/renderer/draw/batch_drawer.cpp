@@ -53,13 +53,8 @@ void BatchDrawer::draw(const RenderBatch &batch, api::PassId pass) {
   device.setRenderState(
       renderStateFor(pass, material.getRenderState(), m_ctx.depthPrepassed));
 
-  if (shaderChanged || m_materialOverrodeUniforms) {
-    if (!shader.usesFrameData()) {
-      m_ctx.frame.applyLoose(shader);
-    }
-    if (readsAlbedo) {
-      shader.setInteger("albedoMap", 0);
-    }
+  if (shaderChanged && readsAlbedo) {
+    shader.setInteger("albedoMap", 0);
   }
 
   if (readsAlbedo) {
@@ -79,7 +74,6 @@ void BatchDrawer::draw(const RenderBatch &batch, api::PassId pass) {
 
   m_ctx.binder.bindResources(device, assets, shader, material, depthOnly);
   MaterialBinder::setUniforms(shader, material);
-  m_materialOverrodeUniforms = !material.getUniforms().empty();
 
   mesh.getImpl().bind();
 

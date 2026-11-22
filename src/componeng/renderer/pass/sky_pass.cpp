@@ -32,9 +32,6 @@ void SkyPass::execute(const PassContext &ctx) {
 
   ctx.profiler.timeShader(&shader);
   shader.use();
-  if (!shader.usesFrameData()) {
-    ctx.frame.applyLoose(shader);
-  }
 
   // Projection x rotation-only view, inverted: turns a pixel back into the
   // direction the camera sees through it. No camera translation, so the sky

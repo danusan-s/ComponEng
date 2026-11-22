@@ -12,8 +12,6 @@ struct MaterialComponent {
 
   // Runtime data (not serialized)
   core::HandleID materialID = 0;
-  core::HandleID textureID = 0;
-  core::HandleID shaderID = 0;
 };
 
 struct ColorComponent {
