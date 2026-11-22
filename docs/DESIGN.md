@@ -487,7 +487,12 @@ const auto& events = world.get_events<CollisionEvent>();
    test `Equal` and depth writes off, so only the nearest surface at each pixel
    runs the fragment shader. Then the sky
 9. **Transparent pass**: Draw `Transparent` batches with their own `RenderState`
-10. **Draw** (both passes): Bind the material's extra textures, texture buffers and uniform
+10. **FXAA** (`RenderSettings::antiAliasing`): With anti-aliasing on, steps 7 to 9
+   are drawn into an off-screen `IRenderTarget` the size of the window's
+   viewport, and `FxaaPass` copies it onto the window through the `fxaa` shader,
+   which smooths the edges. Off, or without an `fxaa` shader, the scene is drawn
+   straight to the window
+11. **Draw** (both passes): Bind the material's extra textures, texture buffers and uniform
    blocks (`IMaterial::setTexture` / `setBufferTexture` / `setUniformBuffer`),
    and use glDrawElementsInstanced for
    single-draw-call rendering, skipping shader/texture rebinds that did not change

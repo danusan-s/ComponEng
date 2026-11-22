@@ -10,6 +10,7 @@
 #else
 #include "componeng/renderer/backend/opengl/gl_render_device.hpp"
 #endif
+#include "componeng/resources/render_settings.hpp"
 #include "componeng/resources/render_stats.hpp"
 #include "componeng/utils/logger.hpp"
 #include "frame_timings.hpp"
@@ -20,6 +21,27 @@
 
 namespace componeng::core {
 namespace {
+
+// The "Settings" tab: switches for the renderer's runtime settings. They are
+// plain fields the renderer reads every frame, so a click takes effect on the
+// next one.
+void showSettingsTab(ecs::World &world) {
+  if (!world.hasResource<resources::RenderSettings>()) {
+    return;
+  }
+  if (DebugUI::beginTab("Settings")) {
+    auto &settings = world.getResource<resources::RenderSettings>();
+    bool fxaa = settings.antiAliasing == resources::AntiAliasing::Fxaa;
+    if (DebugUI::addCheckbox("FXAA", &fxaa)) {
+      settings.antiAliasing =
+          fxaa ? resources::AntiAliasing::Fxaa : resources::AntiAliasing::None;
+    }
+    DebugUI::addCheckbox("Depth pre-pass", &settings.depthPrepass);
+    DebugUI::addCheckbox("LOD dithering", &settings.lodDither);
+    DebugUI::addSlider("LOD fade (s)", &settings.lodFadeSeconds, 0.0f, 2.0f);
+  }
+  DebugUI::endTab();
+}
 
 void windowedLoop(Engine &engine) {
   ecs::World &world = engine.world();
@@ -66,6 +88,7 @@ void windowedLoop(Engine &engine) {
                      static_cast<float>(avgFPS));
     if constexpr (Profiling::kEnabled)
       timings.show();
+    showSettingsTab(world);
     DebugUI::endFrame(world);
     if constexpr (Profiling::kEnabled)
       device.endGpuTimer();

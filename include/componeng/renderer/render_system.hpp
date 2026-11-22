@@ -6,12 +6,15 @@
 #include "componeng/renderer/pipeline/frame_uniforms.hpp"
 #include "componeng/renderer/pipeline/render_pipeline.hpp"
 
+#include <memory>
+
 namespace componeng::renderer {
 
 /**
  * @brief Presentation-phase system that draws the frame from the RenderQueue
- * BatchingSystem built: depth pre-pass, opaque, sky, transparent, in that
- * order.
+ * BatchingSystem built: depth pre-pass, opaque, sky, transparent and then
+ * FXAA, in that order. With anti-aliasing on, everything before FXAA goes into
+ * an off-screen target that FXAA copies onto the window.
  *
  * It builds the RenderPipeline once (onCreate), and each frame gathers the
  * per-frame values, uploads the instance data and runs the pipeline. What each
@@ -34,9 +37,17 @@ class RenderSystem final : public ecs::ISystem {
 public:
   void onCreate(const ecs::SystemState &state) override;
   void onUpdate(const ecs::SystemState &state) override;
+  void onDestroy(const ecs::SystemState &state) override;
 
 private:
+  /** The target the scene is drawn into this frame, or null to draw straight
+   *  to the window: anti-aliasing is off or has no shader. Kept across frames
+   *  and remade when the viewport changes size. */
+  api::IRenderTarget *sceneTargetFor(ecs::World &world);
+
   RenderPipeline m_pipeline;
+  std::unique_ptr<api::IRenderTarget> m_sceneTarget;
+  bool m_warnedMissingFxaa = false;
   // These live across frames because they own GPU buffers, or remember what
   // was already reported.
   FrameUniforms m_frame;

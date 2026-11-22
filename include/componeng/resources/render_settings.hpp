@@ -2,6 +2,11 @@
 
 namespace componeng::resources {
 
+enum class AntiAliasing {
+  None,
+  Fxaa, // post-process edge smoothing, see FxaaPass
+};
+
 /**
  * @brief Renderer switches the RenderSystem reads every frame.
  */
@@ -28,6 +33,15 @@ struct RenderSettings {
 
   /** How long a LOD cross-fade lasts, in seconds. 0 switches instantly. */
   float lodFadeSeconds = 0.35f;
+
+  /**
+   * Fxaa draws the scene into an off-screen target the size of the window's
+   * viewport, then smooths its edges while copying it to the window. It costs
+   * one extra full-screen pass, works on every backend, and also softens the
+   * edges multisampling would miss (alpha-tested leaves, LOD dithering). It
+   * needs the "fxaa" shader (RenderPlugin loads it); without one it is off.
+   */
+  AntiAliasing antiAliasing = AntiAliasing::Fxaa;
 };
 
 } // namespace componeng::resources

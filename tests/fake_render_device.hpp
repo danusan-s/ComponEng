@@ -29,6 +29,16 @@ struct Draw {
   // still show an earlier material's texture).
   std::map<uint32_t, int> textureUnits;       // unit -> texture id
   std::map<uint32_t, int> bufferTextureUnits; // unit -> buffer id
+  int targetId = 0; // render target drawn into (0: window)
+};
+
+// A render target made through createRenderTarget, in creation order. `id`
+// is what Draw::targetId reports; `colorTextureId` the id its colour texture
+// binds as.
+struct CreatedTarget {
+  int id = 0;
+  uint32_t width = 0, height = 0;
+  int colorTextureId = 0;
 };
 
 struct UniformBufferBind {
@@ -68,6 +78,14 @@ struct Recorder {
   int buffersCreated = 0;
 
   int clears = 0;
+  // Render targets: the one currently bound (0: the window), every
+  // setRenderTarget call in order, and which one each clear() hit.
+  int currentTarget = 0;
+  std::vector<int> targetBinds;
+  std::vector<int> clearTargetIds;
+  std::vector<CreatedTarget> createdTargets;
+  // What viewportExtent() reports; tests change it to resize the window.
+  api::Extent viewport{1280, 720};
   std::vector<api::RenderState> stateRequests; // every setRenderState call
   std::vector<int> shaderUses;                 // shader id per use()
   std::vector<int> unit0TextureBinds;          // texture id per unit-0 bind
@@ -265,6 +283,31 @@ private:
   api::TextureFormat m_format = api::TextureFormat::RGBA8;
 };
 
+class FakeRenderTarget final : public api::IRenderTarget {
+public:
+  FakeRenderTarget(Recorder &rec, int id, uint32_t w, uint32_t h)
+      : m_id(id), m_color(rec, ++rec.texturesCreated) {
+    m_width = w;
+    m_height = h;
+    CreatedTarget t;
+    t.id = id;
+    t.width = w;
+    t.height = h;
+    t.colorTextureId = rec.texturesCreated;
+    rec.createdTargets.push_back(t);
+  }
+  int id() const {
+    return m_id;
+  }
+  api::ITexture &colorTexture() override {
+    return m_color;
+  }
+
+private:
+  int m_id;
+  FakeTexture m_color;
+};
+
 class FakeMesh final : public api::IMesh {
 public:
   void upload(const float *, size_t, const uint32_t *, size_t indexCount,
@@ -293,8 +336,12 @@ public:
   }
   void setScissor(int, int, int, int) override {
   }
+  api::Extent viewportExtent() const override {
+    return rec.viewport;
+  }
   void clear(float, float, float, float) override {
     ++rec.clears;
+    rec.clearTargetIds.push_back(rec.currentTarget);
   }
   void present(void *) override {
   }
@@ -315,6 +362,18 @@ public:
   std::unique_ptr<api::IBuffer> createBuffer() override {
     ++rec.buffersCreated;
     return std::make_unique<FakeBuffer>(rec.buffersCreated);
+  }
+
+  std::unique_ptr<api::IRenderTarget>
+  createRenderTarget(const api::RenderTargetDesc &desc) override {
+    return std::make_unique<FakeRenderTarget>(
+        rec, static_cast<int>(rec.createdTargets.size()) + 1, desc.width,
+        desc.height);
+  }
+  void setRenderTarget(api::IRenderTarget *target) override {
+    rec.currentTarget =
+        target ? static_cast<FakeRenderTarget *>(target)->id() : 0;
+    rec.targetBinds.push_back(rec.currentTarget);
   }
 
   void setRenderState(const api::RenderState &state) override {
@@ -357,6 +416,8 @@ public:
     d.state = rec.currentState;
     d.shaderId = rec.currentShader;
     d.instanceCount = 1;
+    d.textureUnits = rec.boundTextureByUnit;
+    d.targetId = rec.currentTarget;
     rec.fullscreenDraws.push_back(d);
     rec.drawSequence.push_back("fullscreen");
     rec.gpuPassEvents.push_back("fullscreen");
@@ -373,6 +434,7 @@ public:
     d.albedoTextureId = it != rec.boundTextureByUnit.end() ? it->second : 0;
     d.textureUnits = rec.boundTextureByUnit;
     d.bufferTextureUnits = rec.boundBufferTextureByUnit;
+    d.targetId = rec.currentTarget;
     rec.draws.push_back(d);
     rec.drawSequence.push_back("indexed");
     rec.gpuPassEvents.push_back("indexed");

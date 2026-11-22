@@ -60,6 +60,15 @@ TEST(RenderStatePolicy, SkyIgnoresMaterialAndDoesNotCullOrWriteDepth) {
   EXPECT_FALSE(s.depthWrite);
 }
 
+TEST(RenderStatePolicy, FxaaIgnoresMaterialAndTestsNothingBlendsNothing) {
+  const auto s = renderStateFor(PassId::Fxaa, materialState(CullMode::Back),
+                                /*depthPrepassed=*/true);
+  EXPECT_EQ(s.cull, CullMode::None);
+  EXPECT_FALSE(s.depthTest);
+  EXPECT_FALSE(s.depthWrite);
+  EXPECT_EQ(s.blend, BlendMode::None);
+}
+
 TEST(RenderStatePolicy, TransparentUsesTheMaterialsStateUnchanged) {
   const api::RenderState m = materialState(CullMode::None);
   EXPECT_EQ(renderStateFor(PassId::Transparent, m, true), m);

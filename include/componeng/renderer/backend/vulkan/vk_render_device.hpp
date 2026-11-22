@@ -3,6 +3,7 @@
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/backend/vulkan/vk_core.hpp"
 #include "componeng/renderer/backend/vulkan/vk_gpu_timer.hpp"
+#include "componeng/renderer/backend/vulkan/vk_render_target.hpp"
 #include "componeng/renderer/backend/vulkan/vk_resources.hpp"
 #include "componeng/renderer/backend/vulkan/vk_shader.hpp"
 
@@ -37,6 +38,7 @@ public:
   void shutdown() override;
   void setViewport(int x, int y, int w, int h) override;
   void setScissor(int x, int y, int w, int h) override;
+  api::Extent viewportExtent() const override;
   void clear(float r, float g, float b, float a) override;
   void present(void *windowHandle) override;
   int checkErrors() const override {
@@ -84,6 +86,14 @@ public:
   std::unique_ptr<api::ITexture> createTexture() override;
   std::unique_ptr<api::IMesh> createMesh() override;
   std::unique_ptr<api::IBuffer> createBuffer() override;
+  std::unique_ptr<api::IRenderTarget>
+  createRenderTarget(const api::RenderTargetDesc &desc) override;
+  void setRenderTarget(api::IRenderTarget *target) override;
+
+  /** The frame slot being recorded (see VulkanRenderTarget). */
+  uint32_t frameSlot() const {
+    return m_slot;
+  }
 
   void setRenderState(const api::RenderState &state) override {
     m_state = state;
@@ -133,6 +143,7 @@ private:
   void pollCompletedFrames();
 
   // frame
+  VkExtent2D currentExtent() const;
   bool ensureFrame();
   bool ensureRendering();
   void beginPass(bool colorOnly);
@@ -195,6 +206,11 @@ private:
   bool m_colorInitialised = false;
   bool m_depthInitialised = false;
   size_t m_stagingBytes = 0; // staging queued into the current frame
+  // The render target being drawn into (null: the window), and what the window
+  // had drawn while a target is bound.
+  VulkanRenderTarget *m_target = nullptr;
+  bool m_windowColorInitialised = false;
+  bool m_windowDepthInitialised = false;
   bool m_clearPending = false;
   float m_clearColor[4] = {0, 0, 0, 1};
 

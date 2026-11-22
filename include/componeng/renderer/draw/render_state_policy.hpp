@@ -19,6 +19,7 @@ namespace componeng::renderer {
  *                  tested) draw in these two passes with exactly this state.
  *  - Sky:          none of it; ignored.
  *  - Transparent:  all of it (blending, depth write, culling).
+ *  - Fxaa:         none of it; ignored.
  *
  * `depthPrepassed` says the depth buffer already holds the opaque surfaces.
  */

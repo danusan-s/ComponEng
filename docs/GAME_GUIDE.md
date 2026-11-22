@@ -550,6 +550,23 @@ partly on screen:
 material.setBoundsPadding(2.0f);   // metres, on every side
 ```
 
+#### Anti-aliasing
+
+Edges are smoothed with FXAA, on by default. The scene is drawn into an
+off-screen target the size of the window's viewport and then copied to the
+window through the `fxaa` shader (`assets/shaders/fxaa.*`, loaded by the render
+plugin). It works the same on OpenGL and Vulkan, costs one extra full-screen
+pass, and also softens edges multisampling would miss, such as alpha-tested
+leaves. The debug UI is drawn afterwards, so it stays sharp.
+
+```cpp
+auto &settings = world.getResource<resources::RenderSettings>();
+settings.antiAliasing = resources::AntiAliasing::None;  // draw straight to the window
+```
+
+It can be changed while the game runs, from code or from the debug UI's
+"Settings" tab, which also switches the depth pre-pass and LOD dithering.
+
 #### The sky
 
 Add a `SkyboxComponent` to any entity. The first one found is drawn behind

@@ -320,6 +320,56 @@ protected:
   uint32_t m_height = 0;
 };
 
+/** A size in pixels. */
+struct Extent {
+  uint32_t width = 0;
+  uint32_t height = 0;
+
+  bool operator==(const Extent &o) const {
+    return width == o.width && height == o.height;
+  }
+  bool operator!=(const Extent &o) const {
+    return !(*this == o);
+  }
+};
+
+struct RenderTargetDesc {
+  uint32_t width = 0;
+  uint32_t height = 0;
+};
+
+/**
+ * @brief An off-screen image the device can draw into instead of the window:
+ * an RGBA8 colour attachment plus a depth buffer.
+ *
+ * Made with IRenderDevice::createRenderTarget, drawn into after
+ * setRenderTarget(), and read back by sampling its colour texture.
+ */
+class IRenderTarget {
+public:
+  virtual ~IRenderTarget() = default;
+
+  /**
+   * The colour attachment as a texture (linear filtered, clamped, no mips).
+   * Sample it with ITexture::bind() once the target is no longer the one being
+   * drawn into. Sampled like any other texture: v = 0 is the bottom of the
+   * picture in every backend. Fetch it again each frame: a backend may rotate
+   * the images behind it.
+   */
+  virtual ITexture &colorTexture() = 0;
+
+  uint32_t width() const {
+    return m_width;
+  }
+  uint32_t height() const {
+    return m_height;
+  }
+
+protected:
+  uint32_t m_width = 0;
+  uint32_t m_height = 0;
+};
+
 /**
  * @brief API-agnostic mesh interface.
  *
@@ -403,7 +453,11 @@ public:
   /** Set the scissor rectangle. */
   virtual void setScissor(int x, int y, int w, int h) = 0;
 
-  /** Clear color and depth buffers. */
+  /** The window area drawn into, as last given to setViewport (the whole
+   *  window before the first call). A render target the same size shows 1:1. */
+  virtual Extent viewportExtent() const = 0;
+
+  /** Clear color and depth buffers of whatever is being drawn into. */
   virtual void clear(float r, float g, float b, float a) = 0;
 
   /** Present the rendered frame. */
@@ -471,6 +525,21 @@ public:
   virtual std::unique_ptr<ITexture> createTexture() = 0;
   virtual std::unique_ptr<IMesh> createMesh() = 0;
   virtual std::unique_ptr<IBuffer> createBuffer() = 0;
+
+  /** A colour + depth target of the given size. Its contents are undefined at
+   *  the start of every frame: clear it before drawing. */
+  virtual std::unique_ptr<IRenderTarget>
+  createRenderTarget(const RenderTargetDesc &desc) = 0;
+
+  /**
+   * Draw into `target` from now on; nullptr goes back to the window.
+   *
+   * While a target is bound, viewport and scissor cover all of it, whatever
+   * setViewport and setScissor were last given; those apply again on return.
+   * A target must not be sampled while it is bound. Anything the frame needs
+   * on the window (the debug UI, present) expects the window to be bound.
+   */
+  virtual void setRenderTarget(IRenderTarget *target) = 0;
 
   /** Apply pipeline state. Cheap to call every draw: only the differences
    *  from the current state reach the graphics API. */

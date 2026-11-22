@@ -14,9 +14,10 @@ enum class PassId : int {
   Opaque,       // opaque and cutout batches, shaded
   Sky,          // the full-screen sky triangle
   Transparent,  // blended / depth-less batches
+  Fxaa,         // full-screen anti-aliasing of the finished scene
 };
 
-constexpr std::size_t kPassCount = 4;
+constexpr std::size_t kPassCount = 5;
 
 constexpr const char *passName(PassId pass) {
   switch (pass) {
@@ -28,6 +29,8 @@ constexpr const char *passName(PassId pass) {
       return "Sky";
     case PassId::Transparent:
       return "Transparent";
+    case PassId::Fxaa:
+      return "FXAA";
   }
   return "?";
 }

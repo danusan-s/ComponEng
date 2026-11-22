@@ -450,6 +450,7 @@ void VulkanRenderDevice::shutdown() {
   m_timer.shutdown();
   m_shader = nullptr;
   m_mesh = nullptr;
+  m_target = nullptr;
   m_whiteTexture.reset();
   m_dummyBuffer.reset();
   for (auto &entry : m_pipelines)
@@ -548,9 +549,16 @@ bool VulkanRenderDevice::ensureFrame() {
   return true;
 }
 
+VkExtent2D VulkanRenderDevice::currentExtent() const {
+  return m_target ? VkExtent2D{m_target->width(), m_target->height()}
+                  : m_extent;
+}
+
 void VulkanRenderDevice::beginPass(bool colorOnly) {
+  VulkanRenderTarget::Slot *target =
+      m_target ? &m_target->slot(m_slot) : nullptr;
   VkRenderingAttachmentInfo color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  color.imageView = m_imageViews[m_imageIndex];
+  color.imageView = target ? target->colorView : m_imageViews[m_imageIndex];
   color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   const bool clearColor = (m_clearPending && !colorOnly) || !m_colorInitialised;
   color.loadOp = clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -560,7 +568,7 @@ void VulkanRenderDevice::beginPass(bool colorOnly) {
     color.clearValue.color.float32[i] = useClearColor ? m_clearColor[i] : (i == 3 ? 1.0f : 0.0f);
 
   VkRenderingAttachmentInfo depth{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-  depth.imageView = m_depth[m_slot].view;
+  depth.imageView = target ? target->depthView : m_depth[m_slot].view;
   depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
   depth.loadOp = (m_clearPending || !m_depthInitialised)
                      ? VK_ATTACHMENT_LOAD_OP_CLEAR
@@ -569,7 +577,7 @@ void VulkanRenderDevice::beginPass(bool colorOnly) {
   depth.clearValue.depthStencil = {1.0f, 0};
 
   VkRenderingInfo ri{VK_STRUCTURE_TYPE_RENDERING_INFO};
-  ri.renderArea = {{0, 0}, m_extent};
+  ri.renderArea = {{0, 0}, currentExtent()};
   ri.layerCount = 1;
   ri.colorAttachmentCount = 1;
   ri.pColorAttachments = &color;
@@ -626,7 +634,25 @@ void VulkanRenderDevice::setScissor(int x, int y, int w, int h) {
   m_scissorSet = true;
 }
 
+api::Extent VulkanRenderDevice::viewportExtent() const {
+  if (m_viewportSet && m_viewport[2] > 0 && m_viewport[3] > 0)
+    return {static_cast<uint32_t>(m_viewport[2]),
+            static_cast<uint32_t>(m_viewport[3])};
+  return {m_extent.width, m_extent.height};
+}
+
 void VulkanRenderDevice::recordViewportAndScissor() {
+  if (m_target) {
+    // Not flipped: row 0 of the image is the bottom of the picture, as in a GL
+    // framebuffer texture, so a shader samples it like any other texture.
+    const float w = static_cast<float>(m_target->width());
+    const float h = static_cast<float>(m_target->height());
+    const VkViewport vp{0.0f, 0.0f, w, h, 0.0f, 1.0f};
+    vkCmdSetViewport(m_cmd, 0, 1, &vp);
+    const VkRect2D rect{{0, 0}, {m_target->width(), m_target->height()}};
+    vkCmdSetScissor(m_cmd, 0, 1, &rect);
+    return;
+  }
   const float fbh = static_cast<float>(m_extent.height);
   float x = 0, y = 0, w = static_cast<float>(m_extent.width), h = fbh;
   if (m_viewportSet) {
@@ -668,7 +694,86 @@ void VulkanRenderDevice::clear(float r, float g, float b, float a) {
   m_clearPending = true;
 }
 
+void VulkanRenderDevice::setRenderTarget(api::IRenderTarget *target) {
+  auto *next = static_cast<VulkanRenderTarget *>(target);
+  if (next && !next->valid())
+    next = nullptr;
+  if (next == m_target)
+    return;
+  if (!ensureFrame()) {
+    m_target = next;
+    return;
+  }
+  endRendering();
+
+  if (m_target) {
+    // Done drawing: what was drawn is sampled from here on.
+    VulkanRenderTarget::Slot &s = m_target->slot(m_slot);
+    s.colorInitialised = m_colorInitialised;
+    s.depthInitialised = m_depthInitialised;
+    transitionImage(m_cmd, s.color.image, s.colorLayout,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 1,
+                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_READ_BIT);
+    s.colorLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  } else {
+    m_windowColorInitialised = m_colorInitialised;
+    m_windowDepthInitialised = m_depthInitialised;
+  }
+
+  m_target = next;
+
+  if (!m_target) {
+    m_colorInitialised = m_windowColorInitialised;
+    m_depthInitialised = m_windowDepthInitialised;
+    return;
+  }
+
+  VulkanRenderTarget::Slot &s = m_target->slot(m_slot);
+  const uint64_t serial = m_core->recordingSerial;
+  if (s.frameSerial != serial) {
+    // First use this frame. The frame that last used this slot has finished
+    // (ensureFrame waited for it), so nothing needs to be waited for.
+    s.frameSerial = serial;
+    s.colorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    s.colorInitialised = false;
+    s.depthInitialised = false;
+    transitionImage(m_cmd, s.depth.image, VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, 0, 1,
+                    VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+                        VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                    0,
+                    VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+                        VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                    VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+                    VK_IMAGE_ASPECT_DEPTH_BIT);
+  }
+  if (s.colorLayout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+    const bool fresh = s.colorLayout == VK_IMAGE_LAYOUT_UNDEFINED;
+    transitionImage(m_cmd, s.color.image, s.colorLayout,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, 1,
+                    fresh ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+                          : VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    fresh ? 0 : VK_ACCESS_2_SHADER_READ_BIT,
+                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
+    s.colorLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  }
+  m_colorInitialised = s.colorInitialised;
+  m_depthInitialised = s.depthInitialised;
+}
+
+std::unique_ptr<api::IRenderTarget>
+VulkanRenderDevice::createRenderTarget(const api::RenderTargetDesc &desc) {
+  return std::make_unique<VulkanRenderTarget>(this, m_core, desc, m_swapFormat,
+                                              m_depthFormat);
+}
+
 void VulkanRenderDevice::present(void * /*windowHandle*/) {
+  setRenderTarget(nullptr);
   if (!m_frameActive && !ensureFrame())
     return;
   ensureRendering(); // guarantees the image was cleared even if nothing drew
@@ -868,7 +973,8 @@ VkPipeline VulkanRenderDevice::pipelineFor(const VulkanShader &shader,
   const VkDynamicState dynamics[] = {
       VK_DYNAMIC_STATE_VIEWPORT,           VK_DYNAMIC_STATE_SCISSOR,
       VK_DYNAMIC_STATE_CULL_MODE,          VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,
-      VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE, VK_DYNAMIC_STATE_DEPTH_COMPARE_OP};
+      VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE, VK_DYNAMIC_STATE_DEPTH_COMPARE_OP,
+      VK_DYNAMIC_STATE_FRONT_FACE};
   VkPipelineDynamicStateCreateInfo dynamic{
       VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
   dynamic.dynamicStateCount = sizeof(dynamics) / sizeof(dynamics[0]);
@@ -1092,6 +1198,10 @@ bool VulkanRenderDevice::draw(bool indexed, uint32_t count, uint32_t instanceCou
   else if (m_state.cull == api::CullMode::Front)
     cull = VK_CULL_MODE_FRONT_BIT;
   vkCmdSetCullMode(m_cmd, cull);
+  // A render target is drawn unflipped (see recordViewportAndScissor), which
+  // mirrors the winding.
+  vkCmdSetFrontFace(m_cmd, m_target ? VK_FRONT_FACE_CLOCKWISE
+                                    : VK_FRONT_FACE_COUNTER_CLOCKWISE);
   vkCmdSetDepthTestEnable(m_cmd, m_state.depthTest ? VK_TRUE : VK_FALSE);
   vkCmdSetDepthWriteEnable(m_cmd, m_state.depthWrite ? VK_TRUE : VK_FALSE);
   VkCompareOp op = VK_COMPARE_OP_LESS;
@@ -1167,6 +1277,7 @@ void VulkanRenderDevice::imguiRender() {
   if (!ensureFrame())
     return;
   // The UI goes on top of the finished scene in a colour-only pass.
+  setRenderTarget(nullptr);
   endRendering();
   beginPass(/*colorOnly=*/true);
   ImGui_ImplVulkan_RenderDrawData(data, m_cmd);

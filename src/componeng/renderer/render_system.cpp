@@ -6,6 +6,7 @@
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
 #include "componeng/renderer/pass/depth_prepass.hpp"
+#include "componeng/renderer/pass/fxaa_pass.hpp"
 #include "componeng/renderer/pass/opaque_pass.hpp"
 #include "componeng/renderer/pass/sky_pass.hpp"
 #include "componeng/renderer/pass/transparent_pass.hpp"
@@ -13,6 +14,7 @@
 #include "componeng/renderer/pipeline/pass_profiler.hpp"
 #include "componeng/resources/render_settings.hpp"
 #include "componeng/resources/render_stats.hpp"
+#include "componeng/utils/logger.hpp"
 
 namespace componeng::renderer {
 
@@ -34,13 +36,53 @@ void RenderSystem::onCreate(const ecs::SystemState &state) {
   m_pipeline.add(std::make_unique<DepthPrepass>())
       .add(std::make_unique<OpaquePass>())
       .add(std::make_unique<SkyPass>())
-      .add(std::make_unique<TransparentPass>());
+      .add(std::make_unique<TransparentPass>())
+      .add(std::make_unique<FxaaPass>());
+}
+
+void RenderSystem::onDestroy(const ecs::SystemState &) {
+  // GPU objects have to go before the render device does.
+  m_sceneTarget.reset();
+}
+
+api::IRenderTarget *RenderSystem::sceneTargetFor(ecs::World &world) {
+  const bool wanted =
+      world.hasResource<resources::RenderSettings>() &&
+      world.getResource<resources::RenderSettings>().antiAliasing ==
+          resources::AntiAliasing::Fxaa;
+  const auto &assets = world.getResource<AssetManager>();
+  if (wanted && !assets.shaderExists("fxaa")) {
+    if (!m_warnedMissingFxaa) {
+      LOG_ERROR("Anti-aliasing is on but there is no \"fxaa\" shader");
+      m_warnedMissingFxaa = true;
+    }
+    m_sceneTarget.reset();
+    return nullptr;
+  }
+  if (!wanted) {
+    m_sceneTarget.reset();
+    return nullptr;
+  }
+
+  api::IRenderDevice &device = world.getRenderDevice();
+  const api::Extent size = device.viewportExtent();
+  if (size.width == 0 || size.height == 0) {
+    return nullptr;
+  }
+  if (!m_sceneTarget || m_sceneTarget->width() != size.width ||
+      m_sceneTarget->height() != size.height) {
+    m_sceneTarget = device.createRenderTarget({size.width, size.height});
+    LOG_INFO("Scene render target: %ux%u", size.width, size.height);
+  }
+  return m_sceneTarget.get();
 }
 
 void RenderSystem::onUpdate(const ecs::SystemState &state) {
   ecs::World &world = *state.world;
   api::IRenderDevice &device = world.getRenderDevice();
   device.setRenderState(api::RenderState{});
+  api::IRenderTarget *sceneTarget = sceneTargetFor(world);
+  device.setRenderTarget(sceneTarget);
   device.clear(0.0f, 0.0f, 0.0f, 1.0f);
 
   const ecs::EntityID camera = world.getResource<camera::MainCamera>().entity;
@@ -65,10 +107,14 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   const bool prepassed = depthPrepassEnabled(world) && queue.opaqueCount() > 0;
 
   const PassContext ctx{
-      world,       camera,   device,   world.getResource<AssetManager>(),
-      m_frame,     profiler, stats,    queue,
-      m_instances, m_binder, prepassed};
+      world,       camera,   device,    world.getResource<AssetManager>(),
+      m_frame,     profiler, stats,     queue,
+      m_instances, m_binder, prepassed, sceneTarget};
   m_pipeline.execute(ctx);
+
+  // FxaaPass has gone back to the window; this covers a frame that stopped
+  // short of it.
+  device.setRenderTarget(nullptr);
 }
 
 } // namespace componeng::renderer

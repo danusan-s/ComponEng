@@ -6,7 +6,7 @@
 namespace componeng::renderer {
 
 void TransparentPass::execute(const PassContext &ctx) {
-  drawBatches(ctx, id(), ctx.queue.opaqueCount(), ctx.queue.size());
+  drawBatches(ctx, this->id(), ctx.queue.opaqueCount(), ctx.queue.size());
 }
 
 } // namespace componeng::renderer

@@ -6,7 +6,7 @@
 namespace componeng::renderer {
 
 void DepthPrepass::execute(const PassContext &ctx) {
-  drawBatches(ctx, id(), 0, ctx.queue.opaqueCount());
+  drawBatches(ctx, this->id(), 0, ctx.queue.opaqueCount());
 }
 
 } // namespace componeng::renderer

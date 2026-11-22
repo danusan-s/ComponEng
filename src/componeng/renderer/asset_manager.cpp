@@ -30,6 +30,10 @@ const Shader &AssetManager::getShader(core::HandleID id) const {
   return *m_shaderResources.at(id - 1);
 }
 
+bool AssetManager::shaderExists(core::Name name) const {
+  return m_shaders.find(name) != m_shaders.end();
+}
+
 core::HandleID AssetManager::getShaderID(core::Name name) const {
   if (m_shaders.find(name) == m_shaders.end()) {
     LOG_ERROR("Shader not found: %s", name.c_str());

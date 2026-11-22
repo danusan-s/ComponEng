@@ -20,7 +20,8 @@ class PassProfiler;
 class RenderQueue;
 namespace api {
 class IRenderDevice;
-}
+class IRenderTarget;
+} // namespace api
 
 /**
  * @brief What every pass of a frame needs, gathered so a pass takes one
@@ -44,6 +45,10 @@ struct PassContext {
   /** A depth pre-pass runs this frame, so the opaque pass shades only the
    *  nearest surface of each pixel (see renderStateFor). */
   bool depthPrepassed;
+  /** The off-screen target the scene is drawn into this frame, for a pass
+   *  that post-processes it onto the window; null when the scene is drawn
+   *  straight to the window. */
+  api::IRenderTarget *sceneTarget;
 };
 
 } // namespace componeng::renderer

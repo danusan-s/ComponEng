@@ -7,6 +7,7 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
 
+#include <algorithm>
 #include <cstdint>
 
 namespace componeng::renderer::opengl {
@@ -186,11 +187,51 @@ void GLRenderDevice::bindUniformBuffer(uint32_t binding, api::IBuffer &buffer) {
 }
 
 void GLRenderDevice::setViewport(int x, int y, int w, int h) {
-  glViewport(x, y, w, h);
+  m_viewport[0] = x;
+  m_viewport[1] = y;
+  m_viewport[2] = w;
+  m_viewport[3] = h;
+  if (!m_target) {
+    glViewport(x, y, w, h);
+  }
 }
 
 void GLRenderDevice::setScissor(int x, int y, int w, int h) {
-  glScissor(x, y, w, h);
+  m_scissor[0] = x;
+  m_scissor[1] = y;
+  m_scissor[2] = w;
+  m_scissor[3] = h;
+  if (!m_target) {
+    glScissor(x, y, w, h);
+  }
+}
+
+api::Extent GLRenderDevice::viewportExtent() const {
+  return {static_cast<uint32_t>(std::max(0, m_viewport[2])),
+          static_cast<uint32_t>(std::max(0, m_viewport[3]))};
+}
+
+std::unique_ptr<api::IRenderTarget>
+GLRenderDevice::createRenderTarget(const api::RenderTargetDesc &desc) {
+  return std::make_unique<GLRenderTarget>(desc);
+}
+
+void GLRenderDevice::setRenderTarget(api::IRenderTarget *target) {
+  if (target == m_target) {
+    return;
+  }
+  m_target = static_cast<const GLRenderTarget *>(target);
+  if (m_target) {
+    const GLsizei w = static_cast<GLsizei>(m_target->width());
+    const GLsizei h = static_cast<GLsizei>(m_target->height());
+    glBindFramebuffer(GL_FRAMEBUFFER, m_target->framebuffer());
+    glViewport(0, 0, w, h);
+    glScissor(0, 0, w, h);
+  } else {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+    glScissor(m_scissor[0], m_scissor[1], m_scissor[2], m_scissor[3]);
+  }
 }
 
 void GLRenderDevice::setActiveTextureUnit(uint32_t unit) {

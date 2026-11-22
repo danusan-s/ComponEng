@@ -27,6 +27,7 @@ bool addSection(const std::string &label);
 bool beginTab(const std::string &label);
 void endTab();
 void addSlider(const std::string &label, float *v, float min, float max);
+bool addCheckbox(const std::string &label, bool *v);
 } // namespace detail
 
 /**
@@ -58,6 +59,13 @@ template <bool Active> struct PanelApi {
                         float max) {
     if constexpr (Active)
       detail::addSlider(label, v, min, max);
+  }
+
+  /** A checkbox bound to `*v`. Returns true on the frame it was clicked. */
+  static bool addCheckbox(const std::string &label, bool *v) {
+    if constexpr (Active)
+      return detail::addCheckbox(label, v);
+    return false;
   }
 
   /** Starts a collapsible group (open by default); the add* calls that follow

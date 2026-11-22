@@ -155,6 +155,12 @@ void addSlider(const std::string &label, float *v, float min, float max) {
   ImGui::SliderFloat(label.c_str(), v, min, max);
 }
 
+bool addCheckbox(const std::string &label, bool *v) {
+  if (!s_frameActive)
+    return false;
+  return ImGui::Checkbox(label.c_str(), v);
+}
+
 } // namespace detail
 
 } // namespace componeng::core

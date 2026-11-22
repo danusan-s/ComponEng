@@ -36,6 +36,14 @@ api::RenderState renderStateFor(api::PassId pass,
 
     case api::PassId::Transparent:
       return material;
+
+    case api::PassId::Fxaa:
+      // A full-screen copy onto the window: nothing to test, write or blend.
+      s.cull = api::CullMode::None;
+      s.depthTest = false;
+      s.depthWrite = false;
+      s.blend = api::BlendMode::None;
+      return s;
   }
   return s;
 }

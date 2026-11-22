@@ -940,9 +940,10 @@ TEST(GpuPassTimers, EachPassIsBracketedAroundItsOwnDraws) {
   EXPECT_EQ(s->rec().gpuPassEvents,
             (std::vector<std::string>{
                 "begin Depth pre-pass", "indexed", "end Depth pre-pass",
-                "begin Opaque", "indexed", "end Opaque", //
-                "begin Sky", "fullscreen", "end Sky",    //
-                "begin Transparent", "indexed", "end Transparent"}));
+                "begin Opaque", "indexed", "end Opaque",           //
+                "begin Sky", "fullscreen", "end Sky",              //
+                "begin Transparent", "indexed", "end Transparent", //
+                "begin FXAA", "end FXAA"}));
 }
 
 TEST(GpuPassTimers, EmptyPassesAreStillBracketed) {
@@ -954,10 +955,10 @@ TEST(GpuPassTimers, EmptyPassesAreStillBracketed) {
 
   // So a pass that did nothing reads ~0 instead of keeping an old value.
   EXPECT_EQ(s->rec().gpuPassEvents,
-            (std::vector<std::string>{"begin Depth pre-pass",
-                                      "end Depth pre-pass", "begin Opaque",
-                                      "end Opaque", "begin Sky", "end Sky",
-                                      "begin Transparent", "end Transparent"}));
+            (std::vector<std::string>{
+                "begin Depth pre-pass", "end Depth pre-pass", "begin Opaque",
+                "end Opaque", "begin Sky", "end Sky", "begin Transparent",
+                "end Transparent", "begin FXAA", "end FXAA"}));
 }
 
 // LOD cross-fade
@@ -1110,4 +1111,134 @@ TEST(LodFadeBatching, ABatchWithNoFadingInstanceKeepsTheEmptyPrepassShader) {
   const auto &draws = s->rec().draws;
   ASSERT_EQ(draws.size(), 2u);
   EXPECT_FALSE(hasMacro(s->rec().fragmentSources.at(draws[0].shaderId)));
+}
+
+// Anti-aliasing
+
+namespace {
+// The "fxaa" shader is shader id 3 in these scenes.
+constexpr int kFxaaShader = 3;
+
+std::unique_ptr<Scene> makeFxaaScene(resources::AntiAliasing mode) {
+  auto s = makeScene();
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "fxaa");
+  s->world->getResource<resources::RenderSettings>().antiAliasing = mode;
+  return s;
+}
+
+int fxaaDrawsOnWindow(Scene &s) {
+  int n = 0;
+  for (const auto &d : s.rec().fullscreenDraws) {
+    n += d.shaderId == kFxaaShader && d.targetId == 0;
+  }
+  return n;
+}
+} // namespace
+
+TEST(AntiAliasing, NoTargetAndNoPassWhenOff) {
+  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_TRUE(s->rec().createdTargets.empty());
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  EXPECT_EQ(s->rec().draws[0].targetId, 0);
+  EXPECT_TRUE(s->rec().fullscreenDraws.empty());
+  EXPECT_EQ(statsOf(*s).of(api::PassId::Fxaa).drawCalls, 0);
+}
+
+TEST(AntiAliasing, IsOffWithoutAFxaaShader) {
+  auto s = makeScene();
+  s->world->getResource<resources::RenderSettings>().antiAliasing =
+      resources::AntiAliasing::Fxaa;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_TRUE(s->rec().createdTargets.empty());
+  EXPECT_EQ(s->rec().draws[0].targetId, 0);
+}
+
+TEST(AntiAliasing, SceneGoesToATargetTheSizeOfTheViewport) {
+  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  s->rec().viewport = {1000, 500};
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().createdTargets.size(), 1u);
+  const auto &target = s->rec().createdTargets[0];
+  EXPECT_EQ(target.width, 1000u);
+  EXPECT_EQ(target.height, 500u);
+  ASSERT_EQ(s->rec().draws.size(), 1u);
+  EXPECT_EQ(s->rec().draws[0].targetId, target.id);
+  // Cleared where it is drawn: the target, not the window.
+  ASSERT_FALSE(s->rec().clearTargetIds.empty());
+  EXPECT_EQ(s->rec().clearTargetIds[0], target.id);
+}
+
+TEST(AntiAliasing, FxaaCopiesTheTargetOntoTheWindowLast) {
+  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
+  s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().createdTargets.size(), 1u);
+  const auto &target = s->rec().createdTargets[0];
+
+  // The sky is part of the scene; FXAA is the one full-screen draw on the
+  // window, after everything.
+  ASSERT_EQ(s->rec().fullscreenDraws.size(), 2u);
+  EXPECT_EQ(s->rec().fullscreenDraws[0].targetId, target.id);
+  const auto &fxaa = s->rec().fullscreenDraws[1];
+  EXPECT_EQ(fxaa.shaderId, kFxaaShader);
+  EXPECT_EQ(fxaa.targetId, 0);
+  EXPECT_EQ(s->rec().drawSequence.back(), "fullscreen");
+
+  // It reads the target's colour on unit 0 and draws with no depth or blend.
+  EXPECT_EQ(fxaa.textureUnits.at(0), target.colorTextureId);
+  EXPECT_FALSE(fxaa.state.depthTest);
+  EXPECT_FALSE(fxaa.state.depthWrite);
+  EXPECT_EQ(fxaa.state.blend, api::BlendMode::None);
+  EXPECT_EQ(fxaa.state.cull, api::CullMode::None);
+
+  EXPECT_EQ(s->rec().targetBinds.back(), 0);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::Fxaa).drawCalls, 1);
+}
+
+TEST(AntiAliasing, TargetIsKeptAcrossFramesAndRemadeWhenTheViewportChanges) {
+  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  s->spawn("tri", "matA");
+  s->frame();
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.size(), 1u);
+
+  s->rec().viewport = {640, 360};
+  s->frame();
+  ASSERT_EQ(s->rec().createdTargets.size(), 2u);
+  EXPECT_EQ(s->rec().createdTargets[1].width, 640u);
+  EXPECT_EQ(s->rec().createdTargets[1].height, 360u);
+}
+
+TEST(AntiAliasing, TurningItOffDrawsStraightToTheWindowAgain) {
+  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  s->spawn("tri", "matA");
+  s->frame();
+  EXPECT_EQ(fxaaDrawsOnWindow(*s), 1);
+
+  s->world->getResource<resources::RenderSettings>().antiAliasing =
+      resources::AntiAliasing::None;
+  s->frame();
+
+  EXPECT_EQ(fxaaDrawsOnWindow(*s), 1) << "no second FXAA draw";
+  EXPECT_EQ(s->rec().draws.back().targetId, 0);
+  EXPECT_EQ(s->rec().targetBinds.back(), 0);
+}
+
+TEST(AntiAliasing, EveryFrameEndsOnTheWindow) {
+  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  s->spawn("tri", "matA");
+  for (int i = 0; i < 3; ++i) {
+    s->frame();
+    EXPECT_EQ(s->rec().currentTarget, 0) << "frame " << i;
+  }
 }
