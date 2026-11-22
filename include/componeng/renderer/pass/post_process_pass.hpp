@@ -6,19 +6,19 @@
 namespace componeng::renderer {
 
 /**
- * @brief Copies the finished scene from the off-screen target onto the window
- * through the "fxaa" shader, which smooths the edges on the way
- * (PassContext::fxaa), or, with FXAA off, only scales it to the window's size
- * (a render scale other than 1).
+ * @brief The last pass: copies the finished scene from the off-screen target
+ * onto the window through the "post_process" shader. The shader smooths the
+ * edges on the way (FXAA, PassContext::fxaa), or, with FXAA off, only scales
+ * the scene to the window's size (a render scale other than 1).
  *
  * RenderSystem draws every earlier pass into PassContext::sceneTarget; this
  * pass switches back to the window and draws one full-screen triangle that
  * samples it. It runs only when there is a scene target.
  */
-class FxaaPass final : public RenderPass {
+class PostProcessPass final : public RenderPass {
 public:
   api::PassId id() const override {
-    return api::PassId::Fxaa;
+    return api::PassId::PostProcess;
   }
   bool enabled(const PassContext &ctx) const override {
     return ctx.sceneTarget != nullptr;

@@ -13,8 +13,9 @@ namespace componeng::renderer {
 /**
  * @brief Presentation-phase system that draws the frame from the RenderQueue
  * BatchingSystem built: depth pre-pass, opaque, sky, transparent and then
- * FXAA, in that order. With anti-aliasing on, everything before FXAA goes into
- * an off-screen target that FXAA copies onto the window.
+ * the post-process pass, in that order. With anti-aliasing on or a render scale
+ * other than 1, everything before the post-process pass goes into an
+ * off-screen target that it copies onto the window.
  *
  * It builds the RenderPipeline once (onCreate), and each frame gathers the
  * per-frame values, uploads the instance data and runs the pipeline. What each
@@ -48,7 +49,7 @@ private:
 
   RenderPipeline m_pipeline;
   std::unique_ptr<api::IRenderTarget> m_sceneTarget;
-  bool m_warnedMissingFxaa = false;
+  bool m_warnedMissingPostProcess = false;
   // These live across frames because they own GPU buffers, or remember what
   // was already reported.
   FrameUniforms m_frame;

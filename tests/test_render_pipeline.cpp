@@ -943,7 +943,7 @@ TEST(GpuPassTimers, EachPassIsBracketedAroundItsOwnDraws) {
                 "begin Opaque", "indexed", "end Opaque",           //
                 "begin Sky", "fullscreen", "end Sky",              //
                 "begin Transparent", "indexed", "end Transparent", //
-                "begin FXAA", "end FXAA"}));
+                "begin Post-process", "end Post-process"}));
 }
 
 TEST(GpuPassTimers, EmptyPassesAreStillBracketed) {
@@ -958,7 +958,7 @@ TEST(GpuPassTimers, EmptyPassesAreStillBracketed) {
             (std::vector<std::string>{
                 "begin Depth pre-pass", "end Depth pre-pass", "begin Opaque",
                 "end Opaque", "begin Sky", "end Sky", "begin Transparent",
-                "end Transparent", "begin FXAA", "end FXAA"}));
+                "end Transparent", "begin Post-process", "end Post-process"}));
 }
 
 // LOD cross-fade
@@ -1116,27 +1116,27 @@ TEST(LodFadeBatching, ABatchWithNoFadingInstanceKeepsTheEmptyPrepassShader) {
 // Anti-aliasing
 
 namespace {
-// The "fxaa" shader is shader id 3 in these scenes.
-constexpr int kFxaaShader = 3;
+// The "post_process" shader is shader id 3 in these scenes.
+constexpr int kPostProcessShader = 3;
 
-std::unique_ptr<Scene> makeFxaaScene(resources::AntiAliasing mode) {
+std::unique_ptr<Scene> makePostProcessScene(resources::AntiAliasing mode) {
   auto s = makeScene();
-  s->assets().loadShader("none.vert", "none.frag", nullptr, "fxaa");
+  s->assets().loadShader("none.vert", "none.frag", nullptr, "post_process");
   s->world->getResource<resources::RenderSettings>().antiAliasing = mode;
   return s;
 }
 
-int fxaaDrawsOnWindow(Scene &s) {
+int postProcessDrawsOnWindow(Scene &s) {
   int n = 0;
   for (const auto &d : s.rec().fullscreenDraws) {
-    n += d.shaderId == kFxaaShader && d.targetId == 0;
+    n += d.shaderId == kPostProcessShader && d.targetId == 0;
   }
   return n;
 }
 } // namespace
 
 TEST(AntiAliasing, NoTargetAndNoPassWhenOff) {
-  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
   s->spawn("tri", "matA");
   s->frame();
 
@@ -1144,10 +1144,10 @@ TEST(AntiAliasing, NoTargetAndNoPassWhenOff) {
   ASSERT_EQ(s->rec().draws.size(), 1u);
   EXPECT_EQ(s->rec().draws[0].targetId, 0);
   EXPECT_TRUE(s->rec().fullscreenDraws.empty());
-  EXPECT_EQ(statsOf(*s).of(api::PassId::Fxaa).drawCalls, 0);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::PostProcess).drawCalls, 0);
 }
 
-TEST(AntiAliasing, IsOffWithoutAFxaaShader) {
+TEST(AntiAliasing, IsOffWithoutAPostProcessShader) {
   auto s = makeScene();
   s->world->getResource<resources::RenderSettings>().antiAliasing =
       resources::AntiAliasing::Fxaa;
@@ -1159,7 +1159,7 @@ TEST(AntiAliasing, IsOffWithoutAFxaaShader) {
 }
 
 TEST(AntiAliasing, SceneGoesToATargetTheSizeOfTheViewport) {
-  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
   s->rec().viewport = {1000, 500};
   s->spawn("tri", "matA");
   s->frame();
@@ -1175,8 +1175,8 @@ TEST(AntiAliasing, SceneGoesToATargetTheSizeOfTheViewport) {
   EXPECT_EQ(s->rec().clearTargetIds[0], target.id);
 }
 
-TEST(AntiAliasing, FxaaCopiesTheTargetOntoTheWindowLast) {
-  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+TEST(AntiAliasing, PostProcessCopiesTheTargetOntoTheWindowLast) {
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
   s->assets().loadShader("none.vert", "none.frag", nullptr, "skybox");
   s->world->addComponents(s->world->createEntity(), SkyboxComponent{});
   s->spawn("tri", "matA");
@@ -1190,7 +1190,7 @@ TEST(AntiAliasing, FxaaCopiesTheTargetOntoTheWindowLast) {
   ASSERT_EQ(s->rec().fullscreenDraws.size(), 2u);
   EXPECT_EQ(s->rec().fullscreenDraws[0].targetId, target.id);
   const auto &fxaa = s->rec().fullscreenDraws[1];
-  EXPECT_EQ(fxaa.shaderId, kFxaaShader);
+  EXPECT_EQ(fxaa.shaderId, kPostProcessShader);
   EXPECT_EQ(fxaa.targetId, 0);
   EXPECT_EQ(s->rec().drawSequence.back(), "fullscreen");
 
@@ -1202,11 +1202,11 @@ TEST(AntiAliasing, FxaaCopiesTheTargetOntoTheWindowLast) {
   EXPECT_EQ(fxaa.state.cull, api::CullMode::None);
 
   EXPECT_EQ(s->rec().targetBinds.back(), 0);
-  EXPECT_EQ(statsOf(*s).of(api::PassId::Fxaa).drawCalls, 1);
+  EXPECT_EQ(statsOf(*s).of(api::PassId::PostProcess).drawCalls, 1);
 }
 
 TEST(AntiAliasing, TargetIsKeptAcrossFramesAndRemadeWhenTheViewportChanges) {
-  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
   s->spawn("tri", "matA");
   s->frame();
   s->frame();
@@ -1220,22 +1220,22 @@ TEST(AntiAliasing, TargetIsKeptAcrossFramesAndRemadeWhenTheViewportChanges) {
 }
 
 TEST(AntiAliasing, TurningItOffDrawsStraightToTheWindowAgain) {
-  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
   s->spawn("tri", "matA");
   s->frame();
-  EXPECT_EQ(fxaaDrawsOnWindow(*s), 1);
+  EXPECT_EQ(postProcessDrawsOnWindow(*s), 1);
 
   s->world->getResource<resources::RenderSettings>().antiAliasing =
       resources::AntiAliasing::None;
   s->frame();
 
-  EXPECT_EQ(fxaaDrawsOnWindow(*s), 1) << "no second FXAA draw";
+  EXPECT_EQ(postProcessDrawsOnWindow(*s), 1) << "no second FXAA draw";
   EXPECT_EQ(s->rec().draws.back().targetId, 0);
   EXPECT_EQ(s->rec().targetBinds.back(), 0);
 }
 
 TEST(AntiAliasing, EveryFrameEndsOnTheWindow) {
-  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
   s->spawn("tri", "matA");
   for (int i = 0; i < 3; ++i) {
     s->frame();
@@ -1243,23 +1243,23 @@ TEST(AntiAliasing, EveryFrameEndsOnTheWindow) {
   }
 }
 
-TEST(AntiAliasing, FxaaPassTellsTheShaderWhetherToSmooth) {
-  auto on = makeFxaaScene(resources::AntiAliasing::Fxaa);
+TEST(AntiAliasing, PostProcessPassTellsTheShaderWhetherToSmooth) {
+  auto on = makePostProcessScene(resources::AntiAliasing::Fxaa);
   on->spawn("tri", "matA");
   on->frame();
-  EXPECT_EQ(on->rec().floatUniforms[kFxaaShader].at("fxaaOn"), 1.0f);
+  EXPECT_EQ(on->rec().floatUniforms[kPostProcessShader].at("fxaaOn"), 1.0f);
 
-  auto scaled = makeFxaaScene(resources::AntiAliasing::None);
+  auto scaled = makePostProcessScene(resources::AntiAliasing::None);
   scaled->world->getResource<resources::RenderSettings>().renderScale = 0.5f;
   scaled->spawn("tri", "matA");
   scaled->frame();
-  EXPECT_EQ(scaled->rec().floatUniforms[kFxaaShader].at("fxaaOn"), 0.0f);
+  EXPECT_EQ(scaled->rec().floatUniforms[kPostProcessShader].at("fxaaOn"), 0.0f);
 }
 
 // Render scale
 
 TEST(RenderScale, OneWithoutFxaaDrawsStraightToTheWindow) {
-  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
   s->world->getResource<resources::RenderSettings>().renderScale = 1.0f;
   s->spawn("tri", "matA");
   s->frame();
@@ -1269,7 +1269,7 @@ TEST(RenderScale, OneWithoutFxaaDrawsStraightToTheWindow) {
 }
 
 TEST(RenderScale, ScalesTheSceneTargetEvenWithFxaaOff) {
-  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
   s->rec().viewport = {1000, 500};
   s->world->getResource<resources::RenderSettings>().renderScale = 0.5f;
   s->spawn("tri", "matA");
@@ -1280,11 +1280,11 @@ TEST(RenderScale, ScalesTheSceneTargetEvenWithFxaaOff) {
   EXPECT_EQ(s->rec().createdTargets[0].height, 250u);
   EXPECT_EQ(s->rec().draws[0].targetId, s->rec().createdTargets[0].id);
   // The copy to the window still runs.
-  EXPECT_EQ(fxaaDrawsOnWindow(*s), 1);
+  EXPECT_EQ(postProcessDrawsOnWindow(*s), 1);
 }
 
 TEST(RenderScale, ScalesUpForSupersampling) {
-  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  auto s = makePostProcessScene(resources::AntiAliasing::Fxaa);
   s->rec().viewport = {1000, 500};
   s->world->getResource<resources::RenderSettings>().renderScale = 2.0f;
   s->spawn("tri", "matA");
@@ -1296,7 +1296,7 @@ TEST(RenderScale, ScalesUpForSupersampling) {
 }
 
 TEST(RenderScale, IsClampedToWhatTheUiOffers) {
-  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
   s->rec().viewport = {1000, 500};
   auto &settings = s->world->getResource<resources::RenderSettings>();
   settings.renderScale = 100.0f;
@@ -1310,7 +1310,7 @@ TEST(RenderScale, IsClampedToWhatTheUiOffers) {
 }
 
 TEST(RenderScale, ChangingItRemakesTheTargetAndOneGoesBackToTheWindow) {
-  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  auto s = makePostProcessScene(resources::AntiAliasing::None);
   s->rec().viewport = {1000, 500};
   auto &settings = s->world->getResource<resources::RenderSettings>();
   settings.renderScale = 0.5f;

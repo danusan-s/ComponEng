@@ -1,4 +1,4 @@
-#include "componeng/renderer/pass/fxaa_pass.hpp"
+#include "componeng/renderer/pass/post_process_pass.hpp"
 
 #include "componeng/renderer/asset_manager.hpp"
 #include "componeng/renderer/backend/api/irender_device.hpp"
@@ -8,9 +8,9 @@
 
 namespace componeng::renderer {
 
-void FxaaPass::execute(const PassContext &ctx) {
+void PostProcessPass::execute(const PassContext &ctx) {
   if (m_shaderID == 0) {
-    m_shaderID = ctx.assets.getShaderID("fxaa");
+    m_shaderID = ctx.assets.getShaderID("post_process");
   }
   const Shader &shader = ctx.assets.getShader(m_shaderID);
   api::IRenderTarget &scene = *ctx.sceneTarget;
@@ -27,10 +27,10 @@ void FxaaPass::execute(const PassContext &ctx) {
   scene.colorTexture().bind();
 
   ctx.device.setRenderState(renderStateFor(
-      api::PassId::Fxaa, api::RenderState{}, /*depthPrepassed=*/false));
+      api::PassId::PostProcess, api::RenderState{}, /*depthPrepassed=*/false));
   ctx.device.drawFullscreenTriangle();
 
-  resources::PassStats &ps = ctx.stats.of(api::PassId::Fxaa);
+  resources::PassStats &ps = ctx.stats.of(api::PassId::PostProcess);
   ++ps.drawCalls;
   ++ps.instances;
   ++ps.triangles;

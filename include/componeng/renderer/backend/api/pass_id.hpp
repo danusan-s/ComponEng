@@ -14,7 +14,7 @@ enum class PassId : int {
   Opaque,       // opaque and cutout batches, shaded
   Sky,          // the full-screen sky triangle
   Transparent,  // blended / depth-less batches
-  Fxaa,         // full-screen anti-aliasing of the finished scene
+  PostProcess,  // scale and anti-alias the finished scene onto the window
 };
 
 constexpr std::size_t kPassCount = 5;
@@ -29,8 +29,8 @@ constexpr const char *passName(PassId pass) {
       return "Sky";
     case PassId::Transparent:
       return "Transparent";
-    case PassId::Fxaa:
-      return "FXAA";
+    case PassId::PostProcess:
+      return "Post-process";
   }
   return "?";
 }

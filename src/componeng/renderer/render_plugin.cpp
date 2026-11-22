@@ -96,9 +96,9 @@ void RenderPlugin::ready(ecs::World &world) {
       nullptr, "skybox");
 
   assetManager.loadShader(
-      utils::Utils::getAssetPath("assets/shaders/fxaa.vert").c_str(),
-      utils::Utils::getAssetPath("assets/shaders/fxaa.frag").c_str(), nullptr,
-      "fxaa");
+      utils::Utils::getAssetPath("assets/shaders/post_process.vert").c_str(),
+      utils::Utils::getAssetPath("assets/shaders/post_process.frag").c_str(),
+      nullptr, "post_process");
 
   assetManager.loadMesh(
       utils::Utils::getAssetPath("assets/models/cube.obj").c_str(), "cube");

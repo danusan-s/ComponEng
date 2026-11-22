@@ -1,5 +1,9 @@
 #version 330 core
 
+// The last pass: copies the scene texture onto the window. With fxaaOn it smooths
+// edges on the way, otherwise it only copies (and, when the scene was drawn at
+// a different size, scales: the sampler is linear).
+//
 // FXAA (Timothy Lottes' algorithm, the compact form): find the direction of the
 // edge from the luma of the four diagonal neighbours, then average a few
 // samples along it. The result is kept only if it stays inside the local luma

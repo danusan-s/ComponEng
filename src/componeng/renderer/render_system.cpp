@@ -6,8 +6,8 @@
 #include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
 #include "componeng/renderer/pass/depth_prepass.hpp"
-#include "componeng/renderer/pass/fxaa_pass.hpp"
 #include "componeng/renderer/pass/opaque_pass.hpp"
+#include "componeng/renderer/pass/post_process_pass.hpp"
 #include "componeng/renderer/pass/sky_pass.hpp"
 #include "componeng/renderer/pass/transparent_pass.hpp"
 #include "componeng/renderer/pipeline/pass_context.hpp"
@@ -40,7 +40,7 @@ void RenderSystem::onCreate(const ecs::SystemState &state) {
       .add(std::make_unique<OpaquePass>())
       .add(std::make_unique<SkyPass>())
       .add(std::make_unique<TransparentPass>())
-      .add(std::make_unique<FxaaPass>());
+      .add(std::make_unique<PostProcessPass>());
 }
 
 void RenderSystem::onDestroy(const ecs::SystemState &) {
@@ -62,11 +62,11 @@ api::IRenderTarget *RenderSystem::sceneTargetFor(ecs::World &world,
     m_sceneTarget.reset();
     return nullptr;
   }
-  if (!world.getResource<AssetManager>().shaderExists("fxaa")) {
-    if (!m_warnedMissingFxaa) {
+  if (!world.getResource<AssetManager>().shaderExists("post_process")) {
+    if (!m_warnedMissingPostProcess) {
       LOG_ERROR("Anti-aliasing or render scale is on but there is no "
-                "\"fxaa\" shader");
-      m_warnedMissingFxaa = true;
+                "\"post_process\" shader");
+      m_warnedMissingPostProcess = true;
     }
     fxaa = false;
     m_sceneTarget.reset();
@@ -127,8 +127,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
       fxaa};
   m_pipeline.execute(ctx);
 
-  // FxaaPass has gone back to the window; this covers a frame that stopped
-  // short of it.
+  // PostProcessPass has gone back to the window; this covers a frame that
+  // stopped short of it.
   device.setRenderTarget(nullptr);
 }
 

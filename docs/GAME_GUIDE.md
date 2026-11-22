@@ -554,7 +554,7 @@ material.setBoundsPadding(2.0f);   // metres, on every side
 
 Edges are smoothed with FXAA, on by default. The scene is drawn into an
 off-screen target the size of the window's viewport and then copied to the
-window through the `fxaa` shader (`assets/shaders/fxaa.*`, loaded by the render
+window through the `post_process` shader (`assets/shaders/post_process.*`, loaded by the render
 plugin). It works the same on OpenGL and Vulkan, costs one extra full-screen
 pass, and also softens edges multisampling would miss, such as alpha-tested
 leaves. The debug UI is drawn afterwards, so it stays sharp.

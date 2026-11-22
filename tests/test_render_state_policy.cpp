@@ -60,9 +60,11 @@ TEST(RenderStatePolicy, SkyIgnoresMaterialAndDoesNotCullOrWriteDepth) {
   EXPECT_FALSE(s.depthWrite);
 }
 
-TEST(RenderStatePolicy, FxaaIgnoresMaterialAndTestsNothingBlendsNothing) {
-  const auto s = renderStateFor(PassId::Fxaa, materialState(CullMode::Back),
-                                /*depthPrepassed=*/true);
+TEST(RenderStatePolicy,
+     PostProcessIgnoresMaterialAndTestsNothingBlendsNothing) {
+  const auto s =
+      renderStateFor(PassId::PostProcess, materialState(CullMode::Back),
+                     /*depthPrepassed=*/true);
   EXPECT_EQ(s.cull, CullMode::None);
   EXPECT_FALSE(s.depthTest);
   EXPECT_FALSE(s.depthWrite);

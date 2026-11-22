@@ -4,7 +4,7 @@ namespace componeng::resources {
 
 enum class AntiAliasing {
   None,
-  Fxaa, // post-process edge smoothing, see FxaaPass
+  Fxaa, // post-process edge smoothing, see PostProcessPass
 };
 
 /**
@@ -39,7 +39,8 @@ struct RenderSettings {
    * while copying it to the window. It costs
    * one extra full-screen pass, works on every backend, and also softens the
    * edges multisampling would miss (alpha-tested leaves, LOD dithering). It
-   * needs the "fxaa" shader (RenderPlugin loads it); without one it is off.
+   * needs the "post_process" shader (RenderPlugin loads it); without one it is
+   * off.
    */
   AntiAliasing antiAliasing = AntiAliasing::Fxaa;
 
@@ -49,7 +50,7 @@ struct RenderSettings {
    * scales it down (supersampling). Anything but 1 draws the scene into an
    * off-screen target, like anti-aliasing does, and the same final pass copies
    * it to the window with linear filtering. Clamped to 0.25 .. 2. Needs the
-   * "fxaa" shader too.
+   * "post_process" shader too.
    */
   float renderScale = 1.0f;
 };
