@@ -20,6 +20,7 @@ void FxaaPass::execute(const PassContext &ctx) {
   ctx.profiler.timeShader(&shader);
   shader.use();
   shader.setInteger("sceneColor", 0);
+  shader.setFloat("fxaaOn", ctx.fxaa ? 1.0f : 0.0f);
   shader.setVector2f("invResolution", 1.0f / static_cast<float>(scene.width()),
                      1.0f / static_cast<float>(scene.height()));
   ctx.device.setActiveTextureUnit(0);

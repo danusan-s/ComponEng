@@ -7,7 +7,9 @@ namespace componeng::renderer {
 
 /**
  * @brief Copies the finished scene from the off-screen target onto the window
- * through the "fxaa" shader, which smooths the edges on the way.
+ * through the "fxaa" shader, which smooths the edges on the way
+ * (PassContext::fxaa), or, with FXAA off, only scales it to the window's size
+ * (a render scale other than 1).
  *
  * RenderSystem draws every earlier pass into PassContext::sceneTarget; this
  * pass switches back to the window and draws one full-screen triangle that

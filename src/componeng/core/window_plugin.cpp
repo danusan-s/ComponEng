@@ -18,6 +18,7 @@
 #include <GLFW/glfw3.h>
 
 #include <chrono>
+#include <cmath>
 
 namespace componeng::core {
 namespace {
@@ -37,6 +38,11 @@ void showSettingsTab(ecs::World &world) {
           fxaa ? resources::AntiAliasing::Fxaa : resources::AntiAliasing::None;
     }
     DebugUI::addCheckbox("Depth pre-pass", &settings.depthPrepass);
+    // Quantised so dragging remakes the scene target a few times, not on
+    // every frame.
+    float scale = settings.renderScale;
+    DebugUI::addSlider("Render scale", &scale, 0.25f, 2.0f);
+    settings.renderScale = std::round(scale * 20.0f) / 20.0f;
     DebugUI::addCheckbox("LOD dithering", &settings.lodDither);
     DebugUI::addSlider("LOD fade (s)", &settings.lodFadeSeconds, 0.0f, 2.0f);
   }

@@ -1242,3 +1242,102 @@ TEST(AntiAliasing, EveryFrameEndsOnTheWindow) {
     EXPECT_EQ(s->rec().currentTarget, 0) << "frame " << i;
   }
 }
+
+TEST(AntiAliasing, FxaaPassTellsTheShaderWhetherToSmooth) {
+  auto on = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  on->spawn("tri", "matA");
+  on->frame();
+  EXPECT_EQ(on->rec().floatUniforms[kFxaaShader].at("fxaaOn"), 1.0f);
+
+  auto scaled = makeFxaaScene(resources::AntiAliasing::None);
+  scaled->world->getResource<resources::RenderSettings>().renderScale = 0.5f;
+  scaled->spawn("tri", "matA");
+  scaled->frame();
+  EXPECT_EQ(scaled->rec().floatUniforms[kFxaaShader].at("fxaaOn"), 0.0f);
+}
+
+// Render scale
+
+TEST(RenderScale, OneWithoutFxaaDrawsStraightToTheWindow) {
+  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  s->world->getResource<resources::RenderSettings>().renderScale = 1.0f;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_TRUE(s->rec().createdTargets.empty());
+  EXPECT_EQ(s->rec().draws[0].targetId, 0);
+}
+
+TEST(RenderScale, ScalesTheSceneTargetEvenWithFxaaOff) {
+  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  s->rec().viewport = {1000, 500};
+  s->world->getResource<resources::RenderSettings>().renderScale = 0.5f;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().createdTargets.size(), 1u);
+  EXPECT_EQ(s->rec().createdTargets[0].width, 500u);
+  EXPECT_EQ(s->rec().createdTargets[0].height, 250u);
+  EXPECT_EQ(s->rec().draws[0].targetId, s->rec().createdTargets[0].id);
+  // The copy to the window still runs.
+  EXPECT_EQ(fxaaDrawsOnWindow(*s), 1);
+}
+
+TEST(RenderScale, ScalesUpForSupersampling) {
+  auto s = makeFxaaScene(resources::AntiAliasing::Fxaa);
+  s->rec().viewport = {1000, 500};
+  s->world->getResource<resources::RenderSettings>().renderScale = 2.0f;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  ASSERT_EQ(s->rec().createdTargets.size(), 1u);
+  EXPECT_EQ(s->rec().createdTargets[0].width, 2000u);
+  EXPECT_EQ(s->rec().createdTargets[0].height, 1000u);
+}
+
+TEST(RenderScale, IsClampedToWhatTheUiOffers) {
+  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  s->rec().viewport = {1000, 500};
+  auto &settings = s->world->getResource<resources::RenderSettings>();
+  settings.renderScale = 100.0f;
+  s->spawn("tri", "matA");
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.back().width, 2000u);
+
+  settings.renderScale = 0.0f;
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.back().width, 250u);
+}
+
+TEST(RenderScale, ChangingItRemakesTheTargetAndOneGoesBackToTheWindow) {
+  auto s = makeFxaaScene(resources::AntiAliasing::None);
+  s->rec().viewport = {1000, 500};
+  auto &settings = s->world->getResource<resources::RenderSettings>();
+  settings.renderScale = 0.5f;
+  s->spawn("tri", "matA");
+  s->frame();
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.size(), 1u) << "kept while unchanged";
+
+  settings.renderScale = 0.75f;
+  s->frame();
+  ASSERT_EQ(s->rec().createdTargets.size(), 2u);
+  EXPECT_EQ(s->rec().createdTargets[1].width, 750u);
+
+  settings.renderScale = 1.0f;
+  s->frame();
+  EXPECT_EQ(s->rec().createdTargets.size(), 2u);
+  EXPECT_EQ(s->rec().draws.back().targetId, 0);
+}
+
+TEST(RenderScale, IsIgnoredWithoutTheFxaaShader) {
+  auto s = makeScene();
+  s->world->getResource<resources::RenderSettings>().renderScale = 0.5f;
+  s->world->getResource<resources::RenderSettings>().antiAliasing =
+      resources::AntiAliasing::None;
+  s->spawn("tri", "matA");
+  s->frame();
+
+  EXPECT_TRUE(s->rec().createdTargets.empty());
+  EXPECT_EQ(s->rec().draws[0].targetId, 0);
+}

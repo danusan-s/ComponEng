@@ -567,6 +567,12 @@ settings.antiAliasing = resources::AntiAliasing::None;  // draw straight to the 
 It can be changed while the game runs, from code or from the debug UI's
 "Settings" tab, which also switches the depth pre-pass and LOD dithering.
 
+`settings.renderScale` (default 1, range 0.25 to 2) draws the scene at that
+fraction of the window's size and scales it to fit: below 1 trades sharpness
+for speed, above 1 supersamples (2 averages 2x2 pixels per window pixel, at
+four times the fragment cost). It uses the same off-screen target and shader as
+FXAA, with or without FXAA on top, and has a slider in the Settings tab.
+
 #### The sky
 
 Add a `SkyboxComponent` to any entity. The first one found is drawn behind

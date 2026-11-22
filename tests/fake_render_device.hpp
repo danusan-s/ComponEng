@@ -110,6 +110,8 @@ struct Recorder {
 
   // Names passed to loose uniform setters, per shader id.
   std::map<int, std::vector<std::string>> looseUniforms;
+  // The latest value given to each float uniform, per shader id.
+  std::map<int, std::map<std::string, float>> floatUniforms;
 
   // Configuration the tests can change before creating assets.
   api::VertexLayout instanceLayout;
@@ -178,8 +180,9 @@ public:
   void release() override {
   }
 
-  void setFloat(const char *n, float) const override {
+  void setFloat(const char *n, float v) const override {
     note(n);
+    m_rec.floatUniforms[m_id][n] = v;
   }
   void setInteger(const char *n, int) const override {
     note(n);

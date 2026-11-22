@@ -49,6 +49,9 @@ struct PassContext {
    *  that post-processes it onto the window; null when the scene is drawn
    *  straight to the window. */
   api::IRenderTarget *sceneTarget;
+  /** Smooth the edges while copying the scene target to the window. Off, the
+   *  copy only scales it (a render scale other than 1). */
+  bool fxaa;
 };
 
 } // namespace componeng::renderer

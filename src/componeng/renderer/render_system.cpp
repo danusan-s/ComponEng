@@ -16,6 +16,9 @@
 #include "componeng/resources/render_stats.hpp"
 #include "componeng/utils/logger.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 namespace componeng::renderer {
 
 namespace {
@@ -45,34 +48,44 @@ void RenderSystem::onDestroy(const ecs::SystemState &) {
   m_sceneTarget.reset();
 }
 
-api::IRenderTarget *RenderSystem::sceneTargetFor(ecs::World &world) {
-  const bool wanted =
-      world.hasResource<resources::RenderSettings>() &&
-      world.getResource<resources::RenderSettings>().antiAliasing ==
-          resources::AntiAliasing::Fxaa;
-  const auto &assets = world.getResource<AssetManager>();
-  if (wanted && !assets.shaderExists("fxaa")) {
-    if (!m_warnedMissingFxaa) {
-      LOG_ERROR("Anti-aliasing is on but there is no \"fxaa\" shader");
-      m_warnedMissingFxaa = true;
-    }
+api::IRenderTarget *RenderSystem::sceneTargetFor(ecs::World &world,
+                                                 bool &fxaa) {
+  fxaa = false;
+  float scale = 1.0f;
+  if (world.hasResource<resources::RenderSettings>()) {
+    const auto &settings = world.getResource<resources::RenderSettings>();
+    fxaa = settings.antiAliasing == resources::AntiAliasing::Fxaa;
+    scale = std::clamp(settings.renderScale, 0.25f, 2.0f);
+  }
+  const bool scaled = std::abs(scale - 1.0f) > 0.001f;
+  if (!fxaa && !scaled) {
     m_sceneTarget.reset();
     return nullptr;
   }
-  if (!wanted) {
+  if (!world.getResource<AssetManager>().shaderExists("fxaa")) {
+    if (!m_warnedMissingFxaa) {
+      LOG_ERROR("Anti-aliasing or render scale is on but there is no "
+                "\"fxaa\" shader");
+      m_warnedMissingFxaa = true;
+    }
+    fxaa = false;
     m_sceneTarget.reset();
     return nullptr;
   }
 
   api::IRenderDevice &device = world.getRenderDevice();
-  const api::Extent size = device.viewportExtent();
-  if (size.width == 0 || size.height == 0) {
+  const api::Extent view = device.viewportExtent();
+  const uint32_t width = static_cast<uint32_t>(
+      std::max(1.0f, std::round(static_cast<float>(view.width) * scale)));
+  const uint32_t height = static_cast<uint32_t>(
+      std::max(1.0f, std::round(static_cast<float>(view.height) * scale)));
+  if (view.width == 0 || view.height == 0) {
     return nullptr;
   }
-  if (!m_sceneTarget || m_sceneTarget->width() != size.width ||
-      m_sceneTarget->height() != size.height) {
-    m_sceneTarget = device.createRenderTarget({size.width, size.height});
-    LOG_INFO("Scene render target: %ux%u", size.width, size.height);
+  if (!m_sceneTarget || m_sceneTarget->width() != width ||
+      m_sceneTarget->height() != height) {
+    m_sceneTarget = device.createRenderTarget({width, height});
+    LOG_INFO("Scene render target: %ux%u", width, height);
   }
   return m_sceneTarget.get();
 }
@@ -81,7 +94,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   ecs::World &world = *state.world;
   api::IRenderDevice &device = world.getRenderDevice();
   device.setRenderState(api::RenderState{});
-  api::IRenderTarget *sceneTarget = sceneTargetFor(world);
+  bool fxaa = false;
+  api::IRenderTarget *sceneTarget = sceneTargetFor(world, fxaa);
   device.setRenderTarget(sceneTarget);
   device.clear(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -109,7 +123,8 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   const PassContext ctx{
       world,       camera,   device,    world.getResource<AssetManager>(),
       m_frame,     profiler, stats,     queue,
-      m_instances, m_binder, prepassed, sceneTarget};
+      m_instances, m_binder, prepassed, sceneTarget,
+      fxaa};
   m_pipeline.execute(ctx);
 
   // FxaaPass has gone back to the window; this covers a frame that stopped

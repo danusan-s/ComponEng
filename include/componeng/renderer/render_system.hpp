@@ -41,9 +41,10 @@ public:
 
 private:
   /** The target the scene is drawn into this frame, or null to draw straight
-   *  to the window: anti-aliasing is off or has no shader. Kept across frames
-   *  and remade when the viewport changes size. */
-  api::IRenderTarget *sceneTargetFor(ecs::World &world);
+   *  to the window: no anti-aliasing, render scale 1, or no shader for them.
+   *  `fxaa` says whether the copy to the window should smooth edges. Kept
+   *  across frames and remade when its size changes. */
+  api::IRenderTarget *sceneTargetFor(ecs::World &world, bool &fxaa);
 
   RenderPipeline m_pipeline;
   std::unique_ptr<api::IRenderTarget> m_sceneTarget;

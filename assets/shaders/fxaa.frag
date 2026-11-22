@@ -10,6 +10,7 @@ out vec4 FragColor;
 
 uniform sampler2D sceneColor;
 uniform vec2 invResolution; // 1 / scene size in pixels
+uniform float fxaaOn;       // 0: only copy (and scale) the scene
 
 const float REDUCE_MIN = 1.0 / 128.0;
 const float REDUCE_MUL = 1.0 / 8.0;
@@ -22,11 +23,16 @@ float luma(vec3 c)
 
 void main()
 {
+    vec3 rgbM = texture(sceneColor, vUV).rgb;
+    if (fxaaOn < 0.5) {
+        FragColor = vec4(rgbM, 1.0);
+        return;
+    }
+
     vec3 rgbNW = texture(sceneColor, vUV + vec2(-1.0, -1.0) * invResolution).rgb;
     vec3 rgbNE = texture(sceneColor, vUV + vec2(1.0, -1.0) * invResolution).rgb;
     vec3 rgbSW = texture(sceneColor, vUV + vec2(-1.0, 1.0) * invResolution).rgb;
     vec3 rgbSE = texture(sceneColor, vUV + vec2(1.0, 1.0) * invResolution).rgb;
-    vec3 rgbM = texture(sceneColor, vUV).rgb;
 
     float lumaNW = luma(rgbNW);
     float lumaNE = luma(rgbNE);
