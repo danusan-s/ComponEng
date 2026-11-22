@@ -32,6 +32,7 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/renderer/lod/*.cpp"
     "src/componeng/renderer/pass/*.cpp"
     "src/componeng/renderer/pipeline/*.cpp"
+    "src/componeng/renderer/shader/*.cpp"
     "src/componeng/audio/*.cpp"
     "src/componeng/input/*.cpp"
     "src/componeng/camera/*.cpp"
@@ -130,11 +131,18 @@ set_source_files_properties(${ENGINE_THIRD_PARTY_SOURCES} PROPERTIES
     COMPILE_OPTIONS "-w"
 )
 
+# glslang compiles every shader to SPIR-V for both backends and reflects it.
+find_package(glslang CONFIG REQUIRED)
+
 # Link dependencies
 target_link_libraries(ComponEng
     PUBLIC
         glfw
         OpenGL::GL
+    PRIVATE
+        glslang::glslang
+        glslang::SPIRV
+        glslang::glslang-default-resource-limits
 )
 
 # GLFW must not pull in the system GL header: glad provides the GL API, and only
@@ -147,20 +155,14 @@ if(WIN32)
     target_compile_definitions(ComponEng PUBLIC NOMINMAX)
 endif()
 
-# Vulkan backend (-DRENDERER_BACKEND=vulkan). Needs the Vulkan loader and
-# glslang: GLSL is compiled to SPIR-V at load time, so there is no offline
-# shader step.
+# Vulkan backend (-DRENDERER_BACKEND=vulkan). Needs the Vulkan loader. Shaders
+# are compiled to SPIR-V at load time, so there is no offline shader step.
 if(RENDERER_BACKEND STREQUAL "vulkan")
     find_package(Vulkan REQUIRED)
-    find_package(glslang CONFIG REQUIRED)
 
     target_link_libraries(ComponEng
         PUBLIC
             Vulkan::Vulkan
-        PRIVATE
-            glslang::glslang
-            glslang::SPIRV
-            glslang::glslang-default-resource-limits
     )
     target_compile_definitions(ComponEng PUBLIC COMPONENG_VULKAN)
     # `VkFooInfo info{sType};` is the Vulkan idiom; -Wextra flags the rest.
@@ -239,6 +241,7 @@ set(TEST_SOURCES
     tests/test_transform_matrix_cache.cpp
     tests/test_render_pipeline.cpp
     tests/test_render_state_policy.cpp
+    tests/test_shader_compiler.cpp
     tests/test_culling.cpp
     tests/test_mesh.cpp
     tests/test_lod.cpp
