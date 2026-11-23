@@ -185,6 +185,17 @@ public:
     return m_type;
   }
 
+  /** Whether this material participates in the opaque depth pre-pass.
+   *  Default true. Set false for expensive procedural or per-fragment materials
+   *  that should write depth only in the opaque pass. */
+  void setDepthPrepass(bool enabled) {
+    m_depthPrepass = enabled;
+  }
+
+  bool depthPrepass() const {
+    return m_depthPrepass;
+  }
+
   /** Pipeline state (culling, depth, blending) this material draws with.
    *  Defaults to the engine baseline: back-face culling, depth test and
    *  write, alpha blending. An Opaque or Cutout material only contributes its
@@ -333,6 +344,7 @@ private:
   api::VertexLayout m_vertexLayout;
   InstanceSlot m_lodFadeSlot;
   MaterialType m_type = MaterialType::Opaque;
+  bool m_depthPrepass = true;
   api::RenderState m_renderState;
   float m_boundsPadding = 0.0f;
   core::UniformMap m_uniforms;

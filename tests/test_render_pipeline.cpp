@@ -370,6 +370,32 @@ TEST(DepthPrepass, DepthVariantsAreBuiltOnceNotEveryFrame) {
   EXPECT_EQ(s->rec().modulesCreated, 6);
   EXPECT_EQ(s->rec().pipelinesCreated, pipelines);
 }
+TEST(DepthPrepass, MaterialCanSkipPrepassAndWritesDepthInOpaquePass) {
+  auto s = makeScene();
+  enablePrepass(*s);
+  s->spawn("tri", "matA", 0);
+  s->assets()
+      .getMaterial(s->assets().getMaterialID("matB"))
+      .setDepthPrepass(false);
+  s->spawn("tri", "matB", 1);
+  s->frame();
+
+  const auto &draws = s->rec().draws;
+  ASSERT_EQ(draws.size(), 3u)
+      << "matA is pre-passed and shaded; matB is shaded once";
+
+  EXPECT_FALSE(draws[0].state.colorWrite);
+  EXPECT_TRUE(draws[0].state.depthWrite);
+  EXPECT_EQ(draws[0].state.depthFunc, api::DepthFunc::Less);
+
+  EXPECT_EQ(draws[1].state.depthFunc, api::DepthFunc::Equal);
+  EXPECT_FALSE(draws[1].state.depthWrite);
+
+  EXPECT_EQ(draws[2].state.depthFunc, api::DepthFunc::Less);
+  EXPECT_TRUE(draws[2].state.depthWrite);
+  EXPECT_TRUE(draws[2].state.colorWrite);
+}
+
 TEST(DepthPrepass, TransparentBatchesAreNotInThePrepass) {
   auto s = makeScene();
   enablePrepass(*s);

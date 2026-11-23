@@ -68,8 +68,10 @@ void BatchDrawer::draw(const RenderBatch &batch, api::PassId pass) {
   request.fragment = program.fragment;
   request.frameLayout = m_ctx.frame.layout();
   request.materialLayout = colorShader.materialLayout();
+  const bool batchPrepassed =
+      pass == api::PassId::Opaque && m_ctx.depthPrepassed && batch.depthPrepass;
   request.state =
-      renderStateFor(pass, material.getRenderState(), m_ctx.depthPrepassed);
+      renderStateFor(pass, material.getRenderState(), batchPrepassed);
   request.colorFormat = m_ctx.colorFormat;
   request.depthFormat = m_ctx.depthFormat;
   request.meshVertices = true;

@@ -36,6 +36,8 @@ struct RenderBatch {
   // True if any instance carries a LOD cross-fade value, so the depth pre-pass
   // must run the fragment stage's discard too.
   bool fading = false;
+  // Whether this batch participates in the opaque depth pre-pass.
+  bool depthPrepass = true;
   std::vector<float> instanceData;
 };
 
@@ -55,7 +57,7 @@ public:
    *  pool. */
   uint32_t openBatch(core::HandleID meshID, core::HandleID materialID,
                      core::HandleID shaderID, core::HandleID textureID,
-                     bool transparent = false) {
+                     bool transparent = false, bool depthPrepass = true) {
     if (m_active == m_pool.size()) {
       m_pool.emplace_back();
     }
@@ -68,6 +70,7 @@ public:
     batch.instanceCount = 0;
     batch.procedural = false;
     batch.fading = false;
+    batch.depthPrepass = depthPrepass;
     batch.instanceData.clear();
     return static_cast<uint32_t>(m_active++);
   }
@@ -104,10 +107,9 @@ public:
    *  after sort(). */
   std::size_t opaqueCount() const {
     return static_cast<std::size_t>(
-        std::partition_point(m_order.begin(), m_order.end(),
-                             [this](uint32_t i) {
-                               return !m_pool[i].transparent;
-                             }) -
+        std::partition_point(
+            m_order.begin(), m_order.end(),
+            [this](uint32_t i) { return !m_pool[i].transparent; }) -
         m_order.begin());
   }
 
