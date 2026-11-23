@@ -16,7 +16,7 @@ struct PassStats {
   int shaderBinds = 0;    // times a different shader was made current
   // Wall time the CPU spent issuing the pass's commands. Measured only in
   // builds with profiling (COMPONENG_PROFILING), otherwise 0. This is
-  // submission cost, not GPU time: see IRenderDevice::beginGpuPass for that.
+  // submission cost, not GPU time: see rhi::IDevice::beginGpuPass for that.
   double cpuMs = 0.0;
 };
 

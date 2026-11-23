@@ -86,10 +86,8 @@ public:
   /** A GPU buffer of `sizeBytes` registered under `name`, to be bound to a
    *  material as a uniform block (IMaterial::setUniformBuffer) or a storage
    *  block (IMaterial::setStorageBuffer). `data` may be null to only size it.
-   *  The buffer cannot grow; the CPU rewrites it with updateBuffer. `usage`
-   *  is kept for source compatibility and ignored. */
-  void createBuffer(core::Name name, const void *data, size_t sizeBytes,
-                    api::IBuffer::Usage usage = api::IBuffer::Usage::Dynamic);
+   *  The buffer cannot grow; the CPU rewrites it with updateBuffer. */
+  void createBuffer(core::Name name, const void *data, size_t sizeBytes);
   /** Overwrites part of a buffer made with createBuffer; the range must lie
    *  inside it. Returns false (and logs) otherwise. */
   bool updateBuffer(core::HandleID id, size_t offset, const void *data,

@@ -93,7 +93,7 @@ bool AssetManager::updateTexture(core::HandleID id, uint32_t x, uint32_t y,
 }
 
 void AssetManager::createBuffer(core::Name name, const void *data,
-                                size_t sizeBytes, api::IBuffer::Usage) {
+                                size_t sizeBytes) {
   LOG_INFO("Creating Buffer: %s (%zu bytes)", name.c_str(), sizeBytes);
   auto buffer = m_device->createBuffer(
       {sizeBytes, rhi::BufferUsage::Uniform | rhi::BufferUsage::Storage,

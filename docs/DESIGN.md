@@ -5,7 +5,7 @@
 ComponEng is an archetype-based Entity-Component-System (ECS) game engine built in C++17. The architecture is designed around three core pillars:
 
 1. **ECS Core** - Data-oriented entity management with cache-efficient archetype storage
-2. **Rendering** - OpenGL 3.3 instanced rendering with dynamic batching
+2. **Rendering** - RHI-based Vulkan and OpenGL 4.6 backends with dynamic batching
 3. **Physics** - Fixed-timestep simulation with impulse-based collision resolution
 
 ## System Architecture
@@ -437,19 +437,18 @@ const auto& events = world.get_events<CollisionEvent>();
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   IRenderDevice                             │
-│              (Abstract Rendering API)                       │
+│                       rhi::IDevice                          │
+│              (Abstract GPU command interface)                │
 ├─────────────────────────────────────────────────────────────┤
-│  createShader(), createTexture(), createMesh(),            │
-│  createBuffer(), setupInstanceAttributes(),                │
-│  drawIndexedInstanced()                                    │
+│  buffers, images, samplers, shaders, pipelines, bind groups │
+│  renderings, draws, barriers, timers and ImGui              │
 └─────────────────────────────────────────────────────────────┘
                             │
                     ┌───────┴───────┐
                     ▼               ▼
 ┌────────────────────────┐  ┌────────────────────────┐
-│    GLRenderDevice      │  │  (Future: Vulkan impl)  │
-│    (OpenGL 3.3)        │  │                        │
+│       GLDevice         │  │       VulkanDevice      │
+│      OpenGL 4.6        │  │       Vulkan 1.3       │
 └────────────────────────┘  └────────────────────────┘
 ```
 
@@ -598,39 +597,15 @@ Loads assets on first request, caches by string name, returns const references.
 
 ## Render Device Abstraction
 
-### IRenderDevice (`renderer/api/irender_device.hpp`)
+### RHI (`renderer/backend/api/rhi/`)
 
-Abstract interface for GPU operations:
+The rendering API is `rhi::IDevice`. It owns resource creation and explicit
+command submission: buffers, images, samplers, shader modules, bind groups,
+graphics and compute pipelines, renderings, draws, barriers and timers.
 
-```cpp
-class IRenderDevice {
-    virtual void init(void* windowHandle) = 0;
-    virtual void setViewport(int x, int y, int w, int h) = 0;
-    virtual void clear(float r, float g, float b, float a) = 0;
-    virtual void present(void* windowHandle) = 0;
-
-    virtual unique_ptr<IShader> createShader() = 0;
-    virtual unique_ptr<ITexture> createTexture() = 0;
-    virtual unique_ptr<IMesh> createMesh() = 0;
-    virtual unique_ptr<IBuffer> createBuffer() = 0;
-
-    virtual void setupInstanceAttributes(IBuffer&) = 0;
-    virtual void drawIndexedInstanced(size_t, uint32_t) = 0;
-};
-```
-
-### Sub-interfaces
-
-| Interface | Purpose |
-|-----------|---------|
-| `IShader` | Compiled shader program, uniform setters |
-| `ITexture` | 2D texture, bind/generate |
-| `IMesh` | Vertex/index data upload, bind for rendering |
-| `IBuffer` | GPU buffer (vertex/index/uniform/instance) |
-
-### GLRenderDevice (`renderer/opengl/gl_render_device.hpp`)
-
-OpenGL 3.3 Core Profile implementation. Creates OpenGL-backed resources, manages global GL state.
+The implementations are `opengl::GLDevice` for OpenGL 4.6 and
+`vulkan::VulkanDevice` for Vulkan 1.3. The renderer uses the same RHI command
+surface for both backends.
 
 ---
 
@@ -666,7 +641,7 @@ OpenGL 3.3 Core Profile implementation. Creates OpenGL-backed resources, manages
 
 | Class | Owned By | Dependencies |
 |-------|----------|--------------|
-| `Engine` | - | `World`, `Window`, `IRenderDevice` |
+| `Engine` | - | `World`, `Window`, `rhi::IDevice` |
 | `World` | `Engine` | All ECS managers |
 | `ComponentRegistry` | `World` | `Entity` types |
 | `EntityManager` | `World` | `EntityRecord` |
@@ -676,8 +651,8 @@ OpenGL 3.3 Core Profile implementation. Creates OpenGL-backed resources, manages
 | `ThreadPool` | `World` | std::thread |
 | `EventBus` | `World` | `EventQueue` |
 | `ResourceManager` | `World` | `IResource` |
-| `Window` | `Engine` | `GLFW`, `IRenderDevice` |
-| `GLRenderDevice` | `Engine` | OpenGL 3.3 |
+| `Window` | `Engine` | `GLFW`, `rhi::IDevice` |
+| `GLDevice` / `VulkanDevice` | `Engine` | OpenGL 4.6 / Vulkan 1.3 |
 | `RenderSystem` | `World` | `RenderQueue` |
 | `PhysicsSystem` | `World` | `CollisionDetection` |
 
@@ -723,14 +698,15 @@ include/componeng/
 │   ├── collision_detection.hpp
 │   └── physics_system.hpp
 ├── renderer/
-│   ├── api/irender_device.hpp
-│   ├── asset_manager.hpp
-│   ├── batch_map.hpp
-│   ├── mesh.hpp
-│   ├── render_system.hpp
-│   ├── shader.hpp
-│   ├── texture.hpp
-│   └── opengl/
+│   ├── asset/
+│   ├── backend/
+│   │   ├── api/rhi/
+│   │   ├── opengl/
+│   │   └── vulkan/
+│   ├── batching/
+│   ├── draw/
+│   ├── pipeline/
+│   └── render_system.hpp
 │       ├── gl_buffer.hpp
 │       ├── gl_mesh.hpp
 │       ├── gl_render_device.hpp

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/backend/api/renderer_types.hpp"
 #include "componeng/renderer/backend/api/rhi/device.hpp"
 #include "componeng/renderer/frame_data.hpp"
 #include "componeng/renderer/shader/compiler.hpp"

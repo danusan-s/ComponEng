@@ -6,7 +6,6 @@
 #include "componeng/renderer/asset/diffuse.hpp"
 #include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/batching_system.hpp"
 #include "componeng/renderer/component/light_component.hpp"
 #include "componeng/renderer/component/material_component.hpp"

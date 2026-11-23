@@ -3,7 +3,7 @@
 #include "componeng/core/types.hpp"
 #include "componeng/renderer/asset/parameter_block.hpp"
 #include "componeng/renderer/asset/shader.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/backend/api/renderer_types.hpp"
 #include "componeng/renderer/batching/instance_data.hpp"
 #include "componeng/utils/logger.hpp"
 

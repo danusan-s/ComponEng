@@ -1,7 +1,7 @@
 # ComponEng — Game Development Guide
 
 This is a hands-on guide to building a game with ComponEng, a C++17 ECS-based engine
-using OpenGL 3.3. It walks through the full pipeline: project setup, the game entry
+using the OpenGL 4.6 or Vulkan backend. It walks through the full pipeline: project setup, the game entry
 point, components, systems, queries, resources, assets, physics, audio, events, and
 a complete worked example. It ends with a section on what the engine would need to
 render a high-quality forest scene (grass, lighting, etc.).
@@ -299,7 +299,7 @@ Resources are singletons shared across systems, stored in the World by type.
 | `resources::MainCamera` | Entity ID of the active camera |
 | `renderer::AssetManager` | Loaded shaders, textures, meshes, materials |
 | `audio::AudioManager` | Sound playback |
-| `renderer::rhi::IDevice` | GPU backend (Vulkan; OpenGL being ported) |
+| `renderer::rhi::IDevice` | GPU backend (Vulkan or OpenGL 4.6) |
 
 ### Accessing resources
 
