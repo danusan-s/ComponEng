@@ -299,7 +299,7 @@ Resources are singletons shared across systems, stored in the World by type.
 | `resources::MainCamera` | Entity ID of the active camera |
 | `renderer::AssetManager` | Loaded shaders, textures, meshes, materials |
 | `audio::AudioManager` | Sound playback |
-| `renderer::api::IRenderDevice` | GPU backend (OpenGL) |
+| `renderer::rhi::IDevice` | GPU backend (Vulkan; OpenGL being ported) |
 
 ### Accessing resources
 
@@ -374,14 +374,62 @@ time the engine resolves it to a shader + texture + vertex layout.
 `DiffuseMaterial` (built-in) writes per-instance data: `instanceModel` (mat4) and
 `instanceColor` (vec4). The diffuse shader reads:
 
-- `uniform mat4 viewProj`
+- `viewProj`, `lightDir` and `lightColor` from the `FrameData` block
 - `layout(location = 3) in mat4 instanceModel`
 - `layout(location = 7) in vec4 instanceColor`
-- `uniform sampler2D Tex`
-- `uniform vec3 lightDir`
-- `uniform vec3 lightColor`
+- `layout(BIND(1, 1)) uniform sampler2D albedoMap`
 
-Write a custom `IMaterial` subclass to add more per-instance attributes or uniforms
+#### Writing a shader
+
+Shaders are `#version 460` GLSL, compiled to SPIR-V when they load, and the same
+source runs on both backends. A few rules come with that:
+
+- Give every vertex input, vertex output and fragment output an explicit
+  `layout(location = N)`.
+- Give every uniform block, storage block and sampler an explicit
+  `layout(BIND(set, binding))`. Set 0 is the engine's per-frame block, set 1 is
+  the shader's own, with at most 8 bindings each and no binding number used
+  twice in a set. `BIND` is predefined; do not write `set = N` yourself.
+- There are **no loose uniforms**. Put parameters in a uniform block (see
+  below), textures in `sampler2D`s and long lists in storage blocks.
+- Use `VERTEX_INDEX` and `INSTANCE_INDEX` instead of `gl_VertexID` / `gl_InstanceID`
+  (or the Vulkan `*Index` names); `INSTANCE_INDEX` counts from 0 within the draw.
+- `#include "name.glsl"` pulls in a file found next to the including file, or in
+  the engine's `assets/shaders` (`frame_data.glsl`, `mesh_instance.glsl`,
+  `lod_fade.glsl` are there). A file is included once. Errors name the real file.
+- Clip space is `y` up with depth in [0, 1]. `core::perspective` and
+  `FrameData::viewProj` already follow this; if a shader builds its own
+  projection, use `core::perspective`.
+
+A shader that fails to compile is logged with the compiler's messages, and
+materials that use it draw nothing.
+
+#### Material parameters, textures and buffers
+
+A shader's own parameters live in one uniform block at set 1, binding 0. A
+material sets them by member name; the type must match exactly (a `float` member
+takes a `float`, an `int` an `int`, and so on), and an unknown name or a wrong
+type is logged once and ignored:
+
+```glsl
+layout(std140, BIND(1, 0)) uniform Material {
+    float windStrength;
+    vec3 tint;
+};
+layout(BIND(1, 1)) uniform sampler2D albedoMap;
+```
+
+```cpp
+material.setUniform("windStrength", 0.4f);
+material.setUniform("tint", core::Vec3(1.0f, 0.9f, 0.8f));
+```
+
+Textures are named samplers (`albedoMap` is the material's own texture;
+`setTexture("heightMap", id)` fills any other), and `setUniformBuffer` /
+`setStorageBuffer` bind a buffer to a block by its name. A sampler or block the
+material gives nothing for is logged once and reads white or zeros.
+
+Write a custom `IMaterial` subclass to add more per-instance attributes
 (e.g., wind speed for grass, normal maps, PBR parameters). Override
 `writeInstanceData`, which runs once per rendered entity per frame and writes
 straight into the batch's instance buffer:
@@ -426,27 +474,26 @@ a material has, and every material must override it.
 
 #### Per-frame values in custom shaders
 
-Camera, light, fog and time are uploaded once per frame to a uniform buffer. A
-shader opts in by declaring this block (identically in its vertex and fragment
-stages) and then uses the members by bare name:
+Camera, light, fog and time are uploaded once per frame to a uniform buffer.
+A shader opts in with one line, which declares this block at set 0 (the same in
+every stage) so the members are used by bare name:
 
 ```glsl
-layout(std140) uniform FrameData {
-    mat4 viewProj;
-    vec3 cameraPos;      float time;
-    vec3 lightDir;       float fogDensity;   // lightDir points towards the light
-    vec3 lightColor;     float fogStart;
-    vec3 ambientColor;   float ambientStrength;
-    vec4 fogColor;
-    float fogEnd;
-};
+#include "frame_data.glsl"
+// layout(std140, BIND(0, 0)) uniform FrameData {
+//     mat4 viewProj;
+//     vec3 cameraPos;      float time;
+//     vec3 lightDir;       float fogDensity;   // lightDir points towards the light
+//     vec3 lightColor;     float fogStart;
+//     vec3 ambientColor;   float ambientStrength;
+//     vec4 fogColor;
+//     float fogEnd;
+// };
 ```
 
 The layout must match `renderer/frame_data.hpp`; the engine logs an error at
-shader load if the sizes disagree. The values are only ever uploaded through
-this block: a shader that reads `viewProj`, `time` and the rest as plain
-`uniform`s gets zeros, and the engine logs an error at load naming each one.
-A shader that needs no per-frame values can leave the block out.
+shader load if the sizes disagree. A shader that needs no per-frame values can
+leave the include out.
 
 #### Material type and render state
 
@@ -487,8 +534,8 @@ return;
 #endif
 ```
 
-The pre-pass binds the material's albedo texture (and what it added with
-`setTexture`), not the PBR set, so the alpha test must read only those. Whether
+The pre-pass binds the same material set as the colour pass, so the alpha test
+can read any of the material's textures. Whether
 the pre-pass pays off depends on the scene: it repeats the vertex stage of every
 opaque and cutout draw, so a vertex-heavy scene can lose more than it saves.
 
@@ -595,12 +642,13 @@ A custom sky shader is loaded like any other (`loadShader`, then set
 `shaderName`). Its contract:
 
 - The vertex shader gets no vertex data and derives its three positions from
-  `gl_VertexID`. Copy `assets/shaders/skybox_procedural.vert` and change only
+  `VERTEX_INDEX`. Copy `assets/shaders/skybox_procedural.vert` and change only
   what you need; keep `gl_Position = vec4(ndc, 1.0, 1.0)` so the sky sits at the
   far plane.
-- Loose uniforms set every frame: `mat4 invSkyViewProj` (inverse of projection
+- Its material block (set 1, binding 0) holds the parameters the engine sets
+  every frame, by these names: `mat4 invSkyViewProj` (inverse of projection
   times rotation-only view; unprojecting a pixel gives its view direction),
-  `vec3 skyColor`, `vec3 horizonColor`.
+  `vec3 skyColor`, `vec3 horizonColor`. A member it does not declare is skipped.
 - Per-frame values (`lightDir`, `lightColor`, fog, camera, time) come from the
   `FrameData` block, which the shader declares.
 - Drawn with culling off, depth test `<=`, and depth writes off.
