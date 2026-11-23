@@ -2,7 +2,7 @@
 
 namespace componeng::renderer {
 
-std::size_t InstanceBufferCache::upload(api::IRenderDevice &device,
+std::size_t InstanceBufferCache::upload(rhi::IDevice &device,
                                         const RenderQueue &queue) {
   std::size_t uploaded = 0;
   for (std::size_t i = 0; i < queue.size(); ++i) {
@@ -10,25 +10,25 @@ std::size_t InstanceBufferCache::upload(api::IRenderDevice &device,
     if (batch.procedural) {
       continue;
     }
-    std::unique_ptr<api::IBuffer> &buf =
-        m_buffers[DrawKey{batch.meshID, batch.materialID}];
-    if (!buf) {
-      buf = device.createBuffer();
-    }
     const std::size_t requiredBytes = batch.instanceData.size() * sizeof(float);
-    uploaded += requiredBytes;
-    if (requiredBytes > buf->size()) {
-      buf->setData(batch.instanceData.data(), requiredBytes,
-                   api::IBuffer::Usage::Dynamic);
-    } else if (requiredBytes > 0) {
-      buf->setSubData(0, batch.instanceData.data(), requiredBytes);
+    if (requiredBytes == 0) {
+      continue;
     }
+    std::unique_ptr<rhi::IBuffer> &buf =
+        m_buffers[DrawKey{batch.meshID, batch.materialID}];
+    uploaded += requiredBytes;
+    if (!buf || requiredBytes > buf->size()) {
+      buf = device.createBuffer({requiredBytes, rhi::BufferUsage::Vertex,
+                                 rhi::MemoryKind::Upload, "instances"});
+    }
+    buf->write(0, batch.instanceData.data(), requiredBytes);
   }
   return uploaded;
 }
 
-api::IBuffer &InstanceBufferCache::bufferFor(const RenderBatch &batch) const {
-  return *m_buffers.at(DrawKey{batch.meshID, batch.materialID});
+rhi::IBuffer *InstanceBufferCache::bufferFor(const RenderBatch &batch) const {
+  auto it = m_buffers.find(DrawKey{batch.meshID, batch.materialID});
+  return it == m_buffers.end() ? nullptr : it->second.get();
 }
 
 } // namespace componeng::renderer

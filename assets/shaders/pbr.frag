@@ -1,51 +1,32 @@
-#version 330 core
+#version 460
 
-in vec3 FragPos;
-in vec3 Normal;
-in vec2 TexCoords;
-in vec3 ObjectColor;
-in vec3 WorldNormal;
-flat in float LodFade;
+#include "frame_data.glsl"
+#include "lod_fade.glsl"
 
-out vec4 FragColor;
+layout(location = 0) in vec3 FragPos;
+layout(location = 1) in vec3 Normal;
+layout(location = 2) in vec2 TexCoords;
+layout(location = 3) in vec3 ObjectColor;
+layout(location = 4) in vec3 WorldNormal;
+layout(location = 5) flat in float LodFade;
 
-// Material textures
-uniform sampler2D albedoMap;      // base color
-uniform sampler2D normalMap;      // tangent-space normal
-uniform sampler2D metallicMap;    // metallic (0=dielectric, 1=metal)
-uniform sampler2D roughnessMap;   // roughness (0=smooth, 1=rough)
-uniform sampler2D aoMap;          // ambient occlusion
+layout(location = 0) out vec4 FragColor;
 
-// Lighting, environment and fog (lightDir points towards the light) come from
-// the FrameData block.
-// Per-frame values, uploaded once per frame by the RenderSystem. Must match
-// renderer/frame_data.hpp exactly, and be declared identically in every stage.
-layout(std140) uniform FrameData {
-    mat4 viewProj;
-    vec3 cameraPos;      float time;
-    vec3 lightDir;       float fogDensity;
-    vec3 lightColor;     float fogStart;
-    vec3 ambientColor;   float ambientStrength;
-    vec4 fogColor;
-    float fogEnd;
+// Material parameters. PbrMaterial sets both to 1; a plain DiffuseMaterial on
+// this shader leaves them 0 and gets solid colours.
+layout(std140, BIND(1, 0)) uniform Material {
+    int useTextures;  // sample the albedo, metallic, roughness and AO maps
+    int useNormalMap; // apply the normal map
 };
 
-// Toggle texture sampling (set to 0 to use solid colors / white textures)
-uniform int useTextures;
-
-// Toggle normal mapping
-uniform int useNormalMap;
+// Material textures
+layout(BIND(1, 1)) uniform sampler2D albedoMap;    // base color
+layout(BIND(1, 2)) uniform sampler2D normalMap;    // tangent-space normal
+layout(BIND(1, 3)) uniform sampler2D metallicMap;  // metallic (0=dielectric, 1=metal)
+layout(BIND(1, 4)) uniform sampler2D roughnessMap; // roughness (0=smooth, 1=rough)
+layout(BIND(1, 5)) uniform sampler2D aoMap;        // ambient occlusion
 
 const float PI = 3.141592653589793;
-
-// LOD cross-fade: LodFade is 0 normally. A fading entity's old mesh has it
-// rising 0 -> 1 and the new mesh -1 -> 0; each discards its share of a fixed
-// screen-space dither (interleaved gradient noise), and the two shares are
-// complementary. The pattern must match in the depth pre-pass and colour pass.
-float lodDither()
-{
-    return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-}
 
 vec3 parseNormal(vec3 normal, sampler2D normalMap, vec2 uv, int useNormalMap) {
     if (useNormalMap == 0) return normalize(normal);
@@ -83,10 +64,7 @@ float geometrySmith(float NdotV, float NdotL, float roughness) {
 
 void main()
 {
-    if (LodFade != 0.0) {
-        float n = lodDither();
-        if (LodFade > 0.0 ? n < LodFade : n >= 1.0 + LodFade) discard;
-    }
+    lodFadeDiscard(LodFade);
 #ifdef COMPONENG_DEPTH_PREPASS
     // Depth pre-pass of a fading batch: the discard above is all it needed.
     return;

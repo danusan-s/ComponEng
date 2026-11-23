@@ -51,16 +51,20 @@ void FrameUniforms::update(ecs::World &world, ecs::EntityID camera) {
   f.fogStart = fog.start;
   f.fogEnd = fog.end;
 
-  api::IRenderDevice &device = world.getRenderDevice();
+  rhi::IDevice &device = world.getRenderDevice();
   if (!m_buffer) {
-    m_buffer = device.createBuffer();
+    m_buffer =
+        device.createBuffer({sizeof(FrameData), rhi::BufferUsage::Uniform,
+                             rhi::MemoryKind::Upload, "frame data"});
+    m_layout = device.createBindGroupLayout(
+        {{{kFrameDataBinding, rhi::BindingType::UniformBuffer,
+           rhi::StageFlags::AllGraphics}}});
+    rhi::BindGroupDesc group;
+    group.layout = m_layout.get();
+    group.entries = {{kFrameDataBinding, m_buffer.get()}};
+    m_group = device.createBindGroup(group);
   }
-  if (m_buffer->size() < sizeof(FrameData)) {
-    m_buffer->setData(&m_data, sizeof(FrameData), api::IBuffer::Usage::Dynamic);
-  } else {
-    m_buffer->setSubData(0, &m_data, sizeof(FrameData));
-  }
-  device.bindUniformBuffer(kFrameDataBinding, *m_buffer);
+  m_buffer->write(0, &m_data, sizeof(FrameData));
 }
 
 } // namespace componeng::renderer

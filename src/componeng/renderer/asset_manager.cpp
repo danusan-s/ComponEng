@@ -2,7 +2,9 @@
 
 #include "componeng/core/types.hpp"
 #include "componeng/utils/logger.hpp"
+#include "componeng/utils/utils.hpp"
 
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -12,6 +14,17 @@
 
 namespace componeng::renderer {
 
+void AssetManager::compileShader(core::Name name,
+                                 const std::string &vertexSource,
+                                 const std::string &fragmentSource) {
+  LOG_INFO("Compiling Shader: %s", name.c_str());
+  auto shader = std::make_unique<Shader>(*m_device);
+  shader->compile(vertexSource, fragmentSource, name.c_str(),
+                  {utils::Utils::getAssetPath("assets/shaders")});
+  m_shaderResources.push_back(std::move(shader));
+  m_shaders[name] = m_shaderResources.size();
+}
+
 void AssetManager::loadShader(const char *vShaderFile, const char *fShaderFile,
                               const char *gShaderFile, core::Name name) {
   LOG_INFO("Loading Shader: %s", name.c_str());
@@ -19,11 +32,6 @@ void AssetManager::loadShader(const char *vShaderFile, const char *fShaderFile,
       loadShaderFromFile(vShaderFile, fShaderFile, gShaderFile));
   core::HandleID id = m_shaderResources.size();
   m_shaders[name] = id;
-}
-
-void AssetManager::collectShaderTimings() const {
-  for (const auto &shader : m_shaderResources)
-    shader->collectGpuTimer();
 }
 
 const Shader &AssetManager::getShader(core::HandleID id) const {
@@ -85,10 +93,14 @@ bool AssetManager::updateTexture(core::HandleID id, uint32_t x, uint32_t y,
 }
 
 void AssetManager::createBuffer(core::Name name, const void *data,
-                                size_t sizeBytes, api::IBuffer::Usage usage) {
+                                size_t sizeBytes) {
   LOG_INFO("Creating Buffer: %s (%zu bytes)", name.c_str(), sizeBytes);
-  auto buffer = m_device->createBuffer();
-  buffer->setData(data, sizeBytes, usage);
+  auto buffer = m_device->createBuffer(
+      {sizeBytes, rhi::BufferUsage::Uniform | rhi::BufferUsage::Storage,
+       rhi::MemoryKind::Upload, name.c_str()});
+  if (data && sizeBytes > 0) {
+    buffer->write(0, data, sizeBytes);
+  }
   m_bufferResources.push_back(std::move(buffer));
   core::HandleID id = m_bufferResources.size();
   m_buffers[name] = id;
@@ -96,17 +108,17 @@ void AssetManager::createBuffer(core::Name name, const void *data,
 
 bool AssetManager::updateBuffer(core::HandleID id, size_t offset,
                                 const void *data, size_t sizeBytes) {
-  api::IBuffer &buffer = *m_bufferResources.at(id - 1);
+  rhi::IBuffer &buffer = *m_bufferResources.at(id - 1);
   if (offset > buffer.size() || sizeBytes > buffer.size() - offset) {
     LOG_ERROR("Buffer update range (%zu + %zu) is outside the %zu-byte buffer",
               offset, sizeBytes, buffer.size());
     return false;
   }
-  buffer.setSubData(offset, data, sizeBytes);
+  buffer.write(offset, data, sizeBytes);
   return true;
 }
 
-api::IBuffer &AssetManager::getBuffer(core::HandleID id) const {
+rhi::IBuffer &AssetManager::getBuffer(core::HandleID id) const {
   return *m_bufferResources.at(id - 1);
 }
 
@@ -163,32 +175,24 @@ core::HandleID AssetManager::getMeshID(core::Name name) const {
 
 std::unique_ptr<Shader> AssetManager::loadShaderFromFile(
     const char *vShaderFile, const char *fShaderFile, const char *gShaderFile) {
-  std::string vertexCode;
-  std::string fragmentCode;
-  std::string geometryCode;
-  try {
-    std::ifstream vertexShaderFile(vShaderFile);
-    std::ifstream fragmentShaderFile(fShaderFile);
-    std::stringstream vShaderStream, fShaderStream;
-    vShaderStream << vertexShaderFile.rdbuf();
-    fShaderStream << fragmentShaderFile.rdbuf();
-    vertexShaderFile.close();
-    fragmentShaderFile.close();
-    vertexCode = vShaderStream.str();
-    fragmentCode = fShaderStream.str();
-    if (gShaderFile != nullptr) {
-      std::ifstream geometryShaderFile(gShaderFile);
-      std::stringstream gShaderStream;
-      gShaderStream << geometryShaderFile.rdbuf();
-      geometryShaderFile.close();
-      geometryCode = gShaderStream.str();
+  auto readFile = [](const char *path) {
+    std::ifstream f(path);
+    if (!f) {
+      LOG_ERROR("Failed to read shader file: %s", path);
     }
-  } catch (const std::exception &e) {
-    LOG_ERROR("ERROR::SHADER: Failed to read shader files");
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+  };
+  if (gShaderFile != nullptr) {
+    LOG_ERROR("Geometry shaders are not supported; ignoring %s", gShaderFile);
   }
   auto shader = std::make_unique<Shader>(*m_device);
-  shader->compile(vertexCode.c_str(), fragmentCode.c_str(),
-                  gShaderFile != nullptr ? geometryCode.c_str() : nullptr);
+  const std::string engineShaders =
+      utils::Utils::getAssetPath("assets/shaders");
+  shader->compile(readFile(vShaderFile), readFile(fShaderFile),
+                  std::filesystem::path(vShaderFile).stem().string(),
+                  {engineShaders});
   return shader;
 }
 

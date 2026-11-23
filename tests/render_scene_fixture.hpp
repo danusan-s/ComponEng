@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fake_render_device.hpp"
+#include "fake_device.hpp"
 
 #include "componeng/camera/camera_component.hpp"
 #include "componeng/camera/main_camera.hpp"
@@ -32,17 +32,84 @@ using namespace componeng::core;
 using namespace componeng::ecs;
 using namespace componeng::renderer;
 
-// instanceModel (mat4 as 4 rows) + instanceColor (vec4): what diffuse.vert
-// reflects to.
-inline api::VertexLayout diffuseLayout() {
-  api::VertexLayout layout;
-  for (int row = 0; row < 4; ++row) {
-    layout.attributes.push_back(
-        {Name("instanceModel"), uint32_t(row * 16), 4, false, row});
+// What the test shaders declare. Shader "a" is the one tests customise;
+// shader "b" is always the plain one.
+struct SceneOptions {
+  // Per-instance inputs instanceModel and instanceColor; off for procedural
+  // draws, whose shaders read INSTANCE_INDEX instead.
+  bool instanced = true;
+  // The instanceFade float after them, for LOD cross-fades.
+  bool fade = false;
+  // Shader "a" also reads a Settings uniform block (set 1, binding 2),
+  // samplers heightMap, first and second (bindings 3 to 5) and a storage block
+  // positions (binding 6), which materials can bind.
+  bool extras = false;
+};
+
+inline std::string testVertexSource(const SceneOptions &o) {
+  std::string s = "#version 460\n"
+                  "#include \"frame_data.glsl\"\n"
+                  "layout(location = 0) in vec3 aPos;\n"
+                  "layout(location = 1) in vec3 aNormal;\n"
+                  "layout(location = 2) in vec2 aUV;\n";
+  if (o.instanced) {
+    s += "layout(location = 3) in mat4 instanceModel;\n"
+         "layout(location = 7) in vec4 instanceColor;\n";
+    if (o.fade) {
+      s += "layout(location = 8) in float instanceFade;\n";
+    }
   }
-  layout.attributes.push_back({Name("instanceColor"), 64, 4, false, -1});
-  layout.stride = 80;
-  return layout;
+  s += "layout(location = 0) out vec2 vUV;\n"
+       "layout(location = 1) out vec4 vColor;\n"
+       "layout(location = 2) flat out float vFade;\n"
+       "invariant gl_Position;\n"
+       "void main() {\n";
+  s += std::string("  vUV = aUV + aNormal.xy;\n  vColor = ") +
+       (o.instanced ? "instanceColor" : "vec4(1.0)") +
+       ";\n  vFade = " + (o.instanced && o.fade ? "instanceFade" : "0.0") +
+       ";\n  gl_Position = viewProj * " +
+       (o.instanced ? "instanceModel" : "mat4(1.0)") +
+       " * vec4(aPos, 1.0);\n}\n";
+  return s;
+}
+
+inline std::string testFragmentSource(bool extras) {
+  std::string s = "#version 460\n"
+                  "#include \"frame_data.glsl\"\n"
+                  "#include \"lod_fade.glsl\"\n"
+                  "layout(location = 0) in vec2 vUV;\n"
+                  "layout(location = 1) in vec4 vColor;\n"
+                  "layout(location = 2) flat in float vFade;\n"
+                  "layout(BIND(1, 1)) uniform sampler2D albedoMap;\n";
+  if (extras) {
+    s +=
+        "layout(std140, BIND(1, 2)) uniform Settings { vec4 settingsValue; };\n"
+        "layout(BIND(1, 3)) uniform sampler2D heightMap;\n"
+        "layout(BIND(1, 4)) uniform sampler2D first;\n"
+        "layout(BIND(1, 5)) uniform sampler2D second;\n"
+        "layout(std430, BIND(1, 6)) readonly buffer Positions { vec4 "
+        "positions[]; };\n";
+  }
+  s += "layout(location = 0) out vec4 outColor;\n"
+       "void main() {\n"
+       "  lodFadeDiscard(vFade);\n"
+       "#ifdef COMPONENG_DEPTH_PREPASS\n"
+       "  return;\n"
+       "#endif\n"
+       "  vec4 c = texture(albedoMap, vUV) * vColor * vec4(lightColor, 1.0);\n";
+  if (extras) {
+    s += "  c += texture(heightMap, vUV) + texture(first, vUV) + "
+         "texture(second, vUV) + settingsValue + positions[0];\n";
+  }
+  s += "  outColor = c;\n}\n";
+  return s;
+}
+
+// The id the fake gave shader `name`'s modules, for tests that compare draws
+// against a variant of a particular shader.
+inline int fragmentModuleId(const Shader &shader, Shader::Variant v) {
+  return static_cast<fakerhi::FakeShaderModule *>(shader.program(v).fragment)
+      ->id();
 }
 
 // A tiny triangle (3 indices) and quad (6 indices) so the two meshes are
@@ -55,18 +122,39 @@ inline const char *kQuadObj =
 
 struct Scene {
   std::unique_ptr<World> world;
-  fake::FakeRenderDevice *device = nullptr; // owned by the world
+  fakerhi::FakeDevice *device = nullptr; // owned by the world
   EntityID camera = INVALID_ENTITY;
 
-  fake::Recorder &rec() {
+  fakerhi::Recorder &rec() {
     return device->rec;
   }
   AssetManager &assets() {
     return world->getResource<AssetManager>();
   }
 
+  // One frame as the window loop runs it: open, update every system, present.
   void frame() {
+    device->beginFrame();
     world->updateSystems(0.016f);
+    device->present(nullptr);
+  }
+
+  // Loads one of the engine's own full-screen shaders under `name`.
+  void loadBundled(const char *vertexFile, const char *fragmentFile,
+                   const char *name) {
+    assets().loadShader(
+        utils::Utils::getAssetPath(std::string("assets/shaders/") + vertexFile)
+            .c_str(),
+        utils::Utils::getAssetPath(std::string("assets/shaders/") +
+                                   fragmentFile)
+            .c_str(),
+        nullptr, name);
+  }
+  void loadSky(const char *name = "skybox") {
+    loadBundled("skybox_procedural.vert", "skybox_procedural.frag", name);
+  }
+  void loadPostProcess() {
+    loadBundled("post_process.vert", "post_process.frag", "post_process");
   }
 
   EntityID spawn(const char *mesh, const char *material, float x = 0.0f) {
@@ -81,24 +169,25 @@ struct Scene {
   }
 };
 
-// shaders: "a" = id 1, "b" = id 2.  textures: "t1" = id 1, "t2" = id 2.
-// meshes: "tri" (3 indices), "quad" (6).
-// materials: matA = shader a + t1, matB = shader b + t2, matC = shader a + t2.
+// shaders: "a" = shader 1, "b" = shader 2 (see FakeDevice's Draw::shaderId).
+// textures: "t1" = image 1, "t2" = image 2. meshes: "tri" (3 indices), "quad"
+// (6). materials: matA = shader a + t1, matB = shader b + t2, matC = shader a
+// + t2.
 inline std::unique_ptr<Scene>
-makeScene(const std::function<void(fake::Recorder &)> &configure = {},
+makeScene(const std::function<void(SceneOptions &)> &configure = {},
           bool withCulling = false) {
+  SceneOptions options;
+  if (configure) {
+    configure(options);
+  }
   auto scene = std::make_unique<Scene>();
   scene->world = std::make_unique<World>();
   World &world = *scene->world;
 
-  auto device = std::make_unique<fake::FakeRenderDevice>();
+  auto device = std::make_unique<fakerhi::FakeDevice>();
   scene->device = device.get();
-  scene->device->rec.instanceLayout = diffuseLayout();
-  if (configure) {
-    configure(scene->device->rec);
-  }
-  std::unique_ptr<api::IRenderDevice> base = std::move(device);
-  world.setResource<std::unique_ptr<api::IRenderDevice>>(std::move(base));
+  std::unique_ptr<rhi::IDevice> base = std::move(device);
+  world.setResource<std::unique_ptr<rhi::IDevice>>(std::move(base));
   world.setResource<AssetManager>(AssetManager(world.getRenderDevice()));
   world.setResource<resources::Fog>(resources::Fog{});
   // Off by default so a test sees each batch drawn once; the depth pre-pass
@@ -111,10 +200,12 @@ makeScene(const std::function<void(fake::Recorder &)> &configure = {},
                            DirectionalLightComponent, SkyboxComponent>();
 
   AssetManager &assets = scene->assets();
-  // Shader sources are never read by the fake device, so missing files are
-  // fine; what matters is that creation goes through the device.
-  assets.loadShader("none.vert", "none.frag", nullptr, "a");
-  assets.loadShader("none.vert", "none.frag", nullptr, "b");
+  // Real shaders, compiled by the real compiler; the fake device only sees
+  // their SPIR-V.
+  assets.compileShader("a", testVertexSource(options),
+                       testFragmentSource(options.extras));
+  assets.compileShader("b", testVertexSource(options),
+                       testFragmentSource(false));
   const std::string white =
       utils::Utils::getAssetPath("assets/textures/white.png");
   assets.loadTexture(white.c_str(), false, "t1");

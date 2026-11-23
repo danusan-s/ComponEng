@@ -6,7 +6,6 @@
 #include "componeng/renderer/asset/diffuse.hpp"
 #include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/batching_system.hpp"
 #include "componeng/renderer/component/light_component.hpp"
 #include "componeng/renderer/component/material_component.hpp"
@@ -73,10 +72,10 @@ void RenderPlugin::ready(ecs::World &world) {
   assetManager.registerMaterial<renderer::DiffuseMaterial>(
       "transparent_diffuse", "default", "white");
   {
-    renderer::api::RenderState state;
-    state.cull = renderer::api::CullMode::Back;
+    rhi::RenderState state;
+    state.cull = rhi::CullMode::Back;
     state.depthWrite = false;
-    state.blend = renderer::api::BlendMode::Alpha;
+    state.blend = rhi::BlendMode::Alpha;
     auto &transparent = assetManager.getMaterial(
         assetManager.getMaterialID("transparent_diffuse"));
     transparent.setType(renderer::MaterialType::Transparent);

@@ -1,15 +1,13 @@
 #pragma once
 
 #include "componeng/renderer/backend/api/pass_id.hpp"
+#include "componeng/renderer/backend/api/rhi/device.hpp"
 
 #include <chrono>
 
 namespace componeng::renderer {
 
 class Shader;
-namespace api {
-class IRenderDevice;
-}
 
 } // namespace componeng::renderer
 
@@ -31,7 +29,7 @@ namespace componeng::renderer {
  */
 class PassProfiler {
 public:
-  PassProfiler(api::IRenderDevice &device, resources::RenderStats &stats);
+  PassProfiler(rhi::IDevice &device, resources::RenderStats &stats);
 
   void beginPass(api::PassId pass);
   void endPass(api::PassId pass);
@@ -48,7 +46,7 @@ public:
 private:
   using Clock = std::chrono::steady_clock;
 
-  api::IRenderDevice &m_device;
+  rhi::IDevice &m_device;
   resources::RenderStats &m_stats;
   const Shader *m_timedShader = nullptr;
   Clock::time_point m_passStart{};

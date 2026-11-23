@@ -1,31 +1,13 @@
-#version 330 core
+#version 460
 
-// Vertex attributes
-layout(location = 0) in vec3 aPos;    // x, y, z
-layout(location = 1) in vec3 aNormal; // nx, ny, nz
-layout(location = 2) in vec2 aUV;     // u, v
+#include "frame_data.glsl"
+#include "mesh_instance.glsl"
 
-layout(location = 3) in mat4 instanceModel; // Per-instance model matrix
-layout(location = 7) in vec4 instanceColor; // Per-instance color
-layout(location = 8) in float instanceFade;  // LOD cross-fade, 0 = none
-
-// Per-frame values, uploaded once per frame by the RenderSystem. Must match
-// renderer/frame_data.hpp exactly, and be declared identically in every stage.
-layout(std140) uniform FrameData {
-    mat4 viewProj;
-    vec3 cameraPos;      float time;
-    vec3 lightDir;       float fogDensity;
-    vec3 lightColor;     float fogStart;
-    vec3 ambientColor;   float ambientStrength;
-    vec4 fogColor;
-    float fogEnd;
-};
-
-out vec3 FragPos;
-out vec4 ObjectColor;
-out vec3 Normal;
-out vec2 TexCoords;
-flat out float LodFade;
+layout(location = 0) out vec3 FragPos;
+layout(location = 1) out vec4 ObjectColor;
+layout(location = 2) out vec3 Normal;
+layout(location = 3) out vec2 TexCoords;
+layout(location = 4) flat out float LodFade;
 
 // Both the depth pre-pass and the colour pass run this stage; invariance makes
 // them compute exactly the same depth, which the "equal" depth test relies on.
@@ -40,4 +22,3 @@ void main()
     TexCoords = aUV;
     gl_Position = viewProj * instanceModel * vec4(aPos, 1.0f);
 }
-

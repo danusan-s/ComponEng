@@ -4,8 +4,8 @@
 #include "componeng/core/string_interner.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/backend/api/pass_id.hpp"
+#include "componeng/renderer/backend/api/rhi/device.hpp"
 #include "componeng/resources/render_stats.hpp"
 
 #include <algorithm>
@@ -56,7 +56,7 @@ private:
  *  - Swap + events: the swap and event polling. Large here means the CPU is
  *    waiting on the GPU (or the driver), i.e. the frame is GPU-bound.
  *  - GPU frame: GPU time for the frame's commands, measured with timer
- *    queries (a few frames behind, see IRenderDevice::beginGpuTimer).
+ *    queries (a few frames behind, see rhi::IDevice::beginGpuTimer).
  *  - Per system: each system's onUpdate wall time.
  *  - Per render pass: GPU time (timestamp queries, like the frame's), the CPU
  *    time spent submitting it, and what it drew (resources::RenderStats).
@@ -74,7 +74,7 @@ public:
   static constexpr double kWindowSeconds = 0.5;
 
   void record(const ecs::World &world, const renderer::AssetManager *assets,
-              const renderer::api::IRenderDevice &device,
+              const renderer::rhi::IDevice &device,
               const resources::RenderStats *stats, double deltaSeconds,
               double cpuMs, double swapMs, double gpuMs) {
     m_cpu.add(cpuMs);

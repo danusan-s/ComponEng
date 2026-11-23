@@ -3,160 +3,204 @@
 #include "componeng/utils/logger.hpp"
 
 #include <algorithm>
-#include <vector>
+#include <atomic>
 
 namespace componeng::renderer {
 
-// What the depth pre-pass runs for every fragment: nothing. The depth buffer
-// is written by the rasteriser, not by the shader.
-static constexpr const char *kDepthOnlyFragmentSource =
-    "#version 330 core\nvoid main() {}\n";
+namespace {
 
-std::string defineAfterVersion(const std::string &source, const char *name) {
-  const std::string define = std::string("#define ") + name + " 1\n";
-  // `#version` has to be the first directive, so the define goes after it.
-  std::size_t version = source.find("#version");
-  while (version != std::string::npos && version != 0 &&
-         source[version - 1] != '\n') {
-    version = source.find("#version", version + 1);
-  }
-  if (version == std::string::npos) {
-    return define + source;
-  }
-  std::size_t lineEnd = source.find('\n', version);
-  lineEnd = lineEnd == std::string::npos ? source.size() : lineEnd + 1;
-  std::string out = source.substr(0, lineEnd);
-  if (out.empty() || out.back() != '\n') {
-    out += '\n';
-  }
-  return out + define + source.substr(lineEnd);
+constexpr const char *kEmptyFragment =
+    "#version 460\nlayout(location = 0) out vec4 unused;\nvoid main() {}\n";
+
+shader::Target targetFor(rhi::Backend backend) {
+  return backend == rhi::Backend::Vulkan ? shader::Target::Vulkan
+                                         : shader::Target::OpenGL;
 }
 
-Shader::Shader(api::IRenderDevice &device)
-    : m_device(&device), m_impl(device.createShader()) {
+void logFailure(const std::string &name, const char *stage,
+                const std::string &log) {
+  LOG_ERROR("Shader '%s' (%s) failed to compile:\n%s", name.c_str(), stage,
+            log.c_str());
 }
 
-void Shader::use() const {
-  m_impl->use();
+uint64_t nextTimerId() {
+  static std::atomic<uint64_t> next{1};
+  return next++;
+}
+
+} // namespace
+
+Shader::Shader(rhi::IDevice &device)
+    : m_device(&device), m_timerId(nextTimerId()) {
+}
+
+rhi::IShaderModule *
+Shader::module(rhi::ShaderStage stage, const shader::CompiledStage &compiled,
+               std::unique_ptr<rhi::IShaderModule> &slot) const {
+  rhi::ShaderModuleDesc d;
+  d.stage = stage;
+  d.code = compiled.spirv.data();
+  d.wordCount = compiled.spirv.size();
+  d.debugName = m_name.c_str();
+  slot = m_device->createShaderModule(d);
+  return slot.get();
+}
+
+bool Shader::compile(const std::string &vertexSource,
+                     const std::string &fragmentSource, const std::string &name,
+                     const std::vector<std::string> &includeRoots) {
+  m_valid = false;
+  m_name = name;
+  m_fragmentSource = fragmentSource;
+  m_roots = includeRoots;
+  m_vertex.reset();
+  m_fragment.reset();
+  m_materialLayout.reset();
+  m_depthFragment.reset();
+  m_alphaTestedFragment.reset();
+  m_reflection = shader::Reflection{};
+
+  const shader::Target target = targetFor(m_device->backend());
+  const shader::CompiledStage vs =
+      shader::compile(rhi::ShaderStage::Vertex, vertexSource, name + ".vert",
+                      target, shader::ShaderFlag::None, includeRoots);
+  const shader::CompiledStage fs = shader::compile(
+      rhi::ShaderStage::Fragment, fragmentSource, name + ".frag", target,
+      shader::ShaderFlag::None, includeRoots);
+  if (!vs.ok) {
+    logFailure(name, "vertex", vs.log);
+  }
+  if (!fs.ok) {
+    logFailure(name, "fragment", fs.log);
+  }
+  if (!vs.ok || !fs.ok) {
+    return false;
+  }
+
+  std::string error;
+  if (!shader::mergeReflection({&vs.reflection, &fs.reflection}, m_reflection,
+                               error)) {
+    LOG_ERROR("Shader '%s': %s", name.c_str(), error.c_str());
+    return false;
+  }
+
+  const shader::ReflectedResource *frame =
+      m_reflection.find(kFrameDataBlockName);
+  if (frame && frame->sizeBytes != sizeof(FrameData)) {
+    LOG_ERROR("Shader '%s': its FrameData block is %u bytes, but "
+              "renderer/frame_data.hpp has %zu; they have drifted apart",
+              name.c_str(), frame->sizeBytes, sizeof(FrameData));
+  }
+
+  module(rhi::ShaderStage::Vertex, vs, m_vertex);
+  module(rhi::ShaderStage::Fragment, fs, m_fragment);
+  m_materialLayout =
+      m_device->createBindGroupLayout(shader::setLayout(m_reflection, 1));
+  m_valid = true;
+  return true;
+}
+
+Shader::Program Shader::program(Variant variant) const {
+  if (!m_valid) {
+    return {};
+  }
+  const shader::Target target = targetFor(m_device->backend());
+  switch (variant) {
+    case Variant::Color:
+      return {m_vertex.get(), m_fragment.get()};
+    case Variant::DepthOnly: {
+      if (!m_depthFragment) {
+        const shader::CompiledStage empty = shader::compile(
+            rhi::ShaderStage::Fragment, kEmptyFragment, "depth_only.frag",
+            target, shader::ShaderFlag::None);
+        module(rhi::ShaderStage::Fragment, empty, m_depthFragment);
+      }
+      return {m_vertex.get(), m_depthFragment.get()};
+    }
+    case Variant::AlphaTestedDepth: {
+      if (!m_alphaTestedFragment) {
+        const shader::CompiledStage fs = shader::compile(
+            rhi::ShaderStage::Fragment, m_fragmentSource, m_name + ".frag",
+            target, shader::ShaderFlag::DepthPrepass, m_roots);
+        if (!fs.ok) {
+          logFailure(m_name, "alpha-tested depth fragment", fs.log);
+          return {};
+        }
+        module(rhi::ShaderStage::Fragment, fs, m_alphaTestedFragment);
+      }
+      return {m_vertex.get(), m_alphaTestedFragment.get()};
+    }
+  }
+  return {};
+}
+
+const shader::ReflectedResource *Shader::materialBlock() const {
+  for (const shader::ReflectedResource &r : m_reflection.resources) {
+    if (r.set == 1 && r.binding == 0 &&
+        r.kind == shader::ResourceKind::UniformBlock) {
+      return &r;
+    }
+  }
+  return nullptr;
+}
+
+api::VertexLayout Shader::instanceLayout() const {
+  api::VertexLayout layout;
+  uint32_t offset = 0;
+  for (const shader::VertexInput &in : m_reflection.vertexInputs) {
+    if (in.location < api::kFirstInstanceAttribLocation) {
+      continue;
+    }
+    uint32_t components = 0;
+    bool matrix = false;
+    switch (in.type) {
+      case shader::ValueType::Float:
+        components = 1;
+        break;
+      case shader::ValueType::Vec2:
+        components = 2;
+        break;
+      case shader::ValueType::Vec3:
+        components = 3;
+        break;
+      case shader::ValueType::Vec4:
+        components = 4;
+        break;
+      case shader::ValueType::Mat4:
+        components = 4;
+        matrix = true;
+        break;
+      default:
+        LOG_ERROR("Shader '%s': per-instance input '%s' must be a float "
+                  "vector or a mat4",
+                  m_name.c_str(), in.name.c_str());
+        continue;
+    }
+    for (int row = 0; row < (matrix ? 4 : 1); ++row) {
+      api::VertexAttribute a;
+      a.name = core::Name(in.name.c_str());
+      a.offset = offset;
+      a.componentCount = components;
+      a.matrixRow = matrix ? row : -1;
+      a.location = static_cast<int>(in.location) + row;
+      layout.attributes.push_back(a);
+      offset += components * sizeof(float);
+    }
+  }
+  layout.stride = offset;
+  return layout;
 }
 
 void Shader::beginGpuTimer() const {
-  m_impl->beginGpuTimer();
+  m_device->beginShaderTimer(m_timerId);
 }
 
 void Shader::endGpuTimer() const {
-  m_impl->endGpuTimer();
-}
-
-void Shader::collectGpuTimer() const {
-  m_impl->collectGpuTimer();
+  m_device->endShaderTimer(m_timerId);
 }
 
 double Shader::lastGpuTimeMs() const {
-  return m_impl->lastGpuTimeMs();
-}
-
-void Shader::compile(const char *vertexSource, const char *fragmentSource,
-                     const char *geometrySource) {
-  m_vertexSource = vertexSource;
-  m_hasGeometry = geometrySource != nullptr;
-  m_geometrySource = m_hasGeometry ? geometrySource : "";
-  m_fragmentSource = fragmentSource ? fragmentSource : "";
-  // Built from the sources that were just replaced.
-  m_depthVariant.reset();
-  m_alphaTestedDepthVariant.reset();
-  m_impl->loadGLSL(vertexSource, fragmentSource, geometrySource);
-  if (!m_impl->bindUniformBlock(kFrameDataBlockName, kFrameDataBinding,
-                                sizeof(FrameData))) {
-    warnIfLooseFrameUniforms();
-  }
-}
-
-void Shader::warnIfLooseFrameUniforms() const {
-  // A shader may skip the block when it needs no per-frame values. One that
-  // reads them as plain uniforms would get zeros, since the engine only
-  // uploads the block.
-  static const char *const kFrameNames[] = {
-      "viewProj", "cameraPos",  "lightDir", "lightColor", "ambientColor",
-      "fogColor", "fogDensity", "fogStart", "fogEnd",     "time"};
-  const std::vector<core::Name> active = m_impl->reflectActiveUniformNames();
-  for (const char *name : kFrameNames) {
-    const core::Name n(name);
-    if (std::find(active.begin(), active.end(), n) != active.end()) {
-      LOG_ERROR("Shader reads '%s' as a loose uniform, but the engine only "
-                "uploads per-frame values in the %s block; declare it",
-                name, kFrameDataBlockName);
-    }
-  }
-}
-
-void Shader::setFloat(const char *name, float value) const {
-  m_impl->setFloat(name, value);
-}
-
-void Shader::setInteger(const char *name, int value) const {
-  m_impl->setInteger(name, value);
-}
-
-void Shader::setVector2f(const char *name, float x, float y) const {
-  m_impl->setVector2f(name, x, y);
-}
-
-void Shader::setVector2f(const char *name, const core::Vec2 &value) const {
-  m_impl->setVector2f(name, value.x, value.y);
-}
-
-void Shader::setVector3f(const char *name, float x, float y, float z) const {
-  m_impl->setVector3f(name, x, y, z);
-}
-
-void Shader::setVector3f(const char *name, const core::Vec3 &value) const {
-  m_impl->setVector3f(name, value.x, value.y, value.z);
-}
-
-void Shader::setVector4f(const char *name, float x, float y, float z,
-                         float w) const {
-  m_impl->setVector4f(name, x, y, z, w);
-}
-
-void Shader::setVector4f(const char *name, const core::Vec4 &value) const {
-  m_impl->setVector4f(name, value.x, value.y, value.z, value.w);
-}
-
-void Shader::setMatrix4(const char *name, const core::Mat4 &matrix) const {
-  m_impl->setMatrix4(name, &matrix[0][0]);
-}
-
-bool Shader::bindUniformBlock(const char *blockName, uint32_t binding) const {
-  return m_impl->bindUniformBlock(blockName, binding);
-}
-
-const Shader &Shader::depthVariant() const {
-  if (!m_depthVariant) {
-    m_depthVariant = std::make_unique<Shader>(*m_device);
-    m_depthVariant->compile(m_vertexSource.c_str(), kDepthOnlyFragmentSource,
-                            m_hasGeometry ? m_geometrySource.c_str() : nullptr);
-  }
-  return *m_depthVariant;
-}
-
-const Shader &Shader::alphaTestedDepthVariant() const {
-  if (!m_alphaTestedDepthVariant) {
-    m_alphaTestedDepthVariant = std::make_unique<Shader>(*m_device);
-    m_alphaTestedDepthVariant->compile(
-        m_vertexSource.c_str(),
-        defineAfterVersion(m_fragmentSource, kDepthPrepassDefine).c_str(),
-        m_hasGeometry ? m_geometrySource.c_str() : nullptr);
-  }
-  return *m_alphaTestedDepthVariant;
-}
-
-api::VertexLayout Shader::reflectInstanceLayout() const {
-  return m_impl->reflectInstanceLayout();
-}
-
-std::vector<core::Name> Shader::reflectActiveUniformNames() const {
-  return m_impl->reflectActiveUniformNames();
+  return m_device->shaderTimeMs(m_timerId);
 }
 
 } // namespace componeng::renderer

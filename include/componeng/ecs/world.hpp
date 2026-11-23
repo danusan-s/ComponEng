@@ -10,7 +10,7 @@
 #include "componeng/ecs/system_manager.hpp"
 #include "componeng/ecs/thread_pool.hpp"
 #include "componeng/events/event_bus.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/backend/api/rhi/device.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <memory>
@@ -90,7 +90,7 @@ public:
   template <typename Fn> void forEachSystemTiming(Fn &&fn) const {
     m_systemManager.forEachSystemTiming(std::forward<Fn>(fn));
   }
-  renderer::api::IRenderDevice &getRenderDevice();
+  renderer::rhi::IDevice &getRenderDevice();
   double getTime() const;
 
   template <typename T> void registerComponent() {

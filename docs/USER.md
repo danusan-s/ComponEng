@@ -648,11 +648,12 @@ to the fragment stage, and discarding on it (copy `lodDither()` and the first
 lines of `main` from `assets/shaders/diffuse.frag`, including the
 `COMPONENG_DEPTH_PREPASS` early return, since a batch with fading instances
 runs the fragment stage in the depth pre-pass so both passes discard the same
-pixels):
+pixels). `#include "lod_fade.glsl"` gives you `lodFadeDiscard(fade)`:
 
 ```glsl
 layout(location = 8) in float instanceFade;   // vertex: 0 = no fade
-flat out float LodFade;                        // ... LodFade = instanceFade;
+layout(location = 4) flat out float LodFade;   // ... LodFade = instanceFade;
+// fragment: lodFadeDiscard(LodFade);
 ```
 
 A material whose shader has no `instanceFade` attribute keeps the hard switch.
@@ -687,29 +688,33 @@ applies to `RGB8`/`RGBA8`.
 
 ### Giving a material extra textures and buffers
 
-A material can hand its shader any number of textures and buffers by name.
-The RenderSystem binds them before each of the material's draws (textures and
-texture buffers take units from 5 up; uniform blocks take binding points from 1
-up; the per-frame block stays at 0):
+A material can hand its shader any number of textures and buffers by name. They
+are bound together with the material's own parameters as set 1 of the shader
+(a name the shader does not declare is logged and ignored):
 
 ```cpp
 auto &mat = assets.getMaterial(assets.getMaterialID("grass"));
-mat.setTexture("heightMap", assets.getTextureID("heights"));      // sampler2D
-mat.setUniformBuffer("Settings", assets.getBufferID("settings")); // std140 block
-mat.setBufferTexture("positions", assets.getBufferID("positions"),
-                     renderer::api::BufferTextureFormat::RGBA32F); // samplerBuffer
+mat.setUniform("windStrength", 0.4f);                              // material block member
+mat.setTexture("heightMap", assets.getTextureID("heights"));       // sampler2D
+mat.setUniformBuffer("Settings", assets.getBufferID("settings"));  // std140 block
+mat.setStorageBuffer("Positions", assets.getBufferID("positions")); // std430 block
 ```
 
 ```glsl
-uniform sampler2D heightMap;
-layout(std140) uniform Settings { vec4 tint; };
-uniform samplerBuffer positions;                // texelFetch(positions, i)
+layout(std140, BIND(1, 0)) uniform Material { float windStrength; };
+layout(BIND(1, 1)) uniform sampler2D albedoMap;
+layout(BIND(1, 2)) uniform sampler2D heightMap;
+layout(std140, BIND(1, 3)) uniform Settings { vec4 tint; };
+layout(std430, BIND(1, 4)) readonly buffer Positions { vec4 positions[]; };
+// positions[INSTANCE_INDEX]
 ```
 
 Use a uniform block for a few values (blocks are limited to roughly 16 KB) and
-a buffer texture for long lists, which has no such small limit. Setting the
-same name again replaces what it points at. These work for ordinary and
-procedural draws alike.
+a storage block for long lists, which has no such small limit. Setting the same
+name again replaces what it points at. These work for ordinary and procedural
+draws alike. The old `setBufferTexture` / `samplerBuffer` pair is gone: use
+`setStorageBuffer` and a `readonly buffer` block (`R32F` becomes `float[]`,
+`RG32F` `vec2[]`, `RGBA32F` `vec4[]`).
 
 ### Procedural instancing
 
@@ -717,8 +722,8 @@ For things too numerous to be entities (grass, debris, rain), one entity can
 drive a whole instanced draw. Add a `ProceduralInstancesComponent` next to the
 usual transform, mesh and material; the engine draws the mesh `count` times and
 uploads **no** per-instance data. The vertex shader works out each copy from
-`gl_InstanceID`, the per-frame block (camera, time, light) and material
-uniforms:
+`INSTANCE_INDEX`, the per-frame block (camera, time, light) and material
+parameters:
 
 ```cpp
 world.addComponents(field,
@@ -730,8 +735,8 @@ world.addComponents(field,
 
 ```glsl
 // grass.vert: no per-instance attributes, so the material has none either
-float h1 = hash(float(gl_InstanceID));
-vec2 cell = vec2(gl_InstanceID % 512, gl_InstanceID / 512) * 0.3 + h1;
+float h1 = hash(float(INSTANCE_INDEX));
+vec2 cell = vec2(INSTANCE_INDEX % 512, INSTANCE_INDEX / 512) * 0.3 + h1;
 vec3 root = vec3(cell.x, 0.0, cell.y);   // placed entirely in the shader
 ```
 

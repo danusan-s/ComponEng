@@ -6,7 +6,7 @@ namespace componeng::renderer::api {
 
 /**
  * @brief The stages the RenderPipeline draws a frame in, in order. Each is
- * timed on the GPU (IRenderDevice::beginGpuPass) and has its own counters
+ * timed on the GPU (rhi::IDevice::beginGpuPass) and has its own counters
  * (resources::RenderStats).
  */
 enum class PassId : int {

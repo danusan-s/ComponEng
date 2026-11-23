@@ -10,16 +10,21 @@
 
 namespace componeng::renderer {
 
-void Mesh::uploadToGPU(api::IRenderDevice &device) {
+void Mesh::uploadToGPU(rhi::IDevice &device) {
   if (m_vertices.empty() || m_indices.empty()) {
     LOG_ERROR("Cannot initialize buffers for an empty mesh.");
     return;
   }
 
   computeBounds();
-  m_impl = device.createMesh();
-  m_impl->upload(m_vertices.data(), m_vertices.size() / 8, m_indices.data(),
-                 m_indices.size(), api::defaultMeshLayout());
+  const uint64_t vertexBytes = m_vertices.size() * sizeof(float);
+  const uint64_t indexBytes = m_indices.size() * sizeof(uint32_t);
+  m_vertexBuffer = device.createBuffer({vertexBytes, rhi::BufferUsage::Vertex,
+                                        rhi::MemoryKind::GpuOnly, "mesh"});
+  m_indexBuffer = device.createBuffer(
+      {indexBytes, rhi::BufferUsage::Index, rhi::MemoryKind::GpuOnly, "mesh"});
+  device.uploadBuffer(*m_vertexBuffer, 0, m_vertices.data(), vertexBytes);
+  device.uploadBuffer(*m_indexBuffer, 0, m_indices.data(), indexBytes);
 }
 
 void Mesh::computeBounds() {
@@ -188,10 +193,6 @@ void Mesh::generateFromWavefrontObj(const std::string &data) {
                         texCoords[i].end());
     }
   }
-}
-
-size_t Mesh::indexCount() const {
-  return m_impl->indexCount();
 }
 
 } // namespace componeng::renderer

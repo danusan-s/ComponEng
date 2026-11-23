@@ -17,15 +17,18 @@ namespace componeng::renderer {
  *
  * Per-instance data: instanceModel (mat4) + instanceColor (vec4), written by
  * DiffuseMaterial, whose per-instance layout this material shares.
- * Material uniforms: albedoMap, normalMap, metallicMap, roughnessMap, aoMap,
- *   lightDir, lightColor, cameraPos, ambientColor, ambientStrength,
- *   fogColor, fogDensity, fogStart, fogEnd, useTextures, useNormalMap
+ * Samplers the shader declares: albedoMap, normalMap, metallicMap,
+ *   roughnessMap, aoMap. A map the material has none of falls back to the
+ *   albedo. Its parameter block holds useTextures and useNormalMap, which this
+ *   material sets to 1.
  */
 class PbrMaterial : public DiffuseMaterial {
 public:
   PbrMaterial(core::HandleID shaderID, core::HandleID textureID)
       : DiffuseMaterial(shaderID, textureID), m_normalMapID(0),
         m_metallicMapID(0), m_roughnessMapID(0), m_aoMapID(0) {
+    setOptionalUniform("useTextures", 1);
+    setOptionalUniform("useNormalMap", 1);
   }
 
   core::HandleID getNormalMapID() const override {
@@ -43,15 +46,19 @@ public:
 
   void setNormalMapID(core::HandleID id) {
     m_normalMapID = id;
+    touch();
   }
   void setMetallicMapID(core::HandleID id) {
     m_metallicMapID = id;
+    touch();
   }
   void setRoughnessMapID(core::HandleID id) {
     m_roughnessMapID = id;
+    touch();
   }
   void setAOMapID(core::HandleID id) {
     m_aoMapID = id;
+    touch();
   }
 
 private:

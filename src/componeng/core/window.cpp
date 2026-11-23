@@ -126,12 +126,12 @@ void Window::init(ecs::World &world, int width, int height, const char *title) {
   // Vulkan owns the surface: GLFW must not create a GL context.
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 #else
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  // 4.6 core is the backend's floor: storage buffers, compute, indirect-count
+  // draws and SPIR-V ingestion are core there (macOS stops at 4.1 and is not
+  // supported).
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#ifdef __APPLE__
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
-#endif
 #endif
 
   GLFWmonitor *primaryMonitor = glfwGetPrimaryMonitor();
@@ -183,15 +183,13 @@ void Window::setViewport(int w, int h) {
   if (currentAspectRatio > targetAspectRatio) {
     int newWidth = static_cast<int>(h * targetAspectRatio);
     int xOffset = (w - newWidth) / 2;
-    m_renderDevice->setScissor(xOffset, 0, newWidth, h);
-    m_renderDevice->setViewport(xOffset, 0, newWidth, h);
+    m_renderDevice->setWindowViewport(xOffset, 0, newWidth, h);
     return;
   }
 
   int newHeight = static_cast<int>(w / targetAspectRatio);
   int yOffset = (h - newHeight) / 2;
-  m_renderDevice->setScissor(0, yOffset, w, newHeight);
-  m_renderDevice->setViewport(0, yOffset, w, newHeight);
+  m_renderDevice->setWindowViewport(0, yOffset, w, newHeight);
 }
 
 void Window::shutdown() {

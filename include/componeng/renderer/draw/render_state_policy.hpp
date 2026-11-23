@@ -1,7 +1,7 @@
 #pragma once
 
-#include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/backend/api/pass_id.hpp"
+#include "componeng/renderer/backend/api/renderer_types.hpp"
 
 namespace componeng::renderer {
 

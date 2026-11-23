@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/backend/api/rhi/device.hpp"
 #include <GLFW/glfw3.h>
 
 namespace componeng::ecs {
@@ -40,7 +40,7 @@ public:
 
 private:
   GLFWwindow *m_handle = nullptr;
-  componeng::renderer::api::IRenderDevice *m_renderDevice = nullptr;
+  componeng::renderer::rhi::IDevice *m_renderDevice = nullptr;
   int m_width = 0;
   int m_height = 0;
 };

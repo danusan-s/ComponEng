@@ -9,8 +9,7 @@ namespace {
 
 // A shader with no per-instance attributes, as a procedural material has.
 std::unique_ptr<Scene> makeProceduralScene(bool withCulling = false) {
-  return makeScene([](fake::Recorder &r) { r.instanceLayout = {}; },
-                   withCulling);
+  return makeScene([](SceneOptions &o) { o.instanced = false; }, withCulling);
 }
 
 EntityID spawnProcedural(Scene &s, int count, bool cull = false,
@@ -58,7 +57,9 @@ TEST(ProceduralInstances, UploadsNoInstanceData) {
   ASSERT_EQ(s->rec().draws.size(), 1u);
   EXPECT_TRUE(s->rec().draws[0].instanceFloats.empty());
   // The per-frame values still reach the shader: only instance data is absent.
-  EXPECT_FALSE(s->rec().uniformBufferBinds.empty());
+  EXPECT_FALSE(s->rec().draws[0].bufferBytes.empty());
+  EXPECT_TRUE(s->rec().draws[0].vertexBufferIds.count(1) == 0)
+      << "no per-instance vertex buffer";
 }
 
 TEST(ProceduralInstances, EachEntityIsItsOwnDraw) {

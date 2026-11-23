@@ -3,7 +3,7 @@
 #include "componeng/core/transform_component.hpp"
 #include "componeng/core/types.hpp"
 #include "componeng/ecs/entity.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/backend/api/renderer_types.hpp"
 
 #include <algorithm>
 #include <cstdint>

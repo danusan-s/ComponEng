@@ -47,8 +47,8 @@ ThreadPool &World::threadPool() {
   return m_threadPool;
 }
 
-renderer::api::IRenderDevice &World::getRenderDevice() {
-  return *getResource<std::unique_ptr<renderer::api::IRenderDevice>>().get();
+renderer::rhi::IDevice &World::getRenderDevice() {
+  return *getResource<std::unique_ptr<renderer::rhi::IDevice>>().get();
 }
 
 double World::getTime() const {

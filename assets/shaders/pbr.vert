@@ -1,45 +1,17 @@
-#version 330 core
+#version 460
 
-// PBR vertex shader with normal mapping support.
-//
-// Per-instance attributes (locations 3-6, bound sequentially by the engine):
-//   location 3: instanceModel (mat4)  per-instance model matrix
-//   location 7: instanceColor (vec4)  per-instance tint
-//   location 8: instanceFade (float)  LOD cross-fade, 0 = none
-//
-// Mesh attributes:
-//   location 0: aPos (vec3)
-//   location 1: aNormal (vec3)
-//   location 2: aUV (vec2)
-//
-// Engine-provided values come from the FrameData block below.
+// PBR vertex shader. Mesh and per-instance attributes come from
+// mesh_instance.glsl, per-frame values from frame_data.glsl.
 
-layout(location = 0) in vec3 aPos;
-layout(location = 1) in vec3 aNormal;
-layout(location = 2) in vec2 aUV;
+#include "frame_data.glsl"
+#include "mesh_instance.glsl"
 
-layout(location = 3) in mat4 instanceModel;
-layout(location = 7) in vec4 instanceColor;
-layout(location = 8) in float instanceFade;
-
-// Per-frame values, uploaded once per frame by the RenderSystem. Must match
-// renderer/frame_data.hpp exactly, and be declared identically in every stage.
-layout(std140) uniform FrameData {
-    mat4 viewProj;
-    vec3 cameraPos;      float time;
-    vec3 lightDir;       float fogDensity;
-    vec3 lightColor;     float fogStart;
-    vec3 ambientColor;   float ambientStrength;
-    vec4 fogColor;
-    float fogEnd;
-};
-
-out vec3 FragPos;
-out vec3 Normal;
-out vec2 TexCoords;
-out vec3 ObjectColor;
-out vec3 WorldNormal;
-flat out float LodFade;
+layout(location = 0) out vec3 FragPos;
+layout(location = 1) out vec3 Normal;
+layout(location = 2) out vec2 TexCoords;
+layout(location = 3) out vec3 ObjectColor;
+layout(location = 4) out vec3 WorldNormal;
+layout(location = 5) flat out float LodFade;
 
 // Both the depth pre-pass and the colour pass run this stage; invariance makes
 // them compute exactly the same depth, which the "equal" depth test relies on.

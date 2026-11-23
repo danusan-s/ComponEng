@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
+#include "componeng/renderer/backend/api/rhi/device.hpp"
 #include "componeng/renderer/culling/bounds.hpp"
 
 #include <memory>
@@ -25,8 +25,9 @@ inline constexpr const char *kIndexedMarker = "#componeng_indexed";
 /**
  * @brief Mesh resource with vertex/index buffers.
  *
- * Parses Wavefront OBJ data and uploads to the GPU via the IMesh interface.
- * The underlying GPU resource is owned by this class.
+ * Parses Wavefront OBJ data and uploads it to two GPU buffers (vertices
+ * interleaved as position(3) normal(3) uv(2), and 32-bit indices). The buffers
+ * are owned by this class.
  */
 class Mesh {
 public:
@@ -34,21 +35,26 @@ public:
 
   /** Uploads the parsed data through `device`, which owns how the GPU
    *  resource is created. */
-  void uploadToGPU(api::IRenderDevice &device);
+  void uploadToGPU(rhi::IDevice &device);
 
   // Helper to generate mesh data from Wavefront OBJ format (vertices, normals,
   // texcoords). Files carrying kIndexedMarker are loaded as indexed meshes.
   void generateFromWavefrontObj(const std::string &data);
 
-  // Access to the underlying IMesh for render device operations
-  api::IMesh &getImpl() {
-    return *m_impl;
+  /** Null until uploadToGPU has run. */
+  rhi::IBuffer *vertexBuffer() const {
+    return m_vertexBuffer.get();
   }
-  const api::IMesh &getImpl() const {
-    return *m_impl;
+  rhi::IBuffer *indexBuffer() const {
+    return m_indexBuffer.get();
   }
 
-  size_t indexCount() const;
+  /** Bytes between two vertices in vertexBuffer(). */
+  static constexpr uint32_t kVertexStride = 32;
+
+  size_t indexCount() const {
+    return m_indices.size();
+  }
 
   /** Local-space bounds of the uploaded vertices; used for frustum culling. */
   const Aabb &bounds() const {
@@ -62,7 +68,8 @@ public:
 private:
   void computeBounds();
 
-  std::unique_ptr<api::IMesh> m_impl;
+  std::unique_ptr<rhi::IBuffer> m_vertexBuffer;
+  std::unique_ptr<rhi::IBuffer> m_indexBuffer;
   Aabb m_bounds;
 };
 

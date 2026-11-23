@@ -3,7 +3,6 @@
 #include "componeng/camera/main_camera.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/asset_manager.hpp"
-#include "componeng/renderer/backend/api/irender_device.hpp"
 #include "componeng/renderer/batching/render_queue.hpp"
 #include "componeng/renderer/pass/depth_prepass.hpp"
 #include "componeng/renderer/pass/opaque_pass.hpp"
@@ -45,11 +44,14 @@ void RenderSystem::onCreate(const ecs::SystemState &state) {
 
 void RenderSystem::onDestroy(const ecs::SystemState &) {
   // GPU objects have to go before the render device does.
-  m_sceneTarget.reset();
+  m_pipelines.clear();
+  m_materials.clear();
+  m_sceneColor.reset();
+  m_sceneDepth.reset();
+  m_sceneSampler.reset();
 }
 
-api::IRenderTarget *RenderSystem::sceneTargetFor(ecs::World &world,
-                                                 bool &fxaa) {
+rhi::IImage *RenderSystem::sceneTargetFor(ecs::World &world, bool &fxaa) {
   fxaa = false;
   float scale = 1.0f;
   if (world.hasResource<resources::RenderSettings>()) {
@@ -59,7 +61,8 @@ api::IRenderTarget *RenderSystem::sceneTargetFor(ecs::World &world,
   }
   const bool scaled = std::abs(scale - 1.0f) > 0.001f;
   if (!fxaa && !scaled) {
-    m_sceneTarget.reset();
+    m_sceneColor.reset();
+    m_sceneDepth.reset();
     return nullptr;
   }
   if (!world.getResource<AssetManager>().shaderExists("post_process")) {
@@ -69,12 +72,13 @@ api::IRenderTarget *RenderSystem::sceneTargetFor(ecs::World &world,
       m_warnedMissingPostProcess = true;
     }
     fxaa = false;
-    m_sceneTarget.reset();
+    m_sceneColor.reset();
+    m_sceneDepth.reset();
     return nullptr;
   }
 
-  api::IRenderDevice &device = world.getRenderDevice();
-  const api::Extent view = device.viewportExtent();
+  rhi::IDevice &device = world.getRenderDevice();
+  const rhi::Extent2D view = device.windowViewportExtent();
   const uint32_t width = static_cast<uint32_t>(
       std::max(1.0f, std::round(static_cast<float>(view.width) * scale)));
   const uint32_t height = static_cast<uint32_t>(
@@ -82,28 +86,46 @@ api::IRenderTarget *RenderSystem::sceneTargetFor(ecs::World &world,
   if (view.width == 0 || view.height == 0) {
     return nullptr;
   }
-  if (!m_sceneTarget || m_sceneTarget->width() != width ||
-      m_sceneTarget->height() != height) {
-    m_sceneTarget = device.createRenderTarget({width, height});
+  if (!m_sceneColor || m_sceneColor->extent() != rhi::Extent2D{width, height}) {
+    rhi::ImageDesc color;
+    color.extent = {width, height};
+    color.format = rhi::Format::RGBA8;
+    color.usage = rhi::ImageUsage::ColorAttachment | rhi::ImageUsage::Sampled;
+    color.flags = rhi::ImageFlags::PerFrame;
+    color.debugName = "scene color";
+    m_sceneColor = device.createImage(color);
+    rhi::ImageDesc depth = color;
+    depth.format = rhi::Format::D32F;
+    depth.usage = rhi::ImageUsage::DepthAttachment;
+    depth.debugName = "scene depth";
+    m_sceneDepth = device.createImage(depth);
+    if (!m_sceneSampler) {
+      rhi::SamplerDesc sampler;
+      sampler.mipFilter = rhi::Filter::Nearest;
+      m_sceneSampler = device.createSampler(sampler);
+    }
     LOG_INFO("Scene render target: %ux%u", width, height);
   }
-  return m_sceneTarget.get();
+  return m_sceneColor.get();
 }
 
 void RenderSystem::onUpdate(const ecs::SystemState &state) {
   ecs::World &world = *state.world;
-  api::IRenderDevice &device = world.getRenderDevice();
-  device.setRenderState(api::RenderState{});
-  bool fxaa = false;
-  api::IRenderTarget *sceneTarget = sceneTargetFor(world, fxaa);
-  device.setRenderTarget(sceneTarget);
-  device.clear(0.0f, 0.0f, 0.0f, 1.0f);
-
-  const ecs::EntityID camera = world.getResource<camera::MainCamera>().entity;
+  rhi::IDevice &device = world.getRenderDevice();
 
   // Counters and CPU timings for the debug panes; see resources::RenderStats.
   auto &stats = world.getResource<resources::RenderStats>();
   stats = resources::RenderStats();
+
+  // A minimised window skips the frame; the game keeps running.
+  if (!device.frameOpen()) {
+    return;
+  }
+
+  bool fxaa = false;
+  rhi::IImage *sceneColor = sceneTargetFor(world, fxaa);
+
+  const ecs::EntityID camera = world.getResource<camera::MainCamera>().entity;
 
   m_frame.update(world, camera);
 
@@ -120,16 +142,35 @@ void RenderSystem::onUpdate(const ecs::SystemState &state) {
   // A pre-pass only pays off when there is opaque geometry to prepass.
   const bool prepassed = depthPrepassEnabled(world) && queue.opaqueCount() > 0;
 
-  const PassContext ctx{
-      world,       camera,   device,    world.getResource<AssetManager>(),
-      m_frame,     profiler, stats,     queue,
-      m_instances, m_binder, prepassed, sceneTarget,
-      fxaa};
+  rhi::RenderingDesc scene;
+  scene.color.image = sceneColor;
+  scene.depth.image = sceneColor ? m_sceneDepth.get() : nullptr;
+  device.beginRendering(scene);
+  device.bindGroup(0, *m_frame.group());
+
+  const PassContext ctx{world,
+                        camera,
+                        device,
+                        world.getResource<AssetManager>(),
+                        m_frame,
+                        profiler,
+                        stats,
+                        queue,
+                        m_instances,
+                        m_materials,
+                        m_pipelines,
+                        prepassed,
+                        sceneColor,
+                        m_sceneSampler.get(),
+                        sceneColor ? rhi::Format::RGBA8
+                                   : device.backbufferFormat(),
+                        rhi::Format::D32F,
+                        fxaa};
   m_pipeline.execute(ctx);
 
-  // PostProcessPass has gone back to the window; this covers a frame that
-  // stopped short of it.
-  device.setRenderTarget(nullptr);
+  // Whichever rendering the last pass left open: the scene's, or the
+  // post-process pass's on the window.
+  device.endRendering();
 }
 
 } // namespace componeng::renderer
