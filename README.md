@@ -3,7 +3,7 @@
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)
 ![OpenGL](https://img.shields.io/badge/OpenGL-4.6-5586A4?logo=opengl&logoColor=white)
 ![Vulkan](https://img.shields.io/badge/Vulkan-1.3-A41E22?logo=vulkan&logoColor=white)
-![CMake](https://img.shields.io/badge/CMake-3.10%2B-064F8C?logo=cmake&logoColor=white)
+![CMake](https://img.shields.io/badge/CMake-3.25%2B-064F8C?logo=cmake&logoColor=white)
 ![GLFW](https://img.shields.io/badge/GLFW-3.3-20232A)
 ![Status](https://img.shields.io/badge/Project-Learning%20Project-6C8E5E)
 

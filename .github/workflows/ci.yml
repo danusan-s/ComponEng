@@ -24,6 +24,8 @@ jobs:
             libgl1-mesa-dev \
             libglew-dev \
             libglm-dev \
+            libglslang-dev \
+            libvulkan-dev \
             xvfb
 
       - name: Configure CMake
@@ -68,7 +70,9 @@ jobs:
           clang-tidy \
           libglfw3-dev \
           libgl1-mesa-dev \
-          libglm-dev
+          libglm-dev \
+          libglslang-dev \
+          libvulkan-dev
 
     # clang-tidy needs compile_commands.json, which configuring generates.
     - name: Configure CMake
