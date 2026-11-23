@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # Renderer backend selection: "opengl" or "vulkan"
-set(RENDERER_BACKEND "opengl" CACHE STRING "Renderer backend to use (opengl or vulkan)")
+set(RENDERER_BACKEND "vulkan" CACHE STRING "Renderer backend to use (opengl or vulkan)")
 set_property(CACHE RENDERER_BACKEND PROPERTY STRINGS "opengl" "vulkan")
 
 # Find dependencies
@@ -40,33 +40,18 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/ecs/*.cpp"
     "src/componeng/utils/*.cpp"
 )
-# Two independent switches for what a build shows and measures. ImGui is always
-# built: with the debug panels off it still draws a small FPS window.
-#
-# COMPONENG_DEBUG_UI: the debug panels (camera info, anything a game adds
-#   through DebugUI). OFF turns those calls into empty inlines and leaves only
-#   the FPS window.
-# COMPONENG_PROFILING (default OFF): measurement. GPU timer queries (frame, render pass,
-#   shader), per-pass and per-system CPU timings, and the timing panes that
-#   show them. OFF compiles all of that out, for a benchmark or a profile that
-#   should not pay for its own measurement.
+
 option(COMPONENG_DEBUG_UI "Show the ImGui debug panels (off: only the FPS window)" ON)
 option(COMPONENG_PROFILING "Measure GPU/CPU timings and show the timing panes" OFF)
-# COMPONENG_NETWORKING: build the ComponEngNet library (peer-to-peer networking).
-#   The engine does not depend on it: a game links ComponEngNet and calls
-#   net::installNetworking(world). OFF skips building it and its tests.
-# COMPONENG_MARCH: CPU target for Release builds. "native" is fastest on the
-#   build machine but the binary may crash elsewhere; use x86-64-v3 for a binary
-#   you hand to someone else (any x86-64 CPU from about 2015 on).
+
 set(COMPONENG_MARCH "native" CACHE STRING "-march value for Release builds")
-# COMPONENG_WERROR: treat warnings in engine code as errors.
 option(COMPONENG_WERROR "Treat engine warnings as errors" ON)
 if(COMPONENG_WERROR)
     set(COMPONENG_WARNING_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual -Werror)
 else()
     set(COMPONENG_WARNING_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual)
 endif()
-option(COMPONENG_NETWORKING "Build the optional networking library (ComponEngNet)" ON)
+option(COMPONENG_NETWORKING "Build the optional networking library (ComponEngNet)" OFF)
 
 file(GLOB ENGINE_THIRD_PARTY_SOURCES
     "src/third_party/glad/*.c"

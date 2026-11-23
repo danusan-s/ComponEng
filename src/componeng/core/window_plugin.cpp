@@ -8,7 +8,7 @@
 #ifdef COMPONENG_VULKAN
 #include "componeng/renderer/backend/vulkan/vk_device.hpp"
 #else
-#include "componeng/renderer/backend/opengl/gl_stub_device.hpp"
+#include "componeng/renderer/backend/opengl/gl_device.hpp"
 #endif
 #include "componeng/resources/render_settings.hpp"
 #include "componeng/resources/render_stats.hpp"
@@ -127,7 +127,7 @@ void WindowPlugin::build(Engine &engine) {
 #ifdef COMPONENG_VULKAN
       std::make_unique<renderer::vulkan::VulkanDevice>();
 #else
-      std::make_unique<renderer::opengl::GLStubDevice>();
+      std::make_unique<renderer::opengl::GLDevice>();
 #endif
   world.setResource<std::unique_ptr<renderer::rhi::IDevice>>(
       std::move(renderDevice));
