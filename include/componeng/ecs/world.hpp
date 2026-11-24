@@ -15,9 +15,11 @@
 
 #include <memory>
 
-namespace componeng::ecs {
-
+namespace componeng::serialization {
 class SceneSerializer;
+}
+
+namespace componeng::ecs {
 
 /**
  * @brief Central ECS world that ties together all subsystems.
@@ -28,7 +30,7 @@ class SceneSerializer;
  * SystemManager, and ThreadPool.
  */
 class World {
-  friend class SceneSerializer;
+  friend class serialization::SceneSerializer;
 
 private:
   ComponentRegistry m_componentRegistry;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/ecs/component_serializer.hpp"
+#include "componeng/serialization/component_serializer.hpp"
 
 namespace componeng::audio {
 
@@ -30,7 +30,7 @@ struct AudioComponent {
 
 } // namespace componeng::audio
 
-namespace componeng::ecs {
+namespace componeng::serialization {
 
 #define AUDIO_COMPONENT_FIELDS(F, ctx)                                         \
   F(audioName, ctx)                                                            \
@@ -46,4 +46,4 @@ SERIALIZABLE_COMPONENT(audio::AudioComponent, AUDIO_COMPONENT_FIELDS)
 
 #undef AUDIO_COMPONENT_FIELDS
 
-} // namespace componeng::ecs
+} // namespace componeng::serialization

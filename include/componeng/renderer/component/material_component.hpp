@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/ecs/component_serializer.hpp"
+#include "componeng/serialization/component_serializer.hpp"
 
 namespace componeng::renderer {
 
@@ -22,7 +22,7 @@ struct ColorComponent {
 
 } // namespace componeng::renderer
 
-namespace componeng::ecs {
+namespace componeng::serialization {
 
 #define MATERIAL_COMPONENT_FIELDS(F, ctx) F(materialName, ctx)
 
@@ -36,4 +36,4 @@ SERIALIZABLE_COMPONENT(renderer::ColorComponent, COLOR_COMPONENT_FIELDS)
 
 #undef COLOR_COMPONENT_FIELDS
 
-} // namespace componeng::ecs
+} // namespace componeng::serialization

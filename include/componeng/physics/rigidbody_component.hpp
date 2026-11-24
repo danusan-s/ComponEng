@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/ecs/component_serializer.hpp"
+#include "componeng/serialization/component_serializer.hpp"
 
 namespace componeng::physics {
 
@@ -22,7 +22,7 @@ struct RigidBodyComponent {
 
 } // namespace componeng::physics
 
-namespace componeng::ecs {
+namespace componeng::serialization {
 
 #define RIGIDBODY_COMPONENT_FIELDS(F, ctx)                                     \
   F(type, ctx)                                                                 \
@@ -34,4 +34,4 @@ SERIALIZABLE_COMPONENT(physics::RigidBodyComponent, RIGIDBODY_COMPONENT_FIELDS)
 
 #undef RIGIDBODY_COMPONENT_FIELDS
 
-} // namespace componeng::ecs
+} // namespace componeng::serialization

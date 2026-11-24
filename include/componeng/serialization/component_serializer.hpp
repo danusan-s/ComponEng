@@ -1,15 +1,33 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
+#include "componeng/ecs/entity.hpp"
 #include "componeng/utils/logger.hpp"
 #include "json.hpp"
 
 #include <array>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 
-namespace componeng::ecs {
+namespace componeng::serialization {
+
+using EntityLocalID = std::uint64_t;
+
+void beginEntityReferenceSave(
+    const std::unordered_map<ecs::EntityID, EntityLocalID> &runtimeToLocal);
+void endEntityReferenceSave();
+EntityLocalID serializeEntityReference(ecs::EntityID entity);
+
+void beginEntityReferenceLoad(
+    const std::unordered_map<EntityLocalID, ecs::EntityID> &localToRuntime);
+void endEntityReferenceLoad();
+ecs::EntityID deserializeEntityReference(const nlohmann::json &json);
+}
+
+namespace componeng::serialization {
 
 template <typename T> struct ComponentSerializer {
   static nlohmann::json serialize(const T &) {
@@ -81,6 +99,8 @@ void serialize_field(nlohmann::json &j, const char *name, const T &obj,
     j[name] = SerializeMat4(val);
   } else if constexpr (std::is_enum_v<MT>) {
     j[name] = static_cast<int>(val);
+  } else if constexpr (std::is_same_v<MT, ecs::EntityID>) {
+    j[name] = serialization::serializeEntityReference(val);
   } else {
     j[name] = ComponentSerializer<MT>::serialize(val);
   }
@@ -122,6 +142,10 @@ void deserialize_field(const nlohmann::json &j, const char *name, T &obj,
     }
   } else if constexpr (std::is_enum_v<MT>) {
     val = static_cast<MT>(j.value(name, static_cast<int>(val)));
+  } else if constexpr (std::is_same_v<MT, ecs::EntityID>) {
+    if (j.contains(name)) {
+      val = serialization::deserializeEntityReference(j[name]);
+    }
   } else {
     if (j.contains(name)) {
       val = ComponentSerializer<MT>::deserialize(j[name]);
@@ -136,12 +160,12 @@ void deserialize_field(const nlohmann::json &j, const char *name, T &obj,
 // Type and default are deduced from pointer-to-member and member initializers.
 
 #define SERIALIZE_FIELD(name, ctx)                                             \
-  ::componeng::ecs::serialize_field(j, #name, ctx,                             \
-                                    &std::decay_t<decltype(ctx)>::name);
+  ::componeng::serialization::serialize_field(                                 \
+      j, #name, ctx, &std::decay_t<decltype(ctx)>::name);
 
 #define DESERIALIZE_FIELD(name, ctx)                                           \
-  ::componeng::ecs::deserialize_field(j, #name, ctx,                           \
-                                      &std::decay_t<decltype(ctx)>::name);
+  ::componeng::serialization::deserialize_field(                               \
+      j, #name, ctx, &std::decay_t<decltype(ctx)>::name);
 
 #define SERIALIZABLE_COMPONENT(Type, Fields)                                   \
   template <> struct ComponentSerializer<Type> {                               \
@@ -155,4 +179,4 @@ void deserialize_field(const nlohmann::json &j, const char *name, T &obj,
     }                                                                          \
   };
 
-} // namespace componeng::ecs
+} // namespace componeng::serialization

@@ -3,7 +3,7 @@
 #include "componeng/ecs/archetype/archetype.hpp"
 #include "componeng/ecs/component_registry.hpp"
 #include "componeng/ecs/entity.hpp"
-#include "componeng/ecs/scene_serializer.hpp"
+#include "componeng/serialization/scene_serializer.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/renderer/component/material_component.hpp"
 #include "componeng/renderer/component/mesh_component.hpp"
@@ -11,12 +11,29 @@
 
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <memory>
 
 using namespace componeng::audio;
 using namespace componeng::core;
 using namespace componeng::ecs;
 using namespace componeng::renderer;
+using namespace componeng::serialization;
+using componeng::serialization::ComponentSerializer;
+using componeng::serialization::SceneSerializer;
+
+namespace componeng::serialization {
+
+struct ReferenceComponent {
+  static constexpr const char *component_name = "ReferenceComponent";
+  ecs::EntityID target = ecs::INVALID_ENTITY;
+};
+
+#define REFERENCE_COMPONENT_FIELDS(F, ctx) F(target, ctx)
+SERIALIZABLE_COMPONENT(ReferenceComponent, REFERENCE_COMPONENT_FIELDS)
+#undef REFERENCE_COMPONENT_FIELDS
+
+} // namespace componeng::serialization
 
 template <typename T> ComponentID reg(ComponentRegistry &r) {
   return r.registerComponent<T>();
@@ -229,8 +246,51 @@ TEST(SerializationTest, SceneRoundTripPreservesTransformAndColor) {
 
   std::remove(path.c_str());
 }
-
 TEST(SerializationTest, LoadReportsFailureForMissingFile) {
   auto world = makeSceneWorld();
   EXPECT_FALSE(SceneSerializer::load(*world, "no_such_scene_file.json"));
+}
+
+TEST(SerializationTest, SceneUsesLocalEntityIDsForReferences) {
+  const std::string path = "test_scene_entity_references.json";
+  {
+    World world;
+    world.registerComponents<ReferenceComponent>();
+    EntityID target = world.createEntity();
+    EntityID source = world.createEntity();
+    world.addComponent(target, ReferenceComponent{});
+    world.addComponent(source, ReferenceComponent{.target = target});
+
+    ASSERT_TRUE(SceneSerializer::save(world, path));
+  }
+
+  std::ifstream saved(path);
+  nlohmann::json json;
+  saved >> json;
+  ASSERT_EQ(json["entities"].size(), 2);
+  ASSERT_TRUE(json["entities"][0].contains("_entityId"));
+  ASSERT_TRUE(json["entities"][1].contains("_entityId"));
+
+  World world;
+  world.registerComponents<ReferenceComponent>();
+  ASSERT_TRUE(SceneSerializer::load(world, path));
+
+  EntityID foundSource = INVALID_ENTITY;
+  EntityID foundTarget = INVALID_ENTITY;
+  world.query()
+      .read<ReferenceComponent>()
+      .eachWithEntity([&](EntityID entity, const ReferenceComponent &reference) {
+        if (reference.target == INVALID_ENTITY) {
+          foundTarget = entity;
+        } else {
+          foundSource = entity;
+          EXPECT_NE(reference.target, entity);
+        }
+      });
+  EXPECT_NE(foundSource, INVALID_ENTITY);
+  EXPECT_NE(foundTarget, INVALID_ENTITY);
+  EXPECT_EQ(world.readComponent<ReferenceComponent>(foundSource).target,
+            foundTarget);
+
+  std::remove(path.c_str());
 }

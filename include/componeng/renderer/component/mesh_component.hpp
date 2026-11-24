@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/ecs/component_serializer.hpp"
+#include "componeng/serialization/component_serializer.hpp"
 
 namespace componeng::renderer {
 
@@ -30,7 +30,7 @@ struct MeshComponent {
 
 } // namespace componeng::renderer
 
-namespace componeng::ecs {
+namespace componeng::serialization {
 
 #define MESH_COMPONENT_FIELDS(F, ctx) F(meshName, ctx)
 
@@ -38,4 +38,4 @@ SERIALIZABLE_COMPONENT(renderer::MeshComponent, MESH_COMPONENT_FIELDS)
 
 #undef MESH_COMPONENT_FIELDS
 
-} // namespace componeng::ecs
+} // namespace componeng::serialization

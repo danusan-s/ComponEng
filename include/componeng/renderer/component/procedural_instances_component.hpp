@@ -1,6 +1,6 @@
 #pragma once
 
-#include "componeng/ecs/component_serializer.hpp"
+#include "componeng/serialization/component_serializer.hpp"
 
 namespace componeng::renderer {
 
@@ -39,7 +39,7 @@ struct ProceduralInstancesComponent {
 
 } // namespace componeng::renderer
 
-namespace componeng::ecs {
+namespace componeng::serialization {
 
 #define PROCEDURAL_INSTANCES_COMPONENT_FIELDS(F, ctx)                          \
   F(count, ctx)                                                                \
@@ -50,4 +50,4 @@ SERIALIZABLE_COMPONENT(renderer::ProceduralInstancesComponent,
 
 #undef PROCEDURAL_INSTANCES_COMPONENT_FIELDS
 
-} // namespace componeng::ecs
+} // namespace componeng::serialization

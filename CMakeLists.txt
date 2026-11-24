@@ -38,6 +38,7 @@ file(GLOB ENGINE_FIRST_PARTY_SOURCES
     "src/componeng/camera/*.cpp"
     "src/componeng/physics/*.cpp"
     "src/componeng/ecs/*.cpp"
+    "src/componeng/serialization/*.cpp"
     "src/componeng/utils/*.cpp"
 )
 

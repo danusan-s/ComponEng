@@ -1,7 +1,7 @@
 #pragma once
 
 #include "componeng/core/types.hpp"
-#include "componeng/ecs/component_serializer.hpp"
+#include "componeng/serialization/component_serializer.hpp"
 
 #include <cmath>
 
@@ -75,7 +75,7 @@ private:
 
 } // namespace componeng::core
 
-namespace componeng::ecs {
+namespace componeng::serialization {
 
 #define TRANSFORM_COMPONENT_FIELDS(F, ctx)                                     \
   F(position, ctx)                                                             \
@@ -86,4 +86,4 @@ SERIALIZABLE_COMPONENT(core::TransformComponent, TRANSFORM_COMPONENT_FIELDS)
 
 #undef TRANSFORM_COMPONENT_FIELDS
 
-} // namespace componeng::ecs
+} // namespace componeng::serialization

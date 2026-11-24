@@ -4,7 +4,7 @@
 #include "componeng/core/default_plugins.hpp"
 #include "componeng/core/engine.hpp"
 #include "componeng/core/transform_component.hpp"
-#include "componeng/ecs/scene_serializer.hpp"
+#include "componeng/serialization/scene_serializer.hpp"
 #include "componeng/ecs/world.hpp"
 #include "componeng/physics/collider_component.hpp"
 #include "componeng/physics/rigidbody_component.hpp"
@@ -50,7 +50,7 @@ public:
         Utils::getAssetPath("assets/audio/boop.wav").c_str(), "boop");
 
     if (loadFromFile) {
-      SceneSerializer::load(
+      componeng::serialization::SceneSerializer::load(
           world, Utils::getAssetPath("assets/scenes/test_scene.json"));
       return;
     }
@@ -218,7 +218,7 @@ public:
 
   void cleanup(World &world) override {
     if (saveToFile) {
-      SceneSerializer::save(
+      componeng::serialization::SceneSerializer::save(
           world, Utils::getAssetPath("assets/scenes/test_scene.json"));
     }
   }
