@@ -47,7 +47,7 @@ void RenderPlugin::build(core::Engine &engine) {
 
 void RenderPlugin::ready(ecs::World &world) {
   world.setResource<renderer::AssetManager>(
-      renderer::AssetManager(world.getRenderDevice()));
+      renderer::AssetManager(world.getRenderDevice(), world.threadPool()));
   auto &assetManager = world.getResource<renderer::AssetManager>();
 
   LOG_INFO("Loading built-in assets...");
@@ -60,27 +60,6 @@ void RenderPlugin::ready(ecs::World &world) {
   assetManager.loadTexture(
       utils::Utils::getAssetPath("assets/textures/white.png").c_str(), false,
       "white");
-
-  assetManager.registerMaterial<renderer::DiffuseMaterial>("default_diffuse",
-                                                           "default", "white");
-
-  // Same shader as default_diffuse, but blended and without depth writes so
-  // things behind it show through. The entity's ColorComponent alpha sets the
-  // opacity. Back faces are culled: a closed shape shows exactly one face to
-  // the camera, so each pixel is blended once instead of twice. A single
-  // two-sided plane would need CullMode::None instead.
-  assetManager.registerMaterial<renderer::DiffuseMaterial>(
-      "transparent_diffuse", "default", "white");
-  {
-    rhi::RenderState state;
-    state.cull = rhi::CullMode::Back;
-    state.depthWrite = false;
-    state.blend = rhi::BlendMode::Alpha;
-    auto &transparent = assetManager.getMaterial(
-        assetManager.getMaterialID("transparent_diffuse"));
-    transparent.setType(renderer::MaterialType::Transparent);
-    transparent.setRenderState(state);
-  }
 
   assetManager.loadShader(
       utils::Utils::getAssetPath("assets/shaders/pbr.vert").c_str(),
@@ -104,6 +83,21 @@ void RenderPlugin::ready(ecs::World &world) {
   assetManager.loadMesh(
       utils::Utils::getAssetPath("assets/models/sphere_smooth.obj").c_str(),
       "sphere");
+
+  assetManager.registerMaterial<renderer::DiffuseMaterial>("default_diffuse",
+                                                           "default", "white");
+  assetManager.registerMaterial<renderer::DiffuseMaterial>(
+      "transparent_diffuse", "default", "white");
+  {
+    rhi::RenderState state;
+    state.cull = rhi::CullMode::Back;
+    state.depthWrite = false;
+    state.blend = rhi::BlendMode::Alpha;
+    auto &transparent = assetManager.getMaterial(
+        assetManager.getMaterialID("transparent_diffuse"));
+    transparent.setType(renderer::MaterialType::Transparent);
+    transparent.setRenderState(state);
+  }
 
   LOG_INFO("Finished loading built-in assets");
 }

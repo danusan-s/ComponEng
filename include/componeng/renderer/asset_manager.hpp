@@ -6,8 +6,11 @@
 #include "componeng/renderer/asset/pbr.hpp"
 #include "componeng/renderer/asset/shader.hpp"
 #include "componeng/renderer/asset/texture.hpp"
+#include "componeng/ecs/thread_pool.hpp"
 
+#include <future>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -24,8 +27,9 @@ class AssetManager {
 public:
   /** Assets create their GPU resources through `device`, which must outlive
    *  the manager. */
-  explicit AssetManager(rhi::IDevice &device) : m_device(&device) {
-  }
+  explicit AssetManager(rhi::IDevice &device) : m_device(&device) {}
+  AssetManager(rhi::IDevice &device, ecs::ThreadPool &pool)
+      : m_device(&device), m_threadPool(&pool) {}
   ~AssetManager() = default;
 
   // Non-copyable, Movable
@@ -52,8 +56,11 @@ public:
 
   /** Calls `fn(name, shader)` for every loaded shader, in no fixed order. */
   template <typename Fn> void forEachShader(Fn &&fn) const {
-    for (const auto &[name, id] : m_shaders)
-      fn(name, *m_shaderResources[id - 1]);
+    const_cast<AssetManager *>(this)->ensureLoaded();
+    for (const auto &[name, id] : m_shaders) {
+      if (id > 0 && id <= m_shaderResources.size())
+        fn(name, *m_shaderResources[id - 1]);
+    }
   }
 
   /** Loads an image file as a texture. `alpha` keeps the file's alpha channel
@@ -101,6 +108,7 @@ public:
                         const char *textureName) {
     core::HandleID shaderID = getShaderID(shaderName);
     core::HandleID textureID = getTextureID(textureName);
+    (void)getTexture(textureID);
     auto material = std::make_unique<T>(shaderID, textureID);
 
     const Shader &shader = getShader(shaderID);
@@ -122,22 +130,31 @@ public:
                            const char *aoName = nullptr) {
     core::HandleID shaderID = getShaderID(shaderName);
     core::HandleID albedoID = getTextureID(albedoName);
+    (void)getTexture(albedoID);
     auto material = std::make_unique<T>(shaderID, albedoID);
 
     const Shader &shader = getShader(shaderID);
     material->bindShader(shader, *m_device);
 
-    if (normalName && textureExists(normalName))
+    if (normalName && textureExists(normalName)) {
+      (void)getTexture(getTextureID(normalName));
       static_cast<T *>(material.get())
           ->setNormalMapID(getTextureID(normalName));
-    if (metallicName && textureExists(metallicName))
+    }
+    if (metallicName && textureExists(metallicName)) {
+      (void)getTexture(getTextureID(metallicName));
       static_cast<T *>(material.get())
           ->setMetallicMapID(getTextureID(metallicName));
-    if (roughnessName && textureExists(roughnessName))
+    }
+    if (roughnessName && textureExists(roughnessName)) {
+      (void)getTexture(getTextureID(roughnessName));
       static_cast<T *>(material.get())
           ->setRoughnessMapID(getTextureID(roughnessName));
-    if (aoName && textureExists(aoName))
+    }
+    if (aoName && textureExists(aoName)) {
+      (void)getTexture(getTextureID(aoName));
       static_cast<T *>(material.get())->setAOMapID(getTextureID(aoName));
+    }
 
     m_materialResources.push_back(std::move(material));
     core::HandleID id = m_materialResources.size();
@@ -152,10 +169,18 @@ public:
   const Mesh &getMesh(core::HandleID id) const;
   core::HandleID getMeshID(core::Name name) const;
 
+  void setThreadPool(ecs::ThreadPool &pool) { m_threadPool = &pool; }
+
+  /** Waits for every queued asset and finalizes GPU resources. */
+  void loadAll(ecs::ThreadPool &pool);
+  /** Waits for every queued asset using the configured pool. */
+  void loadAll();
+
   void clear();
 
 private:
   rhi::IDevice *m_device;
+  ecs::ThreadPool *m_threadPool = nullptr;
 
   std::unordered_map<core::Name, core::HandleID> m_shaders;
   std::unordered_map<core::Name, core::HandleID> m_textures;
@@ -163,18 +188,40 @@ private:
   std::unordered_map<core::Name, core::HandleID> m_meshes;
   std::unordered_map<core::Name, core::HandleID> m_buffers;
 
+  struct PendingShader {
+    core::Name name;
+    std::string vertexSource;
+    std::string fragmentSource;
+    std::string vertexFile;
+    std::string fragmentFile;
+    std::string nameFromFile;
+    bool fromFile = false;
+  };
+  struct PendingTexture {
+    core::Name name;
+    std::string file;
+    bool alpha = false;
+    api::TextureDesc desc;
+    int width = 0;
+    int height = 0;
+    std::vector<unsigned char> pixels;
+  };
+  struct PendingMesh {
+    core::Name name;
+    std::string file;
+    std::unique_ptr<Mesh> mesh;
+  };
+
   std::vector<std::unique_ptr<Shader>> m_shaderResources;
   std::vector<std::unique_ptr<Texture2D>> m_textureResources;
   std::vector<std::unique_ptr<IMaterial>> m_materialResources;
   std::vector<std::unique_ptr<Mesh>> m_meshResources;
   std::vector<std::unique_ptr<rhi::IBuffer>> m_bufferResources;
+  std::vector<PendingShader> m_pendingShaders;
+  std::vector<PendingTexture> m_pendingTextures;
+  std::vector<PendingMesh> m_pendingMeshes;
+  void ensureLoaded() const;
 
-  std::unique_ptr<Shader> loadShaderFromFile(const char *vShaderFile,
-                                             const char *fShaderFile,
-                                             const char *gShaderFile = nullptr);
-  std::unique_ptr<Texture2D> loadTextureFromFile(const char *file, bool alpha,
-                                                 const api::TextureDesc &desc);
-  std::unique_ptr<Mesh> loadMeshFromFile(const char *file);
 };
 
 } // namespace componeng::renderer

@@ -188,7 +188,8 @@ makeScene(const std::function<void(SceneOptions &)> &configure = {},
   scene->device = device.get();
   std::unique_ptr<rhi::IDevice> base = std::move(device);
   world.setResource<std::unique_ptr<rhi::IDevice>>(std::move(base));
-  world.setResource<AssetManager>(AssetManager(world.getRenderDevice()));
+  world.setResource<AssetManager>(
+      AssetManager(world.getRenderDevice(), world.threadPool()));
   world.setResource<resources::Fog>(resources::Fog{});
   // Off by default so a test sees each batch drawn once; the depth pre-pass
   // tests turn it on.
@@ -216,6 +217,7 @@ makeScene(const std::function<void(SceneOptions &)> &configure = {},
     auto mesh = std::make_unique<Mesh>();
     mesh->generateFromWavefrontObj(obj);
     assets.addMesh(name, std::move(mesh));
+    (void)assets.getMesh(assets.getMeshID(name));
   }
 
   assets.registerMaterial<DiffuseMaterial>("matA", "a", "t1");

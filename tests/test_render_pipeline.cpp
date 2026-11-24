@@ -831,6 +831,7 @@ TEST(TextureOptions, LoadTextureForwardsTheDescriptionToTheDevice) {
   const std::string white =
       utils::Utils::getAssetPath("assets/textures/white.png");
   s->assets().loadTexture(white.c_str(), false, "tiled", desc);
+  (void)s->assets().getTexture(s->assets().getTextureID("tiled"));
 
   const rhi::SamplerDesc &got = s->rec().createdSamplers.back();
   EXPECT_EQ(got.wrapU, rhi::WrapMode::Repeat);
@@ -849,6 +850,8 @@ TEST(TextureOptions, ThreeChannelDataIsExpandedToOpaqueRgba) {
       utils::Utils::getAssetPath("assets/textures/white.png");
   s->assets().loadTexture(white.c_str(), true, "with_alpha");
   s->assets().loadTexture(white.c_str(), false, "without_alpha");
+  (void)s->assets().getTexture(s->assets().getTextureID("with_alpha"));
+  (void)s->assets().getTexture(s->assets().getTextureID("without_alpha"));
 
   // Both reach the device as RGBA8; the one loaded without alpha has it set
   // opaque on the CPU.
@@ -867,6 +870,7 @@ TEST(TextureOptions, MissingFileBecomesAOneByOneFallbackInsteadOfGarbage) {
   auto s = makeScene();
   const size_t before = s->rec().createdImages.size();
   s->assets().loadTexture("definitely/not/a/file.png", false, "missing");
+  (void)s->assets().getTexture(s->assets().getTextureID("missing"));
 
   ASSERT_EQ(s->rec().createdImages.size(), before + 1);
   EXPECT_EQ(s->rec().createdImages.back().desc.extent, (rhi::Extent2D{1, 1}));
