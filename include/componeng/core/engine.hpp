@@ -119,6 +119,7 @@ private:
   // stack.
   std::unique_ptr<ecs::World> m_world;
   std::vector<std::unique_ptr<IPlugin>> m_plugins;
+  std::vector<std::string> m_pluginNames;
   std::unordered_map<std::type_index, PluginState> m_pluginStates;
   Runner m_runner;
   bool m_initialized = false;

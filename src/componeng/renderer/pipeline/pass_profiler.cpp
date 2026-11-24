@@ -6,16 +6,6 @@
 
 namespace componeng::renderer {
 
-namespace {
-
-double msSince(std::chrono::steady_clock::time_point t) {
-  return std::chrono::duration<double, std::milli>(
-             std::chrono::steady_clock::now() - t)
-      .count();
-}
-
-} // namespace
-
 PassProfiler::PassProfiler(rhi::IDevice &device, resources::RenderStats &stats)
     : m_device(device), m_stats(stats) {
 }
@@ -29,7 +19,7 @@ void PassProfiler::beginPass(api::PassId pass) {
 
 void PassProfiler::endPass(api::PassId pass) {
   if constexpr (core::Profiling::kEnabled) {
-    m_stats.of(pass).cpuMs = msSince(m_passStart);
+    m_stats.of(pass).cpuMs = core::millisecondsSince(m_passStart);
     m_device.endGpuPass(pass);
   }
 }
@@ -56,7 +46,7 @@ void PassProfiler::beginUpload() {
 
 void PassProfiler::endUpload() {
   if constexpr (core::Profiling::kEnabled) {
-    m_stats.uploadCpuMs = msSince(m_uploadStart);
+    m_stats.uploadCpuMs = core::millisecondsSince(m_uploadStart);
   }
 }
 

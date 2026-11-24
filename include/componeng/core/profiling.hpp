@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 namespace componeng::core {
 
 /**
@@ -24,5 +26,16 @@ struct Profiling {
   static constexpr bool kEnabled = true;
 #endif
 };
+
+using ProfilingClock = std::chrono::steady_clock;
+
+inline ProfilingClock::time_point profilingNow() noexcept {
+  return ProfilingClock::now();
+}
+
+inline double millisecondsSince(ProfilingClock::time_point start) noexcept {
+  return std::chrono::duration<double, std::milli>(ProfilingClock::now() - start)
+      .count();
+}
 
 } // namespace componeng::core

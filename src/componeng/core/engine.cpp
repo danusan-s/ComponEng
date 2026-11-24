@@ -1,5 +1,6 @@
 #include "componeng/core/engine.hpp"
 
+#include "componeng/core/profiling.hpp"
 #include "componeng/utils/logger.hpp"
 
 #include <chrono>
@@ -35,17 +36,34 @@ void Engine::addPlugin(const std::type_index &type,
   LOG_INFO("Building plugin: %s", name.c_str());
   m_pluginStates[type] = PluginState::Building;
   // Anything it requires is built, and listed, before it is.
-  plugin->build(*this);
+  if constexpr (Profiling::kEnabled) {
+    const auto start = profilingNow();
+    plugin->build(*this);
+    LOG_INFO("Plugin build: %s (%.3f ms)", name.c_str(),
+             millisecondsSince(start));
+  } else {
+    plugin->build(*this);
+  }
   m_pluginStates[type] = PluginState::Built;
   m_plugins.push_back(std::move(plugin));
+  m_pluginNames.push_back(name);
 }
 
 void Engine::initialize() {
   if (m_initialized) {
     return;
   }
-  for (auto &plugin : m_plugins) {
-    plugin->ready(*m_world);
+  if constexpr (Profiling::kEnabled) {
+    for (std::size_t i = 0; i < m_plugins.size(); ++i) {
+      const auto start = profilingNow();
+      m_plugins[i]->ready(*m_world);
+      LOG_INFO("Plugin initialize: %s (%.3f ms)", m_pluginNames[i].c_str(),
+               millisecondsSince(start));
+    }
+  } else {
+    for (auto &plugin : m_plugins) {
+      plugin->ready(*m_world);
+    }
   }
   m_world->createSystems();
   m_initialized = true;
@@ -65,8 +83,17 @@ void Engine::shutdown() {
   }
   m_initialized = false;
   m_world->destroySystems();
-  for (auto it = m_plugins.rbegin(); it != m_plugins.rend(); ++it) {
-    (*it)->cleanup(*m_world);
+  if constexpr (Profiling::kEnabled) {
+    for (std::size_t i = m_plugins.size(); i > 0; --i) {
+      const auto start = profilingNow();
+      m_plugins[i - 1]->cleanup(*m_world);
+      LOG_INFO("Plugin shutdown: %s (%.3f ms)", m_pluginNames[i - 1].c_str(),
+               millisecondsSince(start));
+    }
+  } else {
+    for (auto it = m_plugins.rbegin(); it != m_plugins.rend(); ++it) {
+      (*it)->cleanup(*m_world);
+    }
   }
 }
 
