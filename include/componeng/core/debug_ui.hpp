@@ -103,8 +103,7 @@ template <bool Active> struct PanelApi {
  *
  * Two flags decide what a build shows:
  *  - COMPONENG_DEBUG_UI (default ON): the debug panels, i.e. everything a game
- *    or system adds through DebugUI. OFF turns those calls into empty inlines
- *    and leaves only the small FPS window.
+ *    or system adds through DebugUI. OFF turns those calls into empty inlines.
  *  - COMPONENG_PROFILING (default OFF, see Profiling): the timing panes, drawn
  *    through ProfilerUI.
  * ImGui itself is always built, for the FPS window.
@@ -128,8 +127,7 @@ public:
   static void beginFrame(ecs::World &world);
   static void endFrame(ecs::World &world);
 
-  /** Shows the frame rate: two lines in "Debug Info" when the debug panels are
-   *  on, otherwise a small window of its own in the top-left corner. */
+  /** Shows the frame rate in its own small window. */
   static void showFps(float fps, float avgFps);
 };
 

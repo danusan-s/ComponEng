@@ -81,22 +81,18 @@ void DebugUI::endFrame(ecs::World &world) {
 void DebugUI::showFps(float fps, float avgFps) {
   if (!s_frameActive)
     return;
-  if constexpr (kEnabled) {
-    detail::addValue("FPS", fps);
-    detail::addValue("Avg FPS", avgFps);
-  } else {
-    ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.6f);
-    ImGui::Begin("FPS", nullptr,
-                 ImGuiWindowFlags_AlwaysAutoResize |
-                     ImGuiWindowFlags_NoDecoration |
-                     ImGuiWindowFlags_NoSavedSettings |
-                     ImGuiWindowFlags_NoFocusOnAppearing |
-                     ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs);
-    ImGui::Text("FPS: %.1f", fps);
-    ImGui::Text("Avg FPS: %.1f", avgFps);
-    ImGui::End();
-  }
+  ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f, 10.0f),
+                          ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+  ImGui::SetNextWindowBgAlpha(0.6f);
+  ImGui::Begin("FPS", nullptr,
+               ImGuiWindowFlags_AlwaysAutoResize |
+                   ImGuiWindowFlags_NoDecoration |
+                   ImGuiWindowFlags_NoSavedSettings |
+                   ImGuiWindowFlags_NoFocusOnAppearing |
+                   ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs);
+  ImGui::Text("FPS: %.1f", fps);
+  ImGui::Text("Avg FPS: %.1f", avgFps);
+  ImGui::End();
 }
 
 namespace detail {

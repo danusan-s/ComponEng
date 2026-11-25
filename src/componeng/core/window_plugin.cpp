@@ -23,14 +23,13 @@
 namespace componeng::core {
 namespace {
 
-// The "Settings" tab: switches for the renderer's runtime settings. They are
-// plain fields the renderer reads every frame, so a click takes effect on the
-// next one.
+// The "Render Options" tab contains renderer settings. They are plain fields
+// read every frame, so a click takes effect on the next one.
 void showSettingsTab(ecs::World &world) {
   if (!world.hasResource<resources::RenderSettings>()) {
     return;
   }
-  if (DebugUI::beginTab("Settings")) {
+  if (DebugUI::beginTab("Render Options")) {
     auto &settings = world.getResource<resources::RenderSettings>();
     bool fxaa = settings.antiAliasing == resources::AntiAliasing::Fxaa;
     if (DebugUI::addCheckbox("FXAA", &fxaa)) {
