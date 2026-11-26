@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace componeng::renderer::shader {
@@ -21,11 +22,11 @@ enum class ShaderFlag : uint32_t {
 };
 
 constexpr ShaderFlag operator|(ShaderFlag a, ShaderFlag b) {
-  return static_cast<ShaderFlag>(static_cast<uint32_t>(a) |
-                                 static_cast<uint32_t>(b));
+  return static_cast<ShaderFlag>(std::to_underlying(a) |
+                                 std::to_underlying(b));
 }
 constexpr bool hasFlag(ShaderFlag value, ShaderFlag flag) {
-  return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) != 0;
+  return (std::to_underlying(value) & std::to_underlying(flag)) != 0;
 }
 
 struct CompiledStage {

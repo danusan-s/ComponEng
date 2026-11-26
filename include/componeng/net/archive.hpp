@@ -27,21 +27,11 @@ namespace componeng::net {
 
 namespace detail {
 
-template <typename T, typename Ar, typename = void>
-struct HasMemberSerialize : std::false_type {};
 template <typename T, typename Ar>
-struct HasMemberSerialize<
-    T, Ar,
-    std::void_t<decltype(std::declval<T &>().serialize(std::declval<Ar &>()))>>
-    : std::true_type {};
+concept HasMemberSerialize = requires(T &value, Ar &ar) { value.serialize(ar); };
 
-template <typename T, typename Ar, typename = void>
-struct HasFreeSerialize : std::false_type {};
 template <typename T, typename Ar>
-struct HasFreeSerialize<
-    T, Ar,
-    std::void_t<decltype(serialize(std::declval<Ar &>(), std::declval<T &>()))>>
-    : std::true_type {};
+concept HasFreeSerialize = requires(T &value, Ar &ar) { serialize(ar, value); };
 
 template <typename T> struct IsVector : std::false_type {};
 template <typename T, typename A>
@@ -79,7 +69,7 @@ template <typename Ar, typename T> void archiveValue(Ar &ar, T &value) {
       value = static_cast<T>(raw);
     }
   } else if constexpr (std::is_enum_v<T>) {
-    auto underlying = static_cast<std::underlying_type_t<T>>(value);
+    auto underlying = std::to_underlying(value);
     archiveValue(ar, underlying);
     if constexpr (reading) {
       value = static_cast<T>(underlying);
@@ -138,12 +128,12 @@ template <typename Ar, typename T> void archiveValue(Ar &ar, T &value) {
     for (auto &element : value) {
       archiveValue(ar, element);
     }
-  } else if constexpr (HasMemberSerialize<T, Ar>::value) {
+  } else if constexpr (HasMemberSerialize<T, Ar>) {
     value.serialize(ar);
-  } else if constexpr (HasFreeSerialize<T, Ar>::value) {
+  } else if constexpr (HasFreeSerialize<T, Ar>) {
     serialize(ar, value);
   } else {
-    static_assert(HasMemberSerialize<T, Ar>::value,
+    static_assert(HasMemberSerialize<T, Ar> || HasFreeSerialize<T, Ar>,
                   "type has no serialize(Ar &) member or free serialize(Ar &, "
                   "T &) function");
   }

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <utility>
 
 namespace componeng::renderer::rhi {
 
@@ -78,12 +79,10 @@ enum class StageFlags : uint8_t {
 
 #define COMPONENG_RHI_FLAG_OPS(E)                                              \
   constexpr E operator|(E a, E b) {                                            \
-    using U = std::underlying_type_t<E>;                                       \
-    return static_cast<E>(static_cast<U>(a) | static_cast<U>(b));              \
+    return static_cast<E>(std::to_underlying(a) | std::to_underlying(b));      \
   }                                                                            \
   constexpr E operator&(E a, E b) {                                            \
-    using U = std::underlying_type_t<E>;                                       \
-    return static_cast<E>(static_cast<U>(a) & static_cast<U>(b));              \
+    return static_cast<E>(std::to_underlying(a) & std::to_underlying(b));      \
   }                                                                            \
   inline E &operator|=(E &a, E b) {                                            \
     return a = a | b;                                                          \
