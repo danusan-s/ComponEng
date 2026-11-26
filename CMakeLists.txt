@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 project(ComponEng)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 
 # compile_commands.json, needed by clang-tidy and clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -99,7 +99,6 @@ target_include_directories(ComponEng
 target_compile_options(ComponEng PUBLIC
     $<$<CONFIG:Debug>:-g>
     $<$<CONFIG:Debug>:-fsanitize=address>
-    $<$<CONFIG:Release>:-ffast-math>
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Release>:-march=${COMPONENG_MARCH}>
 )

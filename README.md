@@ -36,17 +36,18 @@ A personal learning project built because existing engine documentation was over
 
 ## Tech Stack
 
-- **C++17** – modern language features
+- **C++23** – modern language features
 - **OpenGL 4.6** – rendering backend
 - **Vulkan 1.3** – rendering backend
 - **GLFW** – window and input management
 - **GLAD** – OpenGL function loading
-- **GLM** – mathematics
 - **Dear ImGui** – debug UI
 - **stb_image** – texture loading
 - **miniaudio** – audio playback
 - **nlohmann/json** – json lib used in scene serialization
 - **CMake 3.10+** – build system
+- **GLM** – only used in test now
+- **fastgltf** – glTF model loading (future for animations)
 
 ## Dependencies
 
@@ -89,12 +90,12 @@ Deeper architecture notes are in [docs/DESIGN.md](docs/DESIGN.md), and usage doc
 
 ## Future Plans
 
-- [ ] Replace GLM with custom math library
+- [x] Replace GLM with custom math library
 - [x] Vulkan renderer backend (alongside OpenGL)
 - [ ] Spatial partitioning (BVH, octree) for physics broad phase
 - [x] Serialization system for saving/loading scenes
 - [ ] Animation system with skeletal animation
 - [ ] Scripting language integration (Lua or custom DSL)
 - [x] Multi-threaded system execution (thread pool + parallel queries)
-- [ ] Material system with PBR shading
+- [x] Material system with PBR shading
 - [ ] Scene editor
